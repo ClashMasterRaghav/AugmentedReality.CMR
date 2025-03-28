@@ -1,24 +1,6 @@
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-import { ARButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/ARButton.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-import { DeviceOrientationControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/DeviceOrientationControls.js';
-import { XRControllerModelFactory } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/XRControllerModelFactory.js';
-import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js';
-import { TrackballControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/TrackballControls.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/GLTFLoader.js';
-import { OBJLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/OBJLoader.js';
-import { FBXLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/FBXLoader.js';
-import { EffectComposer } from 'https://unpkg.com/three@0.158.0/examples/jsm/postprocessing/EffectComposer.js';
-import { CSS3DRenderer } from 'https://unpkg.com/three@0.158.0/examples/jsm/renderers/CSS3DRenderer.js';
-
-// Debug logger
-function debug(message) {
-    console.log(message);
-    const debugElement = document.getElementById('info');
-    if (debugElement) {
-        debugElement.textContent = message;
-    }
-}
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+export * from 'https://unpkg.com/three@0.158.0/build/three.module.js';
 
 let camera, scene, renderer;
 let controller;
@@ -51,69 +33,44 @@ const windowContents = [
     }
 ];
 
-debug("Starting initialization...");
-
-try {
-    init();
-    animate();
-} catch (error) {
-    debug("Error during initialization: " + error.message);
-    console.error(error);
-}
+init();
+animate();
 
 function init() {
-    debug("Creating scene and camera...");
     const container = document.createElement('div');
     document.body.appendChild(container);
 
     scene = new THREE.Scene();
+
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-    debug("Adding lights...");
+    // Add lighting
     const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
     light.position.set(0.5, 1, 0.25);
     scene.add(light);
 
+    // Add directional light for better visibility
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    debug("Setting up renderer...");
+    // Setup renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
+    renderer.setAnimationLoop(animate);
     container.appendChild(renderer.domElement);
 
-    debug("Creating AR button...");
-    try {
-        if (navigator.xr) {
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                if (supported) {
-                    debug("AR is supported! Creating AR button...");
-                    
-                    const arButton = ARButton.createButton(renderer, {
-                        requiredFeatures: ['hit-test'],
-                        optionalFeatures: ['dom-overlay'],
-                        domOverlay: { root: document.body }
-                    });
-                    document.body.appendChild(arButton);
-                    
-                    debug("AR button created. Click it to start AR session.");
-                } else {
-                    debug("AR is NOT supported on this device or browser!");
-                }
-            }).catch(err => {
-                debug("Error checking AR support: " + err.message);
-            });
-        } else {
-            debug("WebXR not available in this browser");
-        }
-    } catch (error) {
-        debug("Error setting up AR: " + error.message);
-    }
+    // Add AR button
+    const arButton = ARButton.createButton(renderer, {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+    });
+    document.body.appendChild(arButton);
 
-    debug("Creating reticle...");
+    // Create reticle for placement
     reticle = new THREE.Mesh(
         new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0xffffff })
@@ -122,51 +79,19 @@ function init() {
     reticle.visible = false;
     scene.add(reticle);
 
-    debug("Setting up controller...");
+    // Controller setup
     controller = renderer.xr.getController(0);
     controller.addEventListener('select', onSelect);
     scene.add(controller);
 
-    debug("Setting up Add Window button...");
+    // Add window button
     document.getElementById('addWindowButton').addEventListener('click', function() {
-        debug("Add Window button clicked");
-        // Add test window even if reticle isn't visible (for debugging)
-        createTestWindow();
+        if (reticle.visible) {
+            createWindow();
+        }
     });
 
-    debug("Adding resize listener...");
     window.addEventListener('resize', onWindowResize);
-    
-    // Add a test cube to verify rendering is working
-    debug("Adding test cube...");
-    const cube = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 0.2),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    cube.position.set(0, 0, -1);
-    scene.add(cube);
-    
-    debug("Initialization complete!");
-}
-
-function createTestWindow() {
-    // This function creates a window in front of the camera
-    // even if AR isn't working, for testing purposes
-    windowCount++;
-    const contentType = windowContents[windowCount % windowContents.length];
-    
-    debug("Creating test window " + windowCount);
-    
-    const windowTexture = createCanvasTexture(contentType);
-    const windowMaterial = new THREE.MeshBasicMaterial({ map: windowTexture, side: THREE.DoubleSide });
-    const windowGeometry = new THREE.PlaneGeometry(0.8, 0.6);
-    const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
-    
-    // Place window in front of camera
-    windowMesh.position.set(0, 0, -1);
-    
-    scene.add(windowMesh);
-    debug("Test window created at position: " + JSON.stringify(windowMesh.position));
 }
 
 function createCanvasTexture(content) {
@@ -174,7 +99,7 @@ function createCanvasTexture(content) {
     canvas.width = 512;
     canvas.height = 384;
     const context = canvas.getContext('2d');
-    
+
     // Window background
     context.fillStyle = content.color;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -223,8 +148,6 @@ function createWindow() {
     windowCount++;
     const contentType = windowContents[windowCount % windowContents.length];
     
-    debug("Creating window " + windowCount);
-    
     // Create window
     const windowTexture = createCanvasTexture(contentType);
     const windowMaterial = new THREE.MeshBasicMaterial({ map: windowTexture, side: THREE.DoubleSide });
@@ -246,15 +169,22 @@ function createWindow() {
     windowMesh.lookAt(lookAtPoint);
     
     scene.add(windowMesh);
-    debug("Window created at position: " + JSON.stringify(windowMesh.position));
+    
+    // Add window frame
+    const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const frameGeometry = new THREE.BoxGeometry(0.84, 0.64, 0.02);
+    const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+    frameMesh.position.copy(windowMesh.position);
+    frameMesh.position.z -= 0.01; // Place slightly behind window
+    frameMesh.quaternion.copy(windowMesh.quaternion);
+    scene.add(frameMesh);
+    
+    console.log(`Window ${windowCount} created at position:`, windowMesh.position);
 }
 
 function onSelect() {
-    debug("Select event triggered");
     if (reticle.visible) {
         createWindow();
-    } else {
-        debug("Reticle not visible - can't place window");
     }
 }
 
@@ -265,14 +195,12 @@ function onWindowResize() {
 }
 
 function animate() {
-    renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-        
-        // Only do hit test if in an AR session
-        if (renderer.xr.isPresenting) {
-            updateHitTest();
-        }
-    });
+    renderer.render(scene, camera);
+    
+    // Only do hit test if in an AR session
+    if (renderer.xr.isPresenting) {
+        updateHitTest();
+    }
 }
 
 function updateHitTest() {
@@ -283,16 +211,10 @@ function updateHitTest() {
         session.requestReferenceSpace('viewer').then(function(referenceSpace) {
             session.requestHitTestSource({ space: referenceSpace }).then(function(source) {
                 hitTestSource = source;
-                debug("Hit test source created");
-            }).catch(err => {
-                debug("Error creating hit test source: " + err.message);
             });
-        }).catch(err => {
-            debug("Error requesting reference space: " + err.message);
         });
         
         session.addEventListener('end', function() {
-            debug("AR session ended");
             hitTestSourceRequested = false;
             hitTestSource = null;
         });
@@ -308,13 +230,9 @@ function updateHitTest() {
                 const hit = results[0];
                 reticle.visible = true;
                 reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                debug("Surface detected");
             } else {
                 reticle.visible = false;
-                debug("No surface detected");
             }
-        }).catch(err => {
-            debug("Error getting hit test results: " + err.message);
         });
     }
 }
