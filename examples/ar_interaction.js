@@ -6,7 +6,7 @@ import {
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { toggleVideoPlayback, toggleVideoMute, videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
@@ -194,7 +194,7 @@ function createNewScreen() {
 function toggleMoveMode(button) {
     isMoveModeActive = !isMoveModeActive;
     
-    // Update button color
+    // Update button color based on active state
     button.material.color.set(isMoveModeActive ? 
         button.userData.activeColor || 0x44cc88 : 
         button.userData.inactiveColor || 0x777777);
@@ -214,6 +214,14 @@ function toggleMoveMode(button) {
         }
     }
     
+    // Update control panel state in UI module (if available)
+    if (typeof toggleModeButton === 'function') {
+        toggleModeButton('move');
+    }
+    
+    // Visual feedback for mode change
+    createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
+    
     console.log("Move mode:", isMoveModeActive ? "activated" : "deactivated");
 }
 
@@ -221,7 +229,7 @@ function toggleMoveMode(button) {
 function toggleRotateMode(button) {
     isRotateModeActive = !isRotateModeActive;
     
-    // Update button color
+    // Update button color based on active state
     button.material.color.set(isRotateModeActive ? 
         button.userData.activeColor || 0xf39c12 : 
         button.userData.inactiveColor || 0x777777);
@@ -240,6 +248,14 @@ function toggleRotateMode(button) {
             moveButton.userData.isActive = false;
         }
     }
+    
+    // Update control panel state in UI module (if available)
+    if (typeof toggleModeButton === 'function') {
+        toggleModeButton('rotate');
+    }
+    
+    // Visual feedback for mode change
+    createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
     
     console.log("Rotate mode:", isRotateModeActive ? "activated" : "deactivated");
 }
@@ -328,6 +344,12 @@ function onTouchStart(event) {
         // Disable other touch interactions during pinch
         isTouchMovingScreen = false;
         isRotatingScreen = false;
+        
+        // Provide haptic feedback if available
+        if (navigator.vibrate) {
+            navigator.vibrate(20);
+        }
+        
         return;
     }
     
@@ -357,9 +379,20 @@ function onTouchStart(event) {
             // Visual feedback
             const originalColor = buttonObj.material.color.clone();
             buttonObj.material.color.set(0x4FC3F7);
+            
+            // Scale up and back for button press effect
+            const originalScale = buttonObj.scale.clone();
+            buttonObj.scale.multiplyScalar(1.2);
+            
             setTimeout(() => {
                 buttonObj.material.color.copy(originalColor);
+                buttonObj.scale.copy(originalScale);
             }, 200);
+            
+            // Provide haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(40);
+            }
             
             // Handle the button action
             handleButtonAction(buttonObj);
@@ -383,11 +416,27 @@ function onTouchStart(event) {
             // Double tap to toggle fullscreen
             if (doubleTapDetected) {
                 toggleFullscreen(screenObj);
+                
+                // Provide haptic feedback if available
+                if (navigator.vibrate) {
+                    navigator.vibrate([30, 20, 30]);
+                }
+                
+                // Visual fullscreen feedback
+                createModeChangeIndicator('Fullscreen Toggled');
                 return;
             }
             
             // Always enable screen movement on touch - simplifies interaction
             isTouchMovingScreen = true;
+            
+            // Provide light haptic feedback for screen selection
+            if (navigator.vibrate) {
+                navigator.vibrate(20);
+            }
+            
+            // Flash highlight around selected screen
+            flashScreenHighlight(screenObj);
             
             // If in rotate mode, also enable rotation
             if (isRotateModeActive) {
@@ -397,6 +446,71 @@ function onTouchStart(event) {
             }
         }
     }
+}
+
+// Flash a highlight effect around a selected screen
+function flashScreenHighlight(screen) {
+    // Find the border or create one if it doesn't exist
+    let highlightMesh = screen.children.find(child => 
+        child.userData && child.userData.isHighlight);
+    
+    if (!highlightMesh) {
+        // Get screen dimensions (use the first plane geometry as reference)
+        const screenMesh = screen.children.find(child => 
+            child.geometry && child.geometry.type === 'PlaneGeometry');
+        
+        let width = 1.05;
+        let height = 0.8;
+        
+        if (screenMesh && screenMesh.geometry) {
+            // Extract dimensions from existing geometry
+            const size = new THREE.Vector3();
+            screenMesh.geometry.computeBoundingBox();
+            screenMesh.geometry.boundingBox.getSize(size);
+            
+            // Scale slightly larger than the original screen
+            width = size.x * 1.05;
+            height = size.y * 1.05;
+        }
+        
+        // Create highlight mesh
+        const glowGeometry = new THREE.PlaneGeometry(width, height);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4fc3f7,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
+        });
+        
+        highlightMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        highlightMesh.position.z = -0.01;
+        highlightMesh.userData = { isHighlight: true };
+        screen.add(highlightMesh);
+    }
+    
+    // Animate the highlight
+    let opacity = 0;
+    const fadeIn = () => {
+        opacity += 0.1;
+        highlightMesh.material.opacity = opacity;
+        
+        if (opacity < 0.6) {
+            requestAnimationFrame(fadeIn);
+        } else {
+            // Fade out
+            const fadeOut = () => {
+                opacity -= 0.1;
+                highlightMesh.material.opacity = opacity;
+                
+                if (opacity > 0) {
+                    requestAnimationFrame(fadeOut);
+                }
+            };
+            requestAnimationFrame(fadeOut);
+        }
+    };
+    
+    requestAnimationFrame(fadeIn);
 }
 
 // Touch move handler
@@ -465,14 +579,14 @@ function moveScreenWithTouch() {
     
     // Get intersection point with the plane
     const intersectionPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, intersectionPoint);
+    const didIntersect = raycaster.ray.intersectPlane(plane, intersectionPoint);
     
-    if (intersectionPoint) {
+    if (didIntersect) {
         // Add screenOffset to maintain relative touch position
         const targetPosition = intersectionPoint.clone().add(screenOffset);
         
-        // Apply smoothing for more natural movement
-        selectedScreen.position.lerp(targetPosition, 0.5);
+        // Apply more responsive smoothing
+        selectedScreen.position.lerp(targetPosition, 0.7);
         
         // Ensure the screen stays at a reasonable distance
         const distance = camera.position.distanceTo(selectedScreen.position);
@@ -483,7 +597,55 @@ function moveScreenWithTouch() {
             const direction = selectedScreen.position.clone().sub(camera.position).normalize();
             selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
         }
+        
+        // Update controlPanel if it has a screen reference
+        if (controlPanel && controlPanel.userData && controlPanel.userData.update) {
+            controlPanel.userData.update();
+        }
+        
+        // Add visual feedback for movement
+        createMoveIndicator(selectedScreen.position.clone(), 0.05);
     }
+}
+
+// Create a visual indicator for movement feedback
+function createMoveIndicator(position, size) {
+    // Create a small dot that fades quickly
+    const geometry = new THREE.SphereGeometry(size, 8, 8);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x4fc3f7,
+        transparent: true,
+        opacity: 0.3
+    });
+    
+    const indicator = new THREE.Mesh(geometry, material);
+    indicator.position.copy(position);
+    
+    // Add to scene
+    scene.add(indicator);
+    
+    // Animate fading out
+    const startTime = performance.now();
+    const duration = 200; // 200ms
+    
+    function fadeOut() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
+        
+        if (progress < 1) {
+            material.opacity = 0.3 * (1 - progress);
+            indicator.scale.x = 1 - (progress * 0.5);
+            indicator.scale.y = 1 - (progress * 0.5);
+            indicator.scale.z = 1 - (progress * 0.5);
+            requestAnimationFrame(fadeOut);
+        } else {
+            scene.remove(indicator);
+            geometry.dispose();
+            material.dispose();
+        }
+    }
+    
+    requestAnimationFrame(fadeOut);
 }
 
 // Rotate screen based on touch movement
@@ -504,6 +666,9 @@ function rotateScreenWithTouch() {
 
 // Touch end handler
 function onTouchEnd(event) {
+    // Check if we were doing something interactive
+    const wasInteractive = isTouchMovingScreen || isRotatingScreen || isPinching;
+    
     // Reset interaction flags
     isTouchMovingScreen = false;
     isRotatingScreen = false;
@@ -511,8 +676,42 @@ function onTouchEnd(event) {
     
     // If this was the last touch and we have a selected screen, save its current state
     if (event.touches.length === 0 && selectedScreen) {
+        // Save current scale
         if (selectedScreen.userData.currentScale) {
             selectedScreen.userData.originalScale = selectedScreen.userData.currentScale.clone();
+        }
+        
+        // Save current position
+        selectedScreen.userData.originalPosition = selectedScreen.position.clone();
+        
+        // Provide haptic feedback for interaction end (if we were doing something)
+        if (wasInteractive && navigator.vibrate) {
+            navigator.vibrate(15);  // Lighter vibration for release
+        }
+        
+        // Create a subtle "settle" animation when dropping the screen
+        if (wasInteractive) {
+            // Small "bounce" effect when releasing
+            const originalPosition = selectedScreen.position.clone();
+            
+            // Slight drop effect
+            const dropAnimation = () => {
+                const downPos = originalPosition.clone();
+                downPos.y -= 0.01;  // Move slightly down
+                selectedScreen.position.lerp(downPos, 0.5);
+                
+                setTimeout(() => {
+                    // Bounce back up
+                    const upAnimation = () => {
+                        selectedScreen.position.lerp(originalPosition, 0.3);
+                    };
+                    requestAnimationFrame(upAnimation);
+                }, 100);
+            };
+            requestAnimationFrame(dropAnimation);
+            
+            // Show a brief confirmation indicator
+            createModeChangeIndicator('Position Saved');
         }
     }
 }
@@ -549,4 +748,76 @@ function updateVideoTime(progress) {
     // Set video time
     const newTime = duration * progress;
     videoElement.currentTime = newTime;
+}
+
+// Create a floating text indicator for mode changes
+function createModeChangeIndicator(message) {
+    // Create a canvas for the text
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw the text
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(50, 150, 255, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    const geometry = new THREE.PlaneGeometry(0.3, 0.075);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide
+    });
+    
+    const indicator = new THREE.Mesh(geometry, material);
+    
+    // Position above the control panel
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(camera.quaternion);
+    
+    indicator.position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
+    indicator.position.y += 0.15; // Position above control panel
+    indicator.quaternion.copy(camera.quaternion);
+    
+    scene.add(indicator);
+    
+    // Fade out and remove
+    const startTime = performance.now();
+    const duration = 1500; // 1.5 seconds
+    
+    function fadeOut() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
+        
+        if (progress < 1) {
+            if (progress > 0.7) {
+                // Start fading out in the last 30% of time
+                material.opacity = 0.9 * (1 - ((progress - 0.7) / 0.3));
+            }
+            
+            // Float upward slightly
+            indicator.position.y += 0.0002;
+            
+            requestAnimationFrame(fadeOut);
+        } else {
+            scene.remove(indicator);
+            material.dispose();
+            geometry.dispose();
+            texture.dispose();
+        }
+    }
+    
+    requestAnimationFrame(fadeOut);
 } 
