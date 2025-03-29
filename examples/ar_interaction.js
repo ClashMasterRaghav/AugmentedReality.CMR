@@ -5,9 +5,9 @@ import {
     isPlacingScreen, newScreen, isMoveModeActive,
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
-import { screens, selectScreen, updateKeyboardPosition } from './ar_screens.js';
+import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton } from './ar_ui.js';
-import { toggleVideoPlayback, toggleVideoMute, videoElement, duration, createNewBrowserScreen } from './ar_media.js';
+import { toggleVideoPlayback, toggleVideoMute, videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
 let touchEnabled = true;
