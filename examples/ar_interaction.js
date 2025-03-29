@@ -19,6 +19,10 @@ let lastTapTime = 0;
 let screenOffset = new THREE.Vector3();
 let initialRotation = new THREE.Euler();
 let initialMousePosition = new THREE.Vector2();
+// Multi-touch variables
+let initialPinchDistance = 0;
+let initialScale = new THREE.Vector3(1, 1, 1);
+let isPinching = false;
 
 // Setup event listeners
 export function setupEventListeners() {
@@ -308,7 +312,26 @@ function findAllButtons() {
 function onTouchStart(event) {
     event.preventDefault();
     
-    // Get the first touch
+    // Check for multi-touch (pinch gesture)
+    if (event.touches.length === 2 && selectedScreen) {
+        // Start pinch-to-zoom
+        isPinching = true;
+        
+        // Calculate initial distance between fingers
+        const touch1 = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
+        const touch2 = new THREE.Vector2(event.touches[1].clientX, event.touches[1].clientY);
+        initialPinchDistance = touch1.distanceTo(touch2);
+        
+        // Store initial scale
+        initialScale.copy(selectedScreen.scale);
+        
+        // Disable other touch interactions during pinch
+        isTouchMovingScreen = false;
+        isRotatingScreen = false;
+        return;
+    }
+    
+    // Single touch handling
     const touch = event.touches[0];
     
     // Convert touch to normalized device coordinates
@@ -363,16 +386,14 @@ function onTouchStart(event) {
                 return;
             }
             
-            // Handle move/rotate modes
-            if (isMoveModeActive) {
-                isTouchMovingScreen = true;
-            } else if (isRotateModeActive) {
+            // Always enable screen movement on touch - simplifies interaction
+            isTouchMovingScreen = true;
+            
+            // If in rotate mode, also enable rotation
+            if (isRotateModeActive) {
                 isRotatingScreen = true;
                 initialRotation.copy(screenObj.rotation);
                 initialMousePosition.copy(initialTouchPosition);
-            } else {
-                // If no mode is active, default to moving the screen for better usability
-                isTouchMovingScreen = true;
             }
         }
     }
@@ -380,22 +401,49 @@ function onTouchStart(event) {
 
 // Touch move handler
 function onTouchMove(event) {
-    if (!selectedScreen || (!isTouchMovingScreen && !isRotatingScreen)) {
+    if (!selectedScreen) {
         return;
     }
     
     event.preventDefault();
     
-    // Get the first touch
+    // Handle pinch zoom with two fingers
+    if (event.touches.length === 2 && isPinching) {
+        const touch1 = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
+        const touch2 = new THREE.Vector2(event.touches[1].clientX, event.touches[1].clientY);
+        const currentPinchDistance = touch1.distanceTo(touch2);
+        
+        // Calculate scale factor based on pinch
+        const scaleFactor = currentPinchDistance / initialPinchDistance;
+        
+        // Apply new scale (with limits to prevent too small or too large)
+        const newScale = initialScale.clone().multiplyScalar(scaleFactor);
+        
+        // Clamp scale to reasonable values
+        newScale.x = THREE.MathUtils.clamp(newScale.x, 0.5, 2.5);
+        newScale.y = THREE.MathUtils.clamp(newScale.y, 0.5, 2.5);
+        newScale.z = 1; // Keep z scale at 1
+        
+        // Apply scale with smoothing
+        selectedScreen.scale.lerp(newScale, 0.3);
+        
+        // Store the new scale in userData for reference
+        selectedScreen.userData.currentScale = selectedScreen.scale.clone();
+        return;
+    }
+    
+    // Single touch handling
     const touch = event.touches[0];
     
     // Convert touch to normalized device coordinates
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    if (isTouchMovingScreen) {
-        moveScreenWithTouch();
-    } else if (isRotatingScreen) {
+    // By default, move the screen - this makes touch interaction more intuitive
+    moveScreenWithTouch();
+    
+    // If rotation mode is active, also rotate
+    if (isRotatingScreen) {
         rotateScreenWithTouch();
     }
 }
@@ -407,16 +455,35 @@ function moveScreenWithTouch() {
     // Update raycaster with current touch position
     raycaster.setFromCamera(currentTouchPosition, camera);
     
-    // Create a plane at the camera's viewing direction
+    // Create a plane parallel to the camera's viewing direction
     const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
-    const plane = new THREE.Plane(normal, -selectedScreen.position.dot(normal));
+    
+    // Create a plane at the screen's distance from camera
+    const cameraToScreen = selectedScreen.position.clone().sub(camera.position);
+    const distanceToScreen = cameraToScreen.dot(normal);
+    const plane = new THREE.Plane(normal, -distanceToScreen);
     
     // Get intersection point with the plane
     const intersectionPoint = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, intersectionPoint);
     
-    // Apply the offset to maintain relative position
-    selectedScreen.position.copy(intersectionPoint.add(screenOffset));
+    if (intersectionPoint) {
+        // Add screenOffset to maintain relative touch position
+        const targetPosition = intersectionPoint.clone().add(screenOffset);
+        
+        // Apply smoothing for more natural movement
+        selectedScreen.position.lerp(targetPosition, 0.5);
+        
+        // Ensure the screen stays at a reasonable distance
+        const distance = camera.position.distanceTo(selectedScreen.position);
+        
+        // If screen gets too close or too far, adjust its position
+        if (distance < 0.5 || distance > 5) {
+            const idealDistance = THREE.MathUtils.clamp(distance, 0.5, 5);
+            const direction = selectedScreen.position.clone().sub(camera.position).normalize();
+            selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
+        }
+    }
 }
 
 // Rotate screen based on touch movement
@@ -440,6 +507,14 @@ function onTouchEnd(event) {
     // Reset interaction flags
     isTouchMovingScreen = false;
     isRotatingScreen = false;
+    isPinching = false;
+    
+    // If this was the last touch and we have a selected screen, save its current state
+    if (event.touches.length === 0 && selectedScreen) {
+        if (selectedScreen.userData.currentScale) {
+            selectedScreen.userData.originalScale = selectedScreen.userData.currentScale.clone();
+        }
+    }
 }
 
 // Progress bar touch handler
