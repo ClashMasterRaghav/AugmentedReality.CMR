@@ -9,173 +9,51 @@ export let screens = [];
 
 // Create a new browser screen
 export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
+    // Create a clean, simple group
     const browserWindow = new THREE.Group();
     
-    // Larger screen dimensions
-    const screenWidth = 1.0;  // Increased from 0.8
-    const screenHeight = 0.75; // Increased from 0.6
-    const aspectRatio = 16/9; // Maintain proper video aspect ratio
-    const contentWidth = screenWidth * 0.95;
-    const contentHeight = contentWidth / aspectRatio;
+    // Very basic dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
     
-    // Add transparent interaction plane to capture touch events
-    // This covers the entire screen and is in front of everything
-    const interactionGeometry = new THREE.PlaneGeometry(screenWidth + 0.2, screenHeight + 0.2);
-    const interactionMaterial = new THREE.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0.0, // Completely invisible
-        side: THREE.DoubleSide,
-        depthTest: false, // No depth testing to ensure it's always interactive
-    });
-    const interactionPlane = new THREE.Mesh(interactionGeometry, interactionMaterial);
-    interactionPlane.position.z = 0.020; // In front of ALL other elements
-    interactionPlane.renderOrder = 9999; // Highest render order possible
-    interactionPlane.userData = {
-        type: 'interactionPlane',
-        screen: browserWindow,
-        isInteractive: true
-    };
-    browserWindow.add(interactionPlane);
+    console.log("Creating ULTRA-MINIMAL screen for debugging");
     
-    // Make the window itself have screen identifier
+    // Basic identification data
     browserWindow.userData = { 
         type: 'screen', 
-        id: screens.length, 
+        id: screens.length,
         isSelected: false,
-        isInteractive: true,
-        content: `Video Screen ${screens.length + 1}`,
-        originalScale: new THREE.Vector3(1, 1, 1)
+        isInteractive: true
     };
     
-    // Shadow for depth effect
-    const shadowGeometry = new THREE.PlaneGeometry(screenWidth + 0.05, screenHeight + 0.05);
-    const shadowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x000000,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.6
-    });
-    const shadowPanel = new THREE.Mesh(shadowGeometry, shadowMaterial);
-    shadowPanel.position.z = -0.01;
-    shadowPanel.renderOrder = 0; // Lowest render order (back)
-    browserWindow.add(shadowPanel);
-    
-    // Modern border with rounded corners effect
-    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
-    const borderMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x2c2c2c, // Dark grey border
-        side: THREE.DoubleSide,
-        transparent: false,
-        opacity: 1.0
-    });
-    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
-    borderPanel.position.z = -0.005;
-    borderPanel.renderOrder = 1;
-    browserWindow.add(borderPanel);
-    
-    // Browser background - main content area
-    const browserGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
-    const browserMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x121212, // Dark background like modern YouTube
+    // Single background plane - plain color for simplicity
+    const bgGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    const bgMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x333333, // Dark gray background
         side: THREE.DoubleSide
     });
-    const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
-    browserPanel.renderOrder = 2;
-    browserWindow.add(browserPanel);
+    const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
+    browserWindow.add(bgPanel);
     
-    // Create a distinctive drag handle in the top-left corner
-    const handleSize = 0.08; // Size of the handle
-    const handleGeometry = new THREE.CircleGeometry(handleSize/2, 32);
+    // SUPER OBVIOUS DRAG HANDLE
+    // Make it unmissable and unmistakable
+    const handleSize = 0.3; // HUGE handle
+    const handleGeometry = new THREE.BoxGeometry(handleSize, handleSize, handleSize/10);
     const handleMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4CAF50, // Green for visibility
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        depthTest: false // Always visible
+        color: 0xff0000, // Bright RED
+        transparent: false,
+        side: THREE.DoubleSide
     });
     const dragHandle = new THREE.Mesh(handleGeometry, handleMaterial);
     
-    // Position in top-left corner, slightly outside the screen for better visibility
-    dragHandle.position.set(
-        -screenWidth/2 - handleSize/2 + 0.05, // Left edge + slight offset
-        screenHeight/2 + handleSize/2 - 0.05, // Top edge + slight offset
-        0.025 // In front of everything, even interaction plane
-    );
-    dragHandle.renderOrder = 10000; // Extra high render order
-    
-    // Add grab icon to the handle
-    const handleIconCanvas = document.createElement('canvas');
-    handleIconCanvas.width = 128;
-    handleIconCanvas.height = 128;
-    const ctx = handleIconCanvas.getContext('2d');
-    
-    // Draw a "move" icon (4 directional arrows)
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-    
-    // Draw arrows in four directions
-    // Up arrow
-    ctx.beginPath();
-    ctx.moveTo(64, 20);
-    ctx.lineTo(64, 48);
-    ctx.moveTo(50, 34);
-    ctx.lineTo(64, 20);
-    ctx.lineTo(78, 34);
-    ctx.stroke();
-    
-    // Right arrow
-    ctx.beginPath();
-    ctx.moveTo(108, 64);
-    ctx.lineTo(80, 64);
-    ctx.moveTo(94, 50);
-    ctx.lineTo(108, 64);
-    ctx.lineTo(94, 78);
-    ctx.stroke();
-    
-    // Down arrow
-    ctx.beginPath();
-    ctx.moveTo(64, 108);
-    ctx.lineTo(64, 80);
-    ctx.moveTo(50, 94);
-    ctx.lineTo(64, 108);
-    ctx.lineTo(78, 94);
-    ctx.stroke();
-    
-    // Left arrow
-    ctx.beginPath();
-    ctx.moveTo(20, 64);
-    ctx.lineTo(48, 64);
-    ctx.moveTo(34, 50);
-    ctx.lineTo(20, 64);
-    ctx.lineTo(34, 78);
-    ctx.stroke();
-    
-    // Add a subtle glow hint
-    ctx.globalAlpha = 0.2;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(64, 64, 48, 0, Math.PI * 2);
-    ctx.fill();
-    
-    const handleIconTexture = new THREE.CanvasTexture(handleIconCanvas);
-    const handleIconGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
-    const handleIconMaterial = new THREE.MeshBasicMaterial({
-        map: handleIconTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: false
-    });
-    const handleIcon = new THREE.Mesh(handleIconGeometry, handleIconMaterial);
-    handleIcon.position.z = 0.001; // Slightly in front of handle
-    dragHandle.add(handleIcon);
+    // Position in the center of the screen for maximum visibility
+    dragHandle.position.set(0, 0, 0.1); // Far in front
     
     // Set userData for the drag handle
     dragHandle.userData = {
         type: 'dragHandle',
         action: 'moveScreen',
-        screen: browserWindow, // Reference to parent screen
+        screen: browserWindow,
         isDraggable: true
     };
     
@@ -185,109 +63,6 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     // Store reference to the drag handle on the screen object
     browserWindow.userData.dragHandle = dragHandle;
     
-    // Content area with video - moved back to avoid blocking interactions
-    const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
-    
-    // Check if video texture is available, otherwise use static content
-    const contentMaterial = videoTexture ? 
-        new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide }) :
-        new THREE.MeshBasicMaterial({ 
-            map: createFallbackTexture(screens.length + 1),
-            side: THREE.DoubleSide
-        });
-        
-    const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
-    contentPanel.position.y = screenHeight * 0.05; // Centered in window
-    contentPanel.position.z = 0.001; // MOVED BACK so it doesn't block interactions
-    contentPanel.renderOrder = 3; // Video content
-    browserWindow.add(contentPanel);
-    
-    // Modern header bar
-    const headerGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight * 0.12);
-    const headerMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x181818, // Modern dark header
-        side: THREE.DoubleSide
-    });
-    const headerBar = new THREE.Mesh(headerGeometry, headerMaterial);
-    headerBar.position.y = screenHeight * 0.44;
-    headerBar.position.z = 0.002;
-    headerBar.renderOrder = 4; // Above video
-    browserWindow.add(headerBar);
-    
-    // Create title for the screen with modern font style
-    const titleCanvas = document.createElement('canvas');
-    titleCanvas.width = 1024;
-    titleCanvas.height = 128;
-    const titleCtx = titleCanvas.getContext('2d');
-    titleCtx.fillStyle = '#ffffff';
-    titleCtx.font = 'bold 40px Roboto, Arial';
-    titleCtx.textAlign = 'left'; // Left-aligned like modern interfaces
-    titleCtx.textBaseline = 'middle';
-    titleCtx.fillText(`AR Video Player ${screens.length + 1}`, 30, 64);
-    
-    const titleTexture = new THREE.CanvasTexture(titleCanvas);
-    const titleGeometry = new THREE.PlaneGeometry(screenWidth * 0.9, screenHeight * 0.1);
-    const titleMaterial = new THREE.MeshBasicMaterial({ 
-        map: titleTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
-    titleMesh.position.set(-screenWidth * 0.05, screenHeight * 0.44, 0.003);
-    titleMesh.renderOrder = 5; // Above header
-    browserWindow.add(titleMesh);
-    
-    // Modern control bar
-    const controlBarGeometry = new THREE.PlaneGeometry(contentWidth, screenHeight * 0.1);
-    const controlBarMaterial = new THREE.MeshBasicMaterial({
-        color: 0x181818, // Modern dark controls
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide
-    });
-    const controlBar = new THREE.Mesh(controlBarGeometry, controlBarMaterial);
-    controlBar.position.y = -screenHeight * 0.38; // Position at bottom of content
-    controlBar.position.z = 0.002; // Ensure it's in front of video
-    controlBar.renderOrder = 6; // Above video content
-    browserWindow.add(controlBar);
-    
-    // Add progress bar with modern design
-    const progressBgGeometry = new THREE.PlaneGeometry(contentWidth * 0.98, screenHeight * 0.02);
-    const progressBgMaterial = new THREE.MeshBasicMaterial({
-        color: 0x444444, // Progress bar background
-        side: THREE.DoubleSide
-    });
-    const progressBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
-    progressBg.position.y = -screenHeight * 0.33; // Top of control bar
-    progressBg.position.z = 0.003; // Ensure it's in front
-    progressBg.renderOrder = 7; // Above control bar
-    browserWindow.add(progressBg);
-    
-    // Add progress indicator (YouTube red)
-    const progressGeometry = new THREE.PlaneGeometry(contentWidth * 0.2, screenHeight * 0.02); // Starting progress
-    const progressMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff0000, // YouTube red
-        side: THREE.DoubleSide
-    });
-    const progress = new THREE.Mesh(progressGeometry, progressMaterial);
-    progress.position.x = -contentWidth * 0.39; // Start from left
-    progress.position.y = -screenHeight * 0.33;
-    progress.position.z = 0.004; // Ensure it's in front
-    progress.renderOrder = 8; // Above progress background
-    browserWindow.add(progress);
-    
-    // Create modern control buttons with larger size for better touch
-    const buttonSize = screenHeight * 0.07;
-    const buttonPositions = [
-        { x: -contentWidth * 0.42, y: -screenHeight * 0.42, type: 'play' },
-        { x: -contentWidth * 0.32, y: -screenHeight * 0.42, type: 'volume' },
-        { x: contentWidth * 0.42, y: -screenHeight * 0.42, type: 'resize' } // Changed from fullscreen to resize
-    ];
-    
-    buttonPositions.forEach(btn => {
-        addControlButton(browserWindow, btn.type, btn.x, btn.y, buttonSize);
-    });
-    
     // Position the window
     browserWindow.position.copy(position);
     
@@ -295,12 +70,11 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     scene.add(browserWindow);
     screens.push(browserWindow);
     
-    // Log for debugging
-    console.log("Created new screen with ID:", browserWindow.userData.id);
-    console.log("Total screens:", screens.length);
+    console.log("Created MINIMAL TEST SCREEN with ID:", browserWindow.userData.id);
     console.log("Screen UUID:", browserWindow.uuid);
+    console.log("Drag handle UUID:", dragHandle.uuid);
     
-    // Set this as the selected screen
+    // Select this as the current screen
     selectScreen(browserWindow);
     
     return browserWindow;

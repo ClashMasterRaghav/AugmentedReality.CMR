@@ -668,15 +668,14 @@ function flashScreenHighlight(screen) {
 
 // Touch move handler
 function onTouchMove(event) {
+    // EXTREME VERBOSE LOGGING FOR DEBUGGING
+    console.log("===== TOUCH MOVE EVENT =====");
+    console.log("Number of touches:", event.touches.length);
+    console.log("isDraggingHandle:", isDraggingHandle);
+    console.log("draggedScreen:", draggedScreen ? draggedScreen.userData.id : "none");
+    
     // Always prevent default to avoid browser gestures
     event.preventDefault();
-    
-    // Bail early if nothing is happening
-    if (!selectedScreen && !isDraggingHandle) {
-        return;
-    }
-    
-    console.log("Touch move detected");
     
     // Make sure we have a valid touch point
     const touch = event.touches[0];
@@ -690,36 +689,112 @@ function onTouchMove(event) {
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
+    console.log("Touch position:", 
+        currentTouchPosition.x.toFixed(3), 
+        currentTouchPosition.y.toFixed(3));
+    console.log("Previous position:", 
+        previousTouchPosition.x.toFixed(3), 
+        previousTouchPosition.y.toFixed(3));
+    console.log("Delta:", 
+        (currentTouchPosition.x - previousTouchPosition.x).toFixed(3),
+        (currentTouchPosition.y - previousTouchPosition.y).toFixed(3));
+    
     // Handle dragging via the drag handle
     if (isDraggingHandle && draggedScreen) {
-        console.log("Moving screen via drag handle");
+        console.log("ATTEMPTING TO MOVE SCREEN");
         
-        // Update raycaster with current touch position
-        raycaster.setFromCamera(currentTouchPosition, camera);
-        
-        // Create a plane parallel to the camera
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
-        
-        // Get distance from camera to screen
-        const cameraToScreen = draggedScreen.position.clone().sub(camera.position);
-        const distanceToScreen = cameraToScreen.dot(planeNormal);
-        
-        // Create a plane at that distance
-        const plane = new THREE.Plane(planeNormal, -distanceToScreen);
-        
-        // Find intersection of ray with the plane
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Update screen position while maintaining the original offset
-        draggedScreen.position.copy(intersectionPoint.add(dragOffset));
-        
-        // Make screen face the camera
-        draggedScreen.lookAt(camera.position);
-        
-        // Optional visual feedback
-        createMoveIndicator(draggedScreen.position.clone(), 0.03);
+        try {
+            // SIMPLE DIRECT MOVEMENT APPROACH - Should work regardless of raycasting
+            // Calculate movement delta from touch
+            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+            
+            // Get camera's right and up vectors for moving in screen space
+            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+            
+            // Scale for more noticeable movement
+            const moveScale = 0.1; 
+            
+            // Create movement vector
+            const movement = new THREE.Vector3()
+                .addScaledVector(cameraRight, deltaX * moveScale)
+                .addScaledVector(cameraUp, deltaY * moveScale);
+            
+            console.log("Direct movement vector:", 
+                movement.x.toFixed(5),
+                movement.y.toFixed(5),
+                movement.z.toFixed(5));
+            
+            // Apply movement directly
+            draggedScreen.position.add(movement);
+            
+            // Make screen face the camera
+            draggedScreen.lookAt(camera.position);
+            
+            // Create visual feedback
+            createMoveIndicator(draggedScreen.position.clone(), 0.03);
+            
+            // ALSO try the raycasting approach as a fallback/secondary option
+            // [Original raycasting code follows]
+            
+            // Update raycaster with current touch position
+            raycaster.setFromCamera(currentTouchPosition, camera);
+            
+            // Create a plane parallel to the camera
+            const planeNormal = new THREE.Vector3(0, 0, 1);
+            planeNormal.applyQuaternion(camera.quaternion);
+            
+            // Get distance from camera to screen
+            const cameraToScreen = draggedScreen.position.clone().sub(camera.position);
+            const distanceToScreen = cameraToScreen.dot(planeNormal);
+            
+            console.log("Distance to screen:", distanceToScreen);
+            
+            // Create a plane at that distance
+            const plane = new THREE.Plane(planeNormal, -distanceToScreen);
+            
+            // Find intersection of ray with the plane
+            const intersectionPoint = new THREE.Vector3();
+            const didIntersect = raycaster.ray.intersectPlane(plane, intersectionPoint);
+            
+            console.log("Ray intersected plane:", didIntersect ? "YES" : "NO");
+            if (didIntersect) {
+                console.log("Intersection point:", 
+                    intersectionPoint.x.toFixed(3),
+                    intersectionPoint.y.toFixed(3),
+                    intersectionPoint.z.toFixed(3));
+                
+                // Log current screen position
+                console.log("Current screen position:", 
+                    draggedScreen.position.x.toFixed(3),
+                    draggedScreen.position.y.toFixed(3),
+                    draggedScreen.position.z.toFixed(3));
+                
+                // Log drag offset
+                console.log("Drag offset:", 
+                    dragOffset.x.toFixed(3),
+                    dragOffset.y.toFixed(3),
+                    dragOffset.z.toFixed(3));
+                
+                // Update screen position while maintaining the original offset
+                const newPosition = intersectionPoint.clone().add(dragOffset);
+                console.log("New position:", 
+                    newPosition.x.toFixed(3),
+                    newPosition.y.toFixed(3),
+                    newPosition.z.toFixed(3));
+                
+                // Actually move the screen (again)
+                draggedScreen.position.copy(newPosition);
+                
+                // Make screen face the camera
+                draggedScreen.lookAt(camera.position);
+            } else {
+                console.warn("Ray did not intersect the plane!");
+            }
+        } catch (error) {
+            console.error("Error in drag movement:", error);
+        }
         
         return;
     }
