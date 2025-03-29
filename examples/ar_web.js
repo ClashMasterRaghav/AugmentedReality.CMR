@@ -21,6 +21,11 @@ let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
 let isTouchMoving = false; // Flag to track if touch movement is in progress
 let videoTexture; // Texture for video playback
 let videoElement; // HTML video element
+let isMoveModeActive = false; // Flag to track if move mode is active
+let isRotateModeActive = false; // Flag to track if rotate mode is active
+let rotationSpeed = 0.05; // Speed of rotation
+let initialRotation = new THREE.Vector2(); // Store initial rotation
+let isRotating = false; // Flag to track if rotation is in progress
 
 init();
 animate();
@@ -44,23 +49,31 @@ function init() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Setup video texture
+    // Setup video texture - FIX VIDEO DISPLAY
     videoElement = document.getElementById('videoElement');
     videoTexture = new THREE.VideoTexture(videoElement);
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
-    videoTexture.format = THREE.RGBFormat;
+    // Fix: Use correct format for video texture
+    videoTexture.format = THREE.RGBAFormat;
     
     // Start video (will be muted)
-    videoElement.play();
+    videoElement.play().catch(e => console.error("Video play error:", e));
 
-    // AR Button
-    document.body.appendChild(
-        ARButton.createButton(renderer, {
-            optionalFeatures: ['dom-overlay'],
-            domOverlay: { root: document.body }
-        })
-    );
+    // AR Button with session end event handling
+    const arButton = ARButton.createButton(renderer, {
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+    });
+    
+    document.body.appendChild(arButton);
+    
+    // Add event listener for session end
+    renderer.xr.addEventListener('sessionend', function() {
+        console.log("AR session ended");
+        // Reload the page to return to initial state
+        window.location.reload();
+    });
 
     // Load font for text
     const fontLoader = new FontLoader();
@@ -107,7 +120,7 @@ function createControlPanel() {
     const panel = new THREE.Group();
     
     // Panel background with rounded corners effect
-    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.15);
+    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.25); // Increased height for more buttons
     const panelMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x333333,
         side: THREE.DoubleSide,
@@ -118,7 +131,7 @@ function createControlPanel() {
     panel.add(panelMesh);
     
     // Add panel border glow
-    const glowGeometry = new THREE.PlaneGeometry(0.31, 0.16);
+    const glowGeometry = new THREE.PlaneGeometry(0.31, 0.26); // Adjusted for new panel size
     const glowMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x4488ff,
         side: THREE.DoubleSide,
@@ -138,7 +151,7 @@ function createControlPanel() {
         opacity: 0.9
     });
     const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    newScreenButton.position.set(0, 0.04, 0.001);
+    newScreenButton.position.set(0, 0.09, 0.001);
     newScreenButton.userData = { type: 'button', action: 'newScreen' };
     panel.add(newScreenButton);
     
@@ -161,10 +174,10 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
-    buttonLabel.position.set(0, 0.04, 0.002);
+    buttonLabel.position.set(0, 0.09, 0.002);
     panel.add(buttonLabel);
     
-    // Move Screen button with improved design
+    // Move Screen button with toggle functionality
     const moveButtonMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x44cc88,
         side: THREE.DoubleSide,
@@ -172,11 +185,16 @@ function createControlPanel() {
         opacity: 0.9
     });
     const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
-    moveScreenButton.position.set(0, -0.04, 0.001);
-    moveScreenButton.userData = { type: 'button', action: 'moveScreen' };
+    moveScreenButton.position.set(0, 0.03, 0.001);
+    moveScreenButton.userData = { 
+        type: 'button',
+        action: 'moveScreen',
+        isToggle: true,
+        isActive: false
+    };
     panel.add(moveScreenButton);
     
-    // Move Screen button label with improved text
+    // Move Screen button label
     const moveButtonCanvas = document.createElement('canvas');
     moveButtonCanvas.width = 256;
     moveButtonCanvas.height = 64;
@@ -194,8 +212,79 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
-    moveButtonLabel.position.set(0, -0.04, 0.002);
+    moveButtonLabel.position.set(0, 0.03, 0.002);
     panel.add(moveButtonLabel);
+    
+    // Rotate Screen button
+    const rotateButtonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xf39c12, // Orange color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    });
+    const rotateScreenButton = new THREE.Mesh(buttonGeometry, rotateButtonMaterial);
+    rotateScreenButton.position.set(0, -0.03, 0.001);
+    rotateScreenButton.userData = { 
+        type: 'button',
+        action: 'rotateScreen',
+        isToggle: true,
+        isActive: false
+    };
+    panel.add(rotateScreenButton);
+    
+    // Rotate Screen button label
+    const rotateButtonCanvas = document.createElement('canvas');
+    rotateButtonCanvas.width = 256;
+    rotateButtonCanvas.height = 64;
+    const rotateBtnCtx = rotateButtonCanvas.getContext('2d');
+    rotateBtnCtx.fillStyle = '#ffffff';
+    rotateBtnCtx.font = 'bold 24px Arial';
+    rotateBtnCtx.textAlign = 'center';
+    rotateBtnCtx.textBaseline = 'middle';
+    rotateBtnCtx.fillText('Rotate Screen', 128, 32);
+    
+    const rotateButtonTexture = new THREE.CanvasTexture(rotateButtonCanvas);
+    const rotateButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: rotateButtonTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const rotateButtonLabel = new THREE.Mesh(buttonLabelGeometry, rotateButtonLabelMaterial);
+    rotateButtonLabel.position.set(0, -0.03, 0.002);
+    panel.add(rotateButtonLabel);
+    
+    // End AR button
+    const endARButtonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xe74c3c, // Red color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    });
+    const endARButton = new THREE.Mesh(buttonGeometry, endARButtonMaterial);
+    endARButton.position.set(0, -0.09, 0.001);
+    endARButton.userData = { type: 'button', action: 'endAR' };
+    panel.add(endARButton);
+    
+    // End AR button label
+    const endARButtonCanvas = document.createElement('canvas');
+    endARButtonCanvas.width = 256;
+    endARButtonCanvas.height = 64;
+    const endARBtnCtx = endARButtonCanvas.getContext('2d');
+    endARBtnCtx.fillStyle = '#ffffff';
+    endARBtnCtx.font = 'bold 24px Arial';
+    endARBtnCtx.textAlign = 'center';
+    endARBtnCtx.textBaseline = 'middle';
+    endARBtnCtx.fillText('End AR', 128, 32);
+    
+    const endARButtonTexture = new THREE.CanvasTexture(endARButtonCanvas);
+    const endARButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: endARButtonTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const endARButtonLabel = new THREE.Mesh(buttonLabelGeometry, endARButtonLabelMaterial);
+    endARButtonLabel.position.set(0, -0.09, 0.002);
+    panel.add(endARButtonLabel);
     
     // Position the control panel in front of the user
     panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
@@ -204,7 +293,7 @@ function createControlPanel() {
     scene.add(panel);
 }
 
-function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // Default position moved back
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
     const browserWindow = new THREE.Group();
     
     // Browser background with improved design
@@ -258,7 +347,7 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // D
     const urlCtx = urlCanvas.getContext('2d');
     urlCtx.fillStyle = '#000000';
     urlCtx.font = '20px Arial';
-    urlCtx.fillText(`example.com/screen${screens.length + 1}`, 10, 20);
+    urlCtx.fillText(`AR Video Screen ${screens.length + 1}`, 10, 20);
     
     const urlTexture = new THREE.CanvasTexture(urlCanvas);
     const urlGeometry = new THREE.PlaneGeometry(0.38, 0.03);
@@ -271,11 +360,10 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // D
     urlMesh.position.set(-0.15, 0.25, 0.002);
     browserWindow.add(urlMesh);
     
-    // Content area with example content
+    // Content area with video
     const contentGeometry = new THREE.PlaneGeometry(0.76, 0.46);
-    const texture = createBrowserContentTexture(screens.length + 1);
     const contentMaterial = new THREE.MeshBasicMaterial({ 
-        map: texture,
+        map: videoTexture,
         side: THREE.DoubleSide
     });
     const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
@@ -289,7 +377,7 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // D
         type: 'screen', 
         id: screens.length, 
         isSelected: false,
-        content: `Screen ${screens.length + 1} Content`
+        content: `Video Screen ${screens.length + 1}`
     };
     
     scene.add(browserWindow);
@@ -659,6 +747,21 @@ function render() {
         target.lookAt(camera.position);
     }
     
+    // Handle screen rotation with controller
+    if (isRotateModeActive && selectedScreen && !isRotating) {
+        // Get controller movement
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        
+        // Extract controller orientation
+        const controllerDirection = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // Apply rotation based on controller movement
+        // This is a simple implementation - you might want to refine this
+        selectedScreen.rotation.y += controllerDirection.x * rotationSpeed;
+        selectedScreen.rotation.x += controllerDirection.y * rotationSpeed;
+    }
+    
     // Highlight keys when hovered
     if (controller && virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
         // Reset previously selected key if any
@@ -713,7 +816,18 @@ function onTouchStart(event) {
         const selectedObject = screenIntersects[0].object;
         const screen = selectedObject.parent;
         selectScreen(screen);
-        isTouchMoving = true;
+        
+        // Start moving or rotating based on active mode
+        if (isMoveModeActive) {
+            isTouchMoving = true;
+        } else if (isRotateModeActive) {
+            isRotating = true;
+            // Store initial rotation
+            if (selectedScreen) {
+                initialRotation.x = selectedScreen.rotation.x;
+                initialRotation.y = selectedScreen.rotation.y;
+            }
+        }
         return;
     }
     
@@ -761,7 +875,7 @@ function onTouchStart(event) {
 }
 
 function onTouchMove(event) {
-    if (!touchEnabled || !event.touches[0] || !isTouchMoving || !selectedScreen) return;
+    if (!touchEnabled || !event.touches[0]) return;
     
     event.preventDefault();
     
@@ -775,11 +889,21 @@ function onTouchMove(event) {
     const deltaX = currentTouchPosition.x - initialTouchPosition.x;
     const deltaY = currentTouchPosition.y - initialTouchPosition.y;
     
-    // Update screen position based on touch movement
-    // Scale the movement to make it more natural
-    const movementScale = 2.0;
-    selectedScreen.position.x += deltaX * movementScale;
-    selectedScreen.position.y += deltaY * movementScale;
+    // Update screen position if we're moving a screen with touch
+    if (isTouchMoving && selectedScreen) {
+        // Scale the movement to make it more natural
+        const movementScale = 2.0;
+        selectedScreen.position.x += deltaX * movementScale;
+        selectedScreen.position.y += deltaY * movementScale;
+    }
+    
+    // Update screen rotation if we're rotating a screen with touch
+    if (isRotating && selectedScreen) {
+        // Scale the rotation to make it more natural
+        const rotationScale = 2.0;
+        selectedScreen.rotation.y += deltaX * rotationScale;
+        selectedScreen.rotation.x += deltaY * rotationScale;
+    }
     
     // Update initial position for next move
     initialTouchPosition.copy(currentTouchPosition);
@@ -787,5 +911,5 @@ function onTouchMove(event) {
 
 function onTouchEnd(event) {
     isTouchMoving = false;
-    isMovingScreen = false;
+    isRotating = false;
 }
