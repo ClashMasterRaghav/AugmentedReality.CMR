@@ -27,20 +27,17 @@
 		<script type="module">
 			import * as THREE from "three";
 			import { ARButton } from "three/addons/webxr/ARButton.js";
-			import { HTMLMesh } from "three/addons/interactive/HTMLMesh.js";
-			import { InteractiveGroup } from "three/addons/interactive/InteractiveGroup.js";
 			import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+			import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+			import { FontLoader } from "three/addons/loaders/FontLoader.js";
 
 			let camera, scene, renderer;
 			let controller, controllerGrip;
-			let browserPlane, keyboardPlane;
+			let browserWindow, virtualKeyboard;
+			let font;
 			let raycaster = new THREE.Raycaster();
 			let workingMatrix = new THREE.Matrix4();
-			let interactiveGroup;
-
-			// Browser content
-			let currentURL = "https://example.com";
-			let browserContent;
+			let selectedKey = null;
 
 			init();
 			animate();
@@ -72,15 +69,17 @@
 				// AR Button
 				document.body.appendChild(ARButton.createButton(renderer));
 
-				// Interactive group for handling input
-				interactiveGroup = new InteractiveGroup(renderer);
-				scene.add(interactiveGroup);
-
-				// Create browser window
-				createBrowserWindow();
-
-				// Create virtual keyboard
-				createVirtualKeyboard();
+				// Load font for text
+				const fontLoader = new FontLoader();
+				fontLoader.load(
+					"https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+					function (loadedFont) {
+						font = loadedFont;
+						// Create browser UI once font is loaded
+						createBrowserWindow();
+						createVirtualKeyboard();
+					}
+				);
 
 				// Controller setup
 				controller = renderer.xr.getController(0);
@@ -107,131 +106,241 @@
 			}
 
 			function createBrowserWindow() {
-				// Create a container for browser content
-				browserContent = document.createElement("div");
-				browserContent.style.width = "800px";
-				browserContent.style.height = "600px";
-				browserContent.style.backgroundColor = "white";
-				browserContent.style.padding = "10px";
-				browserContent.style.color = "black";
-				browserContent.style.fontFamily = "Arial, sans-serif";
-				browserContent.style.overflow = "hidden";
+				browserWindow = new THREE.Group();
 
-				// Add browser UI elements
-				browserContent.innerHTML = `
-        <div style="display: flex; align-items: center; background-color: #f0f0f0; padding: 5px; border-radius: 5px; margin-bottom: 10px;">
-            <button style="margin-right: 5px;">←</button>
-            <button style="margin-right: 5px;">→</button>
-            <button style="margin-right: 5px;">↻</button>
-            <input type="text" value="${currentURL}" style="flex-grow: 1; padding: 5px; border-radius: 3px; border: 1px solid #ccc;">
-        </div>
-        <div style="background-color: #fff; height: calc(100% - 50px); border-radius: 5px; padding: 10px; overflow: auto;">
-            <h1>Immersive AR Browser</h1>
-            <p>This is a demonstration of an AR-based web browsing experience.</p>
-            <p>In a full implementation, this area would render actual web content.</p>
-            <div style="margin-top: 20px; padding: 15px; background-color: #f8f8f8; border-radius: 5px;">
-                <h3>Features to implement:</h3>
-                <ul>
-                    <li>Real web content rendering</li>
-                    <li>Interaction with links and forms</li>
-                    <li>Multiple browser windows</li>
-                    <li>Spatial arrangements</li>
-                </ul>
-            </div>
-        </div>
-    `;
+				// Browser background
+				const browserGeometry = new THREE.PlaneGeometry(0.8, 0.6);
+				const browserMaterial = new THREE.MeshBasicMaterial({
+					color: 0xffffff,
+					side: THREE.DoubleSide,
+				});
+				const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
+				browserWindow.add(browserPanel);
 
-				// Create HTML mesh from the content
-				const htmlMesh = new HTMLMesh(browserContent);
-				htmlMesh.scale.setScalar(0.001); // Scale down to appropriate size
-				htmlMesh.position.set(0, 0, -0.5); // Position in front of user
-
-				// Create container
-				browserPlane = new THREE.Group();
-				browserPlane.add(htmlMesh);
-
-				// Add a frame
-				const frameGeometry = new THREE.BoxGeometry(
-					0.8 * 0.001,
-					0.6 * 0.001,
-					0.01 * 0.001
+				// Address bar background
+				const addressBarGeometry = new THREE.PlaneGeometry(0.76, 0.06);
+				const addressBarMaterial = new THREE.MeshBasicMaterial({
+					color: 0xf0f0f0,
+					side: THREE.DoubleSide,
+				});
+				const addressBar = new THREE.Mesh(
+					addressBarGeometry,
+					addressBarMaterial
 				);
-				const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x505050 });
-				const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-				frame.position.z = -0.006 * 0.001;
-				browserPlane.add(frame);
+				addressBar.position.y = 0.25;
+				addressBar.position.z = 0.001;
+				browserWindow.add(addressBar);
 
-				interactiveGroup.add(browserPlane);
+				// URL text (if font is loaded)
+				if (font) {
+					const textGeometry = new TextGeometry("example.com", {
+						font: font,
+						size: 0.025,
+						height: 0.001,
+					});
+					const textMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+					const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+					// Center the text in the address bar
+					textMesh.position.set(-0.35, 0.24, 0.002);
+					browserWindow.add(textMesh);
+				}
+
+				// Content area with example content
+				const contentGeometry = new THREE.PlaneGeometry(0.76, 0.46);
+				const texture = createBrowserContentTexture();
+				const contentMaterial = new THREE.MeshBasicMaterial({
+					map: texture,
+					side: THREE.DoubleSide,
+				});
+				const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
+				contentPanel.position.y = -0.03;
+				contentPanel.position.z = 0.001;
+				browserWindow.add(contentPanel);
+
+				// Position the window in front of the user
+				browserWindow.position.set(0, 0, -0.5);
+				scene.add(browserWindow);
+			}
+
+			function createBrowserContentTexture() {
+				// Create a canvas to draw browser content
+				const canvas = document.createElement("canvas");
+				canvas.width = 760;
+				canvas.height = 460;
+
+				const ctx = canvas.getContext("2d");
+
+				// Fill background
+				ctx.fillStyle = "#ffffff";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+				// Draw header
+				ctx.fillStyle = "#000000";
+				ctx.font = "32px Arial";
+				ctx.fillText("Immersive AR Browser", 20, 50);
+
+				// Draw content
+				ctx.font = "20px Arial";
+				ctx.fillText(
+					"This is a demonstration of an AR-based web browsing experience.",
+					20,
+					100
+				);
+				ctx.fillText(
+					"In a full implementation, this would render actual web content.",
+					20,
+					130
+				);
+
+				// Draw feature box
+				ctx.fillStyle = "#f8f8f8";
+				ctx.fillRect(20, 180, 720, 200);
+
+				ctx.fillStyle = "#000000";
+				ctx.font = "24px Arial";
+				ctx.fillText("Features to implement:", 40, 210);
+
+				ctx.font = "18px Arial";
+				ctx.fillText("• Real web content rendering", 40, 250);
+				ctx.fillText("• Interaction with links and forms", 40, 280);
+				ctx.fillText("• Multiple browser windows", 40, 310);
+				ctx.fillText("• Spatial arrangements", 40, 340);
+
+				// Create texture from canvas
+				const texture = new THREE.CanvasTexture(canvas);
+				texture.needsUpdate = true;
+
+				return texture;
 			}
 
 			function createVirtualKeyboard() {
-				// Create keyboard container
-				const keyboardContent = document.createElement("div");
-				keyboardContent.style.width = "800px";
-				keyboardContent.style.height = "300px";
-				keyboardContent.style.backgroundColor = "#333";
-				keyboardContent.style.borderRadius = "10px";
-				keyboardContent.style.padding = "10px";
+				virtualKeyboard = new THREE.Group();
 
-				// Add keyboard keys
+				// Keyboard background
+				const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
+				const keyboardMaterial = new THREE.MeshBasicMaterial({
+					color: 0x333333,
+					side: THREE.DoubleSide,
+				});
+				const keyboardPanel = new THREE.Mesh(
+					keyboardGeometry,
+					keyboardMaterial
+				);
+				virtualKeyboard.add(keyboardPanel);
+
+				// Create keyboard keys
 				const rows = [
 					["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-					["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-					["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-					["z", "x", "c", "v", "b", "n", "m", ".", "/"],
+					["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+					["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+					["Z", "X", "C", "V", "B", "N", "M", ".", "/"],
 				];
 
-				let keyboardHTML =
-					'<div style="display: flex; flex-direction: column; gap: 5px;">';
-
-				rows.forEach((row) => {
-					keyboardHTML +=
-						'<div style="display: flex; justify-content: center; gap: 5px;">';
-					row.forEach((key) => {
-						keyboardHTML += `<button style="width: 50px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px; font-size: 20px;">${key}</button>`;
-					});
-					keyboardHTML += "</div>";
+				const keySize = 0.05;
+				const keySpacing = 0.01;
+				const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
+				const keyMaterial = new THREE.MeshBasicMaterial({
+					color: 0x444444,
+					side: THREE.DoubleSide,
+				});
+				const keyHoverMaterial = new THREE.MeshBasicMaterial({
+					color: 0x666666,
+					side: THREE.DoubleSide,
 				});
 
-				// Add space bar and special keys
-				keyboardHTML += `
-        <div style="display: flex; justify-content: center; gap: 5px; margin-top: 5px;">
-            <button style="width: 300px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px;">Space</button>
-            <button style="width: 100px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px;">Enter</button>
-        </div>
-    `;
+				// Track keys for interaction
+				const keys = [];
 
-				keyboardHTML += "</div>";
-				keyboardContent.innerHTML = keyboardHTML;
+				// Create rows of keys
+				rows.forEach((row, rowIndex) => {
+					const rowWidth = row.length * (keySize + keySpacing) - keySpacing;
+					const startX = -rowWidth / 2;
 
-				// Create HTML mesh for keyboard
-				const keyboardMesh = new HTMLMesh(keyboardContent);
-				keyboardMesh.scale.setScalar(0.001); // Scale down
+					row.forEach((key, keyIndex) => {
+						const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial.clone());
+						const x = startX + keyIndex * (keySize + keySpacing);
+						const y = 0.12 - rowIndex * (keySize + keySpacing);
+						keyMesh.position.set(x, y, 0.001);
 
-				// Create container
-				keyboardPlane = new THREE.Group();
-				keyboardPlane.add(keyboardMesh);
-				keyboardPlane.position.set(0, -0.3, -0.5); // Position below browser
-				keyboardPlane.rotation.x = -Math.PI / 6; // Angle for better visibility
+						// Store key data for interaction
+						keyMesh.userData = {
+							key: key,
+							originalMaterial: keyMesh.material,
+							hoverMaterial: keyHoverMaterial.clone(),
+						};
+						keys.push(keyMesh);
 
-				interactiveGroup.add(keyboardPlane);
+						virtualKeyboard.add(keyMesh);
+
+						// Add key label if font is loaded
+						if (font) {
+							const textGeometry = new TextGeometry(key, {
+								font: font,
+								size: 0.02,
+								height: 0.001,
+							});
+							const textMaterial = new THREE.MeshBasicMaterial({
+								color: 0xffffff,
+							});
+							const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+
+							// Center the text on the key
+							textMesh.position.set(x - 0.01, y - 0.01, 0.002);
+							virtualKeyboard.add(textMesh);
+						}
+					});
+				});
+
+				// Add space bar
+				const spaceBarGeometry = new THREE.PlaneGeometry(0.3, keySize);
+				const spaceBar = new THREE.Mesh(spaceBarGeometry, keyMaterial.clone());
+				spaceBar.position.set(0, -0.12, 0.001);
+				spaceBar.userData = {
+					key: " ",
+					originalMaterial: spaceBar.material,
+					hoverMaterial: keyHoverMaterial.clone(),
+				};
+				keys.push(spaceBar);
+				virtualKeyboard.add(spaceBar);
+
+				// Store the keys array for interaction
+				virtualKeyboard.userData = { keys: keys };
+
+				// Position the keyboard below the browser window
+				virtualKeyboard.position.set(0, -0.35, -0.5);
+				virtualKeyboard.rotation.x = -Math.PI / 6; // Angle for better visibility
+				scene.add(virtualKeyboard);
 			}
 
 			function onSelect(event) {
-				// Implement selection/click functionality
-				// This would handle interactions with browser elements
-
 				// Raycast to detect interactive elements
 				const tempMatrix = new THREE.Matrix4();
 				tempMatrix.identity().extractRotation(controller.matrixWorld);
 				raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
 				raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
 
-				// In a full implementation:
-				// - Check for intersections with browser UI elements
-				// - Check for intersections with keyboard keys
-				// - Handle the appropriate actions
-				console.log("Select event triggered");
+				// Check for keyboard key intersections
+				if (virtualKeyboard && virtualKeyboard.userData.keys) {
+					const intersects = raycaster.intersectObjects(
+						virtualKeyboard.userData.keys
+					);
+
+					if (intersects.length > 0) {
+						const key = intersects[0].object;
+						console.log(`Key pressed: ${key.userData.key}`);
+
+						// Visual feedback on key press
+						const flashColor = new THREE.Color(0x00ff00);
+						const originalColor = key.userData.originalMaterial.color.clone();
+
+						key.material.color.copy(flashColor);
+
+						// Reset color after brief flash
+						setTimeout(() => {
+							key.material.color.copy(originalColor);
+						}, 200);
+					}
+				}
 			}
 
 			function onWindowResize() {
@@ -245,10 +354,31 @@
 			}
 
 			function render() {
-				// Update browser content if needed
+				// Update browser position to follow user if needed
 
-				// Make browser follow the user's view at a fixed distance if not being manipulated
-				// This would create a more Vision Pro-like experience
+				// Highlight keys when hovered
+				if (controller && virtualKeyboard && virtualKeyboard.userData.keys) {
+					// Reset previously selected key if any
+					if (selectedKey) {
+						selectedKey.material.copy(selectedKey.userData.originalMaterial);
+						selectedKey = null;
+					}
+
+					// Check for key hovering
+					const tempMatrix = new THREE.Matrix4();
+					tempMatrix.identity().extractRotation(controller.matrixWorld);
+					raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+					raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+					const intersects = raycaster.intersectObjects(
+						virtualKeyboard.userData.keys
+					);
+
+					if (intersects.length > 0) {
+						selectedKey = intersects[0].object;
+						selectedKey.material.copy(selectedKey.userData.hoverMaterial);
+					}
+				}
 
 				renderer.render(scene, camera);
 			}
