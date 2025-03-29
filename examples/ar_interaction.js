@@ -13,7 +13,7 @@ import { toggleVideoPlayback, toggleVideoMute } from './ar_media.js';
 let touchEnabled = true;
 let initialTouchPosition = new THREE.Vector2();
 let currentTouchPosition = new THREE.Vector2();
-let isMovingScreen = false;
+let isTouchMovingScreen = false;
 let isRotatingScreen = false;
 let lastTapTime = 0;
 let screenOffset = new THREE.Vector3();
@@ -113,7 +113,7 @@ function onSelect(event) {
             
             // If in move mode, start moving
             if (isMoveModeActive) {
-                isMovingScreen = true;
+                isTouchMovingScreen = true;
             }
             
             // If in rotate mode, start rotating
@@ -353,14 +353,14 @@ function onTouchStart(event) {
             
             // Handle move/rotate modes
             if (isMoveModeActive) {
-                isMovingScreen = true;
+                isTouchMovingScreen = true;
             } else if (isRotateModeActive) {
                 isRotatingScreen = true;
                 initialRotation.copy(screenObj.rotation);
                 initialMousePosition.copy(initialTouchPosition);
             } else {
                 // If no mode is active, default to moving the screen for better usability
-                isMovingScreen = true;
+                isTouchMovingScreen = true;
             }
         }
     }
@@ -368,7 +368,7 @@ function onTouchStart(event) {
 
 // Touch move handler
 function onTouchMove(event) {
-    if (!selectedScreen || (!isMovingScreen && !isRotatingScreen)) {
+    if (!selectedScreen || (!isTouchMovingScreen && !isRotatingScreen)) {
         return;
     }
     
@@ -381,7 +381,7 @@ function onTouchMove(event) {
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    if (isMovingScreen) {
+    if (isTouchMovingScreen) {
         moveScreenWithTouch();
     } else if (isRotatingScreen) {
         rotateScreenWithTouch();
@@ -426,7 +426,7 @@ function rotateScreenWithTouch() {
 // Touch end handler
 function onTouchEnd(event) {
     // Reset interaction flags
-    isMovingScreen = false;
+    isTouchMovingScreen = false;
     isRotatingScreen = false;
 }
 
