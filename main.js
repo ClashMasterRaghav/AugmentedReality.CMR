@@ -1,5 +1,5 @@
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-import { ARButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/ARButton.js';
+import * as THREE from './build/three.module.js';
+import { ARButton } from './jsm/webxr/ARButton.js';
 
 let camera, scene, renderer;
 let controller;
