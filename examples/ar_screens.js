@@ -64,7 +64,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     titleCtx.font = 'bold 28px Arial';
     titleCtx.textAlign = 'center';
     titleCtx.textBaseline = 'middle';
-    titleCtx.fillText(`AR Screen ${screens.length + 1}`, 256, 32);
+    titleCtx.fillText(`Screen ${screens.length + 1}`, 256, 32);
     
     const titleTexture = new THREE.CanvasTexture(titleCanvas);
     const titleGeometry = new THREE.PlaneGeometry(0.7, 0.06);
@@ -133,7 +133,7 @@ function createFallbackTexture(screenNumber) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(`AR Screen ${screenNumber}`, canvas.width/2, 40);
+    ctx.fillText(`Screen ${screenNumber}`, canvas.width/2, 40);
     
     // Draw content area
     ctx.fillStyle = '#ffffff';

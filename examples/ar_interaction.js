@@ -193,10 +193,10 @@ function onSelect(event) {
 
 // Handle control panel button actions
 function handleButtonAction(button) {
-    console.log("Handling button action:", button.userData.action);
+    // Get the action for this button
+    const action = button.userData.action;
     
-    // Check the button's action
-    if (button.userData.action === 'newScreen') {
+    if (action === 'newScreen') {
         // Start placing a new screen
         isPlacingScreen = true;
         
@@ -210,7 +210,7 @@ function handleButtonAction(button) {
         
         // Create the new screen
         newScreen = createNewBrowserScreen(position);
-        showNotification("New screen created!");
+        console.log("New screen created!");
         
         // Make it face the user
         newScreen.lookAt(camera.position);
@@ -228,7 +228,7 @@ function handleButtonAction(button) {
         return;
     }
     
-    if (button.userData.action === 'moveScreen') {
+    if (action === 'moveScreen') {
         // Always toggle move mode regardless of selected screen
         isMoveModeActive = !isMoveModeActive;
         button.userData.isActive = isMoveModeActive;
@@ -247,15 +247,15 @@ function handleButtonAction(button) {
                 rotateButton.userData.isActive = false;
             });
             
-            showNotification("Move mode activated");
+            console.log("Move mode activated");
         } else {
             button.material.color.set(0x777777); // Grey when inactive
-            showNotification("Move mode deactivated");
+            console.log("Move mode deactivated");
         }
         return;
     }
     
-    if (button.userData.action === 'rotateScreen') {
+    if (action === 'rotateScreen') {
         // Always toggle rotate mode regardless of selected screen
         isRotateModeActive = !isRotateModeActive;
         button.userData.isActive = isRotateModeActive;
@@ -274,15 +274,15 @@ function handleButtonAction(button) {
                 moveButton.userData.isActive = false;
             });
             
-            showNotification("Rotate mode activated");
+            console.log("Rotate mode activated");
         } else {
             button.material.color.set(0x777777); // Grey when inactive
-            showNotification("Rotate mode deactivated");
+            console.log("Rotate mode deactivated");
         }
         return;
     }
     
-    if (button.userData.action === 'endAR') {
+    if (action === 'endAR') {
         // End the AR session
         if (renderer.xr.isPresenting) {
             renderer.xr.getSession().end();
@@ -397,232 +397,147 @@ function findButtonsByAction(action) {
 
 // Touch start handler
 function onTouchStart(event) {
-    if (!touchEnabled || !event.touches[0]) return;
-    
     event.preventDefault();
+
+    // Convert touch to normalized device coordinates
+    const touch = event.touches[0];
+    initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    initialTouchPosition.y = - (touch.clientY / window.innerHeight) * 2 + 1;
     
-    console.log("Touch start detected");
-    
-    // Store initial touch position
-    initialTouchPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-    initialTouchPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-    
-    // Cast ray from touch position
+    // Update the raycaster
     raycaster.setFromCamera(initialTouchPosition, camera);
     
-    // First check for button touches - prioritize UI interaction
+    // First, check if we touched a button
+    const buttons = findButtonsInScene();
+    const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
-    // Check for control panel button interactions
-    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
-    let controlIntersects = [];
-    
-    controlPanels.forEach(panel => {
-        // Get all button children
-        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        controlIntersects = controlIntersects.concat(buttonIntersects);
-    });
-    
-    if (controlIntersects.length > 0) {
-        const button = controlIntersects[0].object;
-        console.log("Control button touched:", button.userData.action);
+    if (buttonIntersects.length > 0) {
+        let buttonObject = buttonIntersects[0].object;
         
-        // Show visual feedback
-        const originalColor = button.material.color.clone();
-        button.material.color.set(0xffffff);
-        setTimeout(() => {
-            button.material.color.copy(originalColor);
-        }, 200);
+        // If we hit a child of a button (like the icon), get the parent button
+        if (!buttonObject.userData || !buttonObject.userData.type) {
+            buttonObject = buttonObject.parent;
+        }
         
-        // Handle button actions
-        handleButtonAction(button);
-        return; // Stop processing other touches
+        if (buttonObject.userData && buttonObject.userData.type === 'button') {
+            handleButtonAction(buttonObject);
+            
+            // Visual feedback for button press
+            const originalColor = buttonObject.material.color.clone();
+            buttonObject.material.color.set(0x4FC3F7); // Highlight color
+            setTimeout(() => {
+                buttonObject.material.color.copy(originalColor);
+            }, 200);
+            
+            return; // Don't continue with other interactions
+        }
     }
     
-    // Check for screen button interactions (like rotate, resize, close buttons)
-    let screenButtonIntersects = [];
-    screens.forEach(screen => {
-        const buttons = screen.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        
-        buttonIntersects.forEach(intersect => {
-            intersect.object.parent = screen; // Ensure the parent reference is set
-            screenButtonIntersects.push(intersect);
-        });
-    });
+    // Check for control panel touches
+    const panelIntersects = raycaster.intersectObjects(
+        scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel'),
+        true
+    );
     
-    // Sort by distance
-    screenButtonIntersects.sort((a, b) => a.distance - b.distance);
-    
-    if (screenButtonIntersects.length > 0) {
-        const intersect = screenButtonIntersects[0];
-        const screen = intersect.object.parent;
-        const button = intersect.object;
-        console.log("Screen button touched:", button.userData.action);
-        
-        // Select the screen first
-        selectScreen(screen);
-        
-        // Show visual feedback
-        const originalColor = button.material.color.clone();
-        button.material.color.set(0xffffff);
-        setTimeout(() => {
-            button.material.color.copy(originalColor);
-        }, 200);
-        
-        // Handle the button action
-        handleScreenButtonAction(button, screen);
-        return; // Stop processing other touches
+    if (panelIntersects.length > 0) {
+        return; // Touched the panel but not a button, do nothing
     }
     
-    // Check for screen selection
-    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0]));
-    
+    // Test if we touched a screen
+    const screenIntersects = raycaster.intersectObjects(screens, true);
     if (screenIntersects.length > 0) {
-        const selectedObject = screenIntersects[0].object;
-        const screen = selectedObject.parent;
+        const obj = screenIntersects[0].object;
         
-        console.log("Screen touched, modes:", isMoveModeActive ? "Move" : "", isRotateModeActive ? "Rotate" : "");
-        
-        // Select the screen first
-        selectScreen(screen);
-        
-        if (isMoveModeActive) {
-            // Direct screen dragging mode
-            isDraggingScreen = true;
-            
-            // Calculate the offset from the touch point to the screen center
-            const intersectionPoint = screenIntersects[0].point.clone();
-            screenOffset.copy(screen.position).sub(intersectionPoint);
-            
-            showNotification("Moving screen...");
-        } 
-        else if (isRotateModeActive) {
-            // Start rotating the screen
-            isRotatingScreen = true;
-            
-            // Store initial rotation
-            initialRotation.copy(screen.rotation);
-            
-            showNotification("Rotating screen...");
+        // Find the screen group this object belongs to
+        let screenObj = obj;
+        while (screenObj && (!screenObj.userData || screenObj.userData.type !== 'screen')) {
+            screenObj = screenObj.parent;
         }
-        else {
-            // Default to moving when neither mode is active for better usability
-            isDraggingScreen = true;
+        
+        if (screenObj && screenObj.userData && screenObj.userData.type === 'screen') {
+            // Select the screen
+            selectScreen(screenObj);
+            selectedScreen = screenObj;
             
-            // Calculate the offset from the touch point to the screen center
-            const intersectionPoint = screenIntersects[0].point.clone();
-            screenOffset.copy(screen.position).sub(intersectionPoint);
+            // If we're in move mode, start moving the screen
+            if (isMoveModeActive) {
+                isMovingScreen = true;
+                
+                // Store intersection point for relative movement
+                screenOffset.copy(screenObj.position).sub(screenIntersects[0].point);
+            }
             
-            showNotification("Moving screen...");
+            // If we're in rotate mode, start rotating the screen
+            if (isRotateModeActive) {
+                isRotatingScreen = true;
+                
+                // Store initial rotation for relative movement
+                initialRotation.copy(screenObj.rotation);
+            }
         }
-        return;
+    } else {
+        // Touched empty space, deselect current screen
+        /*if (selectedScreen) {
+            selectedScreen.userData.isSelected = false;
+            selectedScreen = null;
+        }*/
     }
 }
 
 // Touch move handler
 function onTouchMove(event) {
-    if (!touchEnabled || !event.touches[0]) return;
+    if (!isMovingScreen && !isRotatingScreen) return;
     
     event.preventDefault();
     
-    // Get current touch position
-    const currentTouchPosition = new THREE.Vector2(
-        (event.touches[0].clientX / window.innerWidth) * 2 - 1,
-        -(event.touches[0].clientY / window.innerHeight) * 2 + 1
-    );
+    // Convert touch to normalized device coordinates
+    const touch = event.touches[0];
+    initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    initialTouchPosition.y = - (touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Calculate movement delta
-    const deltaX = currentTouchPosition.x - initialTouchPosition.x;
-    const deltaY = currentTouchPosition.y - initialTouchPosition.y;
-    
-    // Update screen based on interaction type
-    if ((isDraggingScreen || isTouchMoving) && selectedScreen) {
-        console.log("Dragging screen");
+    // Handle screen movement
+    if (isMovingScreen && selectedScreen) {
+        // Update the raycaster
+        raycaster.setFromCamera(initialTouchPosition, camera);
         
-        // Get ray intersection with z-plane
-        raycaster.setFromCamera(currentTouchPosition, camera);
+        // Create a plane at the camera's distance to the screen
+        const movePlane = new THREE.Plane();
+        movePlane.setFromNormalAndCoplanarPoint(
+            camera.getWorldDirection(new THREE.Vector3()).negate(),
+            screenOffset
+        );
         
-        // Create a plane parallel to the camera view
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
+        // Find the intersection point with the plane
+        const targetPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(movePlane, targetPoint);
         
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        const intersectionPoint = new THREE.Vector3();
-        if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-            // Move the screen to the new position, accounting for the initial offset
-            selectedScreen.position.copy(intersectionPoint.add(screenOffset));
-            
-            // Update keyboard position if visible
-            if (virtualKeyboard && virtualKeyboard.visible) {
-                updateKeyboardPosition(selectedScreen);
-            }
+        // Move the screen to the new position
+        if (targetPoint) {
+            selectedScreen.position.copy(targetPoint);
         }
     }
     
+    // Handle screen rotation
     if (isRotatingScreen && selectedScreen) {
-        console.log("Rotating screen");
+        // Calculate rotation delta
+        const deltaX = initialTouchPosition.x - initialTouchPosition.x;
+        const deltaY = initialTouchPosition.y - initialTouchPosition.y;
         
-        // Calculate rotation based on finger movement
-        // X movement controls Y rotation (left/right)
-        // Y movement controls X rotation (up/down)
-        selectedScreen.rotation.y += deltaX * 2.0;
-        selectedScreen.rotation.x += deltaY * 2.0;
+        // Apply rotation - make Y axis movement rotate around X axis and vice versa
+        selectedScreen.rotation.x = initialRotation.x + (deltaY * 2);
+        selectedScreen.rotation.y = initialRotation.y + (deltaX * 2);
         
-        // Limit rotation angles to avoid extreme angles
-        selectedScreen.rotation.x = THREE.MathUtils.clamp(
-            selectedScreen.rotation.x,
-            -Math.PI / 2,  // Limit to 90 degrees up
-            Math.PI / 2    // Limit to 90 degrees down
-        );
+        // Limit rotation to reasonable angles
+        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, selectedScreen.rotation.x));
     }
-    
-    if (isTiltingScreen && selectedScreen) {
-        console.log("Tilting screen");
-        
-        // Scale the movement for tilting
-        const tiltAmount = deltaY * 2.0;
-        
-        // Apply tilt with constraints (limit to reasonable angles)
-        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, initialTilt.x + tiltAmount));
-    }
-    
-    if (isResizingScreen && selectedScreen) {
-        console.log("Resizing screen");
-        
-        // Scale the movement for resizing
-        const scaleX = Math.max(0.5, Math.min(2.0, selectedScreen.scale.x + deltaX * 2.0));
-        const scaleY = Math.max(0.5, Math.min(2.0, selectedScreen.scale.y + deltaY * 2.0));
-        
-        // Apply scaling
-        selectedScreen.scale.set(scaleX, scaleY, 1);
-    }
-    
-    // Update initial position for next move
-    initialTouchPosition.copy(currentTouchPosition);
 }
 
 // Touch end handler
 function onTouchEnd(event) {
-    console.log("Touch end detected");
+    event.preventDefault();
     
-    // Save the state of what was being interacted with
-    const wasMoving = isDraggingScreen || isTouchMoving;
-    const wasRotating = isRotatingScreen;
-    
-    // Reset all interaction states
-    isTouchMoving = false;
+    // End screen movement or rotation
+    isMovingScreen = false;
     isRotatingScreen = false;
-    isTiltingScreen = false;
     isResizingScreen = false;
-    isDraggingScreen = false;
-    
-    // Show completion notification
-    if (wasMoving && selectedScreen) {
-        showNotification("Screen moved successfully");
-    } else if (wasRotating && selectedScreen) {
-        showNotification("Screen rotated successfully");
-    }
 } 

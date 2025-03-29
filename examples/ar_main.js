@@ -35,9 +35,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!supported) {
             // Show error message for unsupported browsers
             if (loadingMessage) loadingMessage.style.display = 'none';
-            if (errorMessage) errorMessage.style.display = 'block';
-            
-            console.error('WebXR AR is not supported on this device or browser');
+            if (errorMessage) {
+                errorMessage.style.display = 'block';
+                console.error('WebXR AR is not supported on this device or browser');
+            } else {
+                // If error message element doesn't exist, create one
+                const errorDiv = document.createElement('div');
+                errorDiv.id = 'errorMessage';
+                errorDiv.style.position = 'absolute';
+                errorDiv.style.top = '50%';
+                errorDiv.style.left = '50%';
+                errorDiv.style.transform = 'translate(-50%, -50%)';
+                errorDiv.style.color = '#fff';
+                errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+                errorDiv.style.padding = '20px';
+                errorDiv.style.borderRadius = '10px';
+                errorDiv.style.fontFamily = 'Arial, sans-serif';
+                errorDiv.style.fontSize = '18px';
+                errorDiv.style.textAlign = 'center';
+                errorDiv.style.zIndex = '1000';
+                
+                errorDiv.innerHTML = `
+                    <h2>WebXR AR Not Supported</h2>
+                    <p>Your browser or device does not support WebXR Augmented Reality.</p>
+                    <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+                `;
+                
+                document.body.appendChild(errorDiv);
+            }
             return;
         }
         

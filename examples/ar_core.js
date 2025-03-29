@@ -3,8 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createNotification } from './ar_ui.js';
-import { createVirtualKeyboard } from './ar_ui.js';
+import { createControlPanel, createVirtualKeyboard } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 
 // Global variables exported for use in other modules
@@ -29,8 +28,8 @@ export function initAR() {
         return true;
     } catch (error) {
         console.error("Error initializing AR:", error);
-        // Show error in notification
-        createNotification("Error initializing AR: " + error.message, "error");
+        // Show error in console only to avoid circular dependencies
+        console.error("Error initializing AR: " + error.message);
         return false;
     }
 }

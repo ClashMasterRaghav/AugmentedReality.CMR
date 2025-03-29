@@ -12,13 +12,7 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let isResizeModeActive = false;
 
-// Initialize UI elements
-export function initUI() {
-    createControlPanel();
-    createVirtualKeyboard();
-}
-
-// Create notification in both DOM and 3D space
+// Export notification functions explicitly at the top level
 export function createNotification(message, type = 'info') {
     console.log(`Notification (${type}): ${message}`);
     
@@ -29,6 +23,15 @@ export function createNotification(message, type = 'info') {
     if (renderer && camera) {
         create3DNotification(message, type);
     }
+}
+
+// Alias for backward compatibility
+export const showNotification = createNotification;
+
+// Initialize UI elements
+export function initUI() {
+    createControlPanel();
+    createVirtualKeyboard();
 }
 
 // Create a notification in the DOM
@@ -93,9 +96,20 @@ function create3DNotification(message, type = 'info') {
             bgColor = 'rgba(0, 0, 0, 0.7)';
     }
     
-    // Draw background
+    // Draw rounded rectangle background (compatible with all browsers)
     context.fillStyle = bgColor;
-    context.roundRect(0, 0, canvas.width, canvas.height, 20);
+    // Use path drawing instead of roundRect for better compatibility
+    context.beginPath();
+    context.moveTo(20, 0);
+    context.lineTo(canvas.width - 20, 0);
+    context.quadraticCurveTo(canvas.width, 0, canvas.width, 20);
+    context.lineTo(canvas.width, canvas.height - 20);
+    context.quadraticCurveTo(canvas.width, canvas.height, canvas.width - 20, canvas.height);
+    context.lineTo(20, canvas.height);
+    context.quadraticCurveTo(0, canvas.height, 0, canvas.height - 20);
+    context.lineTo(0, 20);
+    context.quadraticCurveTo(0, 0, 20, 0);
+    context.closePath();
     context.fill();
     
     // Draw text
@@ -140,21 +154,18 @@ function create3DNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Alias for backward compatibility
-export const showNotification = createNotification;
-
-// Create a control panel with buttons
+// Create a minimalist control panel with buttons
 export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
     
     // Panel background
-    const panelSize = { width: 0.2, height: 0.2 };
+    const panelSize = { width: 0.25, height: 0.15 };
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
     const panelMaterial = new THREE.MeshBasicMaterial({
-        color: 0x222222,
+        color: 0x111111,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.9,
         side: THREE.DoubleSide
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
@@ -163,9 +174,9 @@ export function createControlPanel() {
     // Add glow effect around the panel
     const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.02, panelSize.height + 0.02);
     const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00aaff,
+        color: 0x00ccff,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.5,
         side: THREE.DoubleSide
     });
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -173,22 +184,21 @@ export function createControlPanel() {
     controlPanel.add(glowMesh);
     
     // Define button parameters
-    const buttonSize = 0.05;
-    const buttonMargin = 0.015;
+    const buttonSize = 0.06; // Larger buttons for touch
+    const buttonSpacing = 0.08;
+    
+    // Create buttons - only 3 buttons: New Screen, Move, and Rotate
     const buttonPositions = [
-        { x: -0.05, y: 0.05 },  // Top left - New Screen
-        { x: 0.05, y: 0.05 },   // Top right - Move
-        { x: -0.05, y: -0.05 }, // Bottom left - Rotate
-        { x: 0.05, y: -0.05 }   // Bottom right - Resize
+        { x: -buttonSpacing, y: 0 },  // Left - New Screen
+        { x: 0, y: 0 },               // Center - Move
+        { x: buttonSpacing, y: 0 }    // Right - Rotate
     ];
     
-    // Create buttons
-    const buttonNames = ['New Screen', 'Move', 'Rotate', 'Resize'];
-    const buttonColors = [0x2196F3, 0x777777, 0x777777, 0x777777];
-    const buttons = [];
+    const buttonActions = ['newScreen', 'moveScreen', 'rotateScreen'];
+    const buttonColors = [0x2196F3, 0x777777, 0x777777]; // Blue, Grey, Grey
     
     buttonPositions.forEach((position, index) => {
-        // Create button mesh
+        // Create button mesh with circle geometry for better touch targeting
         const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             color: buttonColors[index],
@@ -200,18 +210,18 @@ export function createControlPanel() {
         button.position.set(position.x, position.y, 0.001);
         button.userData = {
             type: 'button',
-            name: buttonNames[index],
+            action: buttonActions[index],
             hoverColor: 0x4FC3F7,
             originalColor: buttonColors[index],
+            isToggle: index > 0, // Move and Rotate are toggles
             isActive: index === 0 // Only New Screen starts as active
         };
         
         controlPanel.add(button);
-        buttons.push(button);
         
         // Add icon to button using canvas texture
         const iconTexture = createButtonIcon(index);
-        const iconSize = buttonSize * 0.7;
+        const iconSize = buttonSize * 0.8; // Larger icon
         const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
             map: iconTexture,
@@ -224,7 +234,7 @@ export function createControlPanel() {
     });
     
     // Add control panel to scene
-    controlPanel.position.set(0, -0.15, -0.5);
+    controlPanel.position.set(0, -0.25, -0.5);
     controlPanel.userData = { type: 'controlPanel' };
     
     // Make the control panel follow the camera
@@ -258,87 +268,78 @@ function createButtonIcon(buttonIndex) {
     // Set up shared styling
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 8; // Thicker lines for visibility
     ctx.lineCap = 'round';
     
     // Draw different icons based on button index
     switch(buttonIndex) {
         case 0: // New Screen icon - Plus symbol
             ctx.beginPath();
-            ctx.moveTo(40, 64);
-            ctx.lineTo(88, 64);
+            ctx.moveTo(35, 64);
+            ctx.lineTo(93, 64);
             ctx.stroke();
             
             ctx.beginPath();
-            ctx.moveTo(64, 40);
-            ctx.lineTo(64, 88);
+            ctx.moveTo(64, 35);
+            ctx.lineTo(64, 93);
             ctx.stroke();
             break;
             
         case 1: // Move icon - Four arrows
             ctx.beginPath();
             // Left arrow
-            ctx.moveTo(30, 64);
-            ctx.lineTo(50, 64);
-            ctx.moveTo(40, 54);
-            ctx.lineTo(30, 64);
-            ctx.lineTo(40, 74);
+            ctx.moveTo(25, 64);
+            ctx.lineTo(45, 64);
+            ctx.moveTo(35, 54);
+            ctx.lineTo(25, 64);
+            ctx.lineTo(35, 74);
             
             // Right arrow
-            ctx.moveTo(98, 64);
-            ctx.lineTo(78, 64);
-            ctx.moveTo(88, 54);
-            ctx.lineTo(98, 64);
-            ctx.lineTo(88, 74);
+            ctx.moveTo(103, 64);
+            ctx.lineTo(83, 64);
+            ctx.moveTo(93, 54);
+            ctx.lineTo(103, 64);
+            ctx.lineTo(93, 74);
             
             // Up arrow
-            ctx.moveTo(64, 30);
-            ctx.lineTo(64, 50);
-            ctx.moveTo(54, 40);
-            ctx.lineTo(64, 30);
-            ctx.lineTo(74, 40);
+            ctx.moveTo(64, 25);
+            ctx.lineTo(64, 45);
+            ctx.moveTo(54, 35);
+            ctx.lineTo(64, 25);
+            ctx.lineTo(74, 35);
             
             // Down arrow
-            ctx.moveTo(64, 98);
-            ctx.lineTo(64, 78);
-            ctx.moveTo(54, 88);
-            ctx.lineTo(64, 98);
-            ctx.lineTo(74, 88);
+            ctx.moveTo(64, 103);
+            ctx.lineTo(64, 83);
+            ctx.moveTo(54, 93);
+            ctx.lineTo(64, 103);
+            ctx.lineTo(74, 93);
             
             ctx.stroke();
             break;
             
-        case 2: // Rotate icon - Circular arrow
+        case 2: // Rotate icon - Circular arrows for X and Y rotation
             ctx.beginPath();
-            ctx.arc(64, 64, 30, 0, 1.75 * Math.PI);
+            // X-axis rotation (horizontal oval)
+            ctx.save();
+            ctx.scale(1.5, 0.8);
+            ctx.arc(64/1.5, 64/0.8, 20, 0, 2 * Math.PI);
+            ctx.restore();
+            ctx.stroke();
+            
+            // Y-axis rotation (vertical oval)
+            ctx.beginPath();
+            ctx.save();
+            ctx.scale(0.8, 1.5);
+            ctx.arc(64/0.8, 64/1.5, 20, 0, 2 * Math.PI);
+            ctx.restore();
             ctx.stroke();
             
             // Arrow head
             ctx.beginPath();
-            ctx.moveTo(64, 34);
-            ctx.lineTo(54, 44);
-            ctx.lineTo(74, 44);
-            ctx.fill();
-            break;
-            
-        case 3: // Resize icon - Expand/contract arrows
-            ctx.beginPath();
-            // Top-left to bottom-right arrow
-            ctx.moveTo(40, 40);
-            ctx.lineTo(88, 88);
-            ctx.stroke();
-            
-            // Arrow heads
-            ctx.beginPath();
-            ctx.moveTo(40, 40);
-            ctx.lineTo(40, 55);
-            ctx.lineTo(55, 40);
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.moveTo(88, 88);
-            ctx.lineTo(88, 73);
-            ctx.lineTo(73, 88);
+            ctx.moveTo(100, 64);
+            ctx.lineTo(90, 54);
+            ctx.lineTo(90, 74);
             ctx.fill();
             break;
     }
