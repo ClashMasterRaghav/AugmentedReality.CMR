@@ -6,6 +6,8 @@ import { screens } from './ar_screens.js';
 // Export video texture reference
 export let videoTexture;
 export let videoElement;
+export let currentTime = 0;
+export let duration = 100; // Default duration if not available
 
 // Load video texture for AR content
 export function loadVideoTexture() {
@@ -51,7 +53,14 @@ export function loadVideoTexture() {
         // Add event listeners for video load status
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
+            duration = videoElement.duration || 100;
             updateExistingScreensWithVideo();
+        });
+        
+        videoElement.addEventListener('timeupdate', () => {
+            currentTime = videoElement.currentTime;
+            // Update progress bars on all screens
+            updateVideoProgress();
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -73,6 +82,225 @@ export function loadVideoTexture() {
         console.error("Error in loadVideoTexture:", error);
         return createFallbackTexture("Error: " + error.message);
     }
+}
+
+// Update video progress on all screens
+function updateVideoProgress() {
+    if (!videoElement || !screens) return;
+    
+    const progress = currentTime / duration;
+    
+    screens.forEach(screen => {
+        // Find progress bar in screen
+        const progressBar = screen.children.find(child => 
+            child.geometry && 
+            child.geometry.type === 'PlaneGeometry' && 
+            Math.abs(child.position.y - (-0.21)) < 0.001 &&
+            child.material.color.getHex() === 0xff0000);
+        
+        if (progressBar) {
+            // Update progress bar width and position
+            progressBar.scale.x = progress;
+            // Adjust position to keep left-aligned
+            progressBar.position.x = -0.37 + (progress * 0.37);
+            
+            // Update progress in userData
+            if (screen.userData && screen.userData.controls) {
+                screen.userData.controls.progress = progress;
+            }
+        }
+    });
+}
+
+// Toggle video playback
+export function toggleVideoPlayback() {
+    if (!videoElement) return;
+    
+    if (videoElement.paused) {
+        videoElement.play().then(() => {
+            updatePlayPauseIcons(false);
+        }).catch(e => {
+            console.error("Video play error:", e);
+        });
+    } else {
+        videoElement.pause();
+        updatePlayPauseIcons(true);
+    }
+}
+
+// Toggle video mute
+export function toggleVideoMute() {
+    if (!videoElement) return;
+    
+    videoElement.muted = !videoElement.muted;
+    updateMuteIcons(videoElement.muted);
+}
+
+// Update play/pause icons on all screens
+function updatePlayPauseIcons(isPaused) {
+    screens.forEach(screen => {
+        // Find play/pause button
+        const playButton = findButtonInScreen(screen, 'playButton');
+        if (playButton) {
+            // Update icon
+            updateButtonIcon(playButton, isPaused ? 'play' : 'pause');
+            
+            // Update in userData
+            if (screen.userData && screen.userData.controls) {
+                screen.userData.controls.isPlaying = !isPaused;
+            }
+        }
+    });
+}
+
+// Update mute icons on all screens
+function updateMuteIcons(isMuted) {
+    screens.forEach(screen => {
+        // Find volume button
+        const volumeButton = findButtonInScreen(screen, 'volumeButton');
+        if (volumeButton) {
+            // Update icon
+            updateButtonIcon(volumeButton, isMuted ? 'muted' : 'volume');
+            
+            // Update in userData
+            if (screen.userData && screen.userData.controls) {
+                screen.userData.controls.isMuted = isMuted;
+            }
+        }
+    });
+}
+
+// Find a button in a screen by action
+function findButtonInScreen(screen, action) {
+    return screen.children.find(child => 
+        child.userData && 
+        child.userData.type === 'button' && 
+        child.userData.action === action);
+}
+
+// Update a button's icon
+function updateButtonIcon(button, newType) {
+    // Find icon mesh (first child)
+    const iconMesh = button.children[0];
+    if (iconMesh && iconMesh.material && iconMesh.material.map) {
+        // Create new icon texture
+        const newTexture = createControlIcon(newType);
+        iconMesh.material.map.dispose();
+        iconMesh.material.map = newTexture;
+        iconMesh.material.needsUpdate = true;
+    }
+}
+
+// Create control button icons
+function createControlIcon(type) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas and set styles
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    
+    switch(type) {
+        case 'play':
+            // Draw play icon (triangle)
+            ctx.beginPath();
+            ctx.moveTo(22, 16);
+            ctx.lineTo(22, 48);
+            ctx.lineTo(48, 32);
+            ctx.closePath();
+            ctx.fill();
+            break;
+            
+        case 'pause':
+            // Draw pause icon (two vertical bars)
+            ctx.fillRect(20, 16, 8, 32);
+            ctx.fillRect(36, 16, 8, 32);
+            break;
+            
+        case 'volume':
+            // Draw volume icon
+            // Speaker base
+            ctx.beginPath();
+            ctx.moveTo(16, 24);
+            ctx.lineTo(24, 24);
+            ctx.lineTo(32, 16);
+            ctx.lineTo(32, 48);
+            ctx.lineTo(24, 40);
+            ctx.lineTo(16, 40);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Sound waves
+            ctx.beginPath();
+            ctx.moveTo(40, 22);
+            ctx.bezierCurveTo(45, 30, 45, 34, 40, 42);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(44, 18);
+            ctx.bezierCurveTo(52, 28, 52, 36, 44, 46);
+            ctx.stroke();
+            break;
+            
+        case 'muted':
+            // Draw muted icon
+            // Speaker base
+            ctx.beginPath();
+            ctx.moveTo(16, 24);
+            ctx.lineTo(24, 24);
+            ctx.lineTo(32, 16);
+            ctx.lineTo(32, 48);
+            ctx.lineTo(24, 40);
+            ctx.lineTo(16, 40);
+            ctx.closePath();
+            ctx.fill();
+            
+            // X mark for mute
+            ctx.beginPath();
+            ctx.moveTo(38, 22);
+            ctx.lineTo(52, 42);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(38, 42);
+            ctx.lineTo(52, 22);
+            ctx.stroke();
+            break;
+            
+        case 'fullscreen':
+            // Draw fullscreen icon
+            ctx.beginPath();
+            // Top-left corner
+            ctx.moveTo(18, 26);
+            ctx.lineTo(18, 18);
+            ctx.lineTo(26, 18);
+            
+            // Top-right corner
+            ctx.moveTo(38, 18);
+            ctx.lineTo(46, 18);
+            ctx.lineTo(46, 26);
+            
+            // Bottom-right corner
+            ctx.moveTo(46, 38);
+            ctx.lineTo(46, 46);
+            ctx.lineTo(38, 46);
+            
+            // Bottom-left corner
+            ctx.moveTo(26, 46);
+            ctx.lineTo(18, 46);
+            ctx.lineTo(18, 38);
+            ctx.stroke();
+            break;
+    }
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
 }
 
 // Create a fallback texture when video fails

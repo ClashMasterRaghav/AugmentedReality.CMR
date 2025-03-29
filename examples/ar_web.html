@@ -117,7 +117,7 @@
 		</div>
 
 		<!-- Hidden video element that will be used as texture -->
-		<video id="videoElement" loop muted crossorigin="anonymous">
+		<video id="videoElement" loop crossorigin="anonymous" playsInline>
 			<source src="textures/ar_videoplayback.mp4" type="video/mp4">
 			<!-- Fallback to other videos if ar_videoplayback.mp4 is not found -->
 			<source src="textures/sintel.mp4" type="video/mp4">
@@ -135,6 +135,13 @@
 			<h2>WebXR AR Not Supported</h2>
 			<p>Your browser or device does not support WebXR Augmented Reality.</p>
 			<p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+		</div>
+
+		<!-- Initial interaction trigger for video playback on mobile devices -->
+		<div id="interactionHelper" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+			background-color: rgba(0,0,0,0.8); z-index: 1000; color: white; text-align: center; padding-top: 40%;">
+			<h2>Tap to Enable Video</h2>
+			<p>Tap anywhere to start your AR experience with video and audio.</p>
 		</div>
 
 		<script type="importmap">
