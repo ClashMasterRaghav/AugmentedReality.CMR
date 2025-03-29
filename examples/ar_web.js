@@ -16,6 +16,9 @@ let selectedScreen = null; // Currently selected screen
 let isPlacingScreen = false; // Flag to indicate if user is currently placing a screen
 let newScreen = null; // Reference to a new screen being placed
 let isMovingScreen = false; // Flag to indicate if user is currently moving a screen
+let touchEnabled = true; // Flag to enable touch controls
+let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
+let isTouchMoving = false; // Flag to track if touch movement is in progress
 
 init();
 animate();
@@ -76,6 +79,11 @@ function init() {
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
+    
+    // Add touch event listeners
+    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
 function createControlPanel() {
@@ -150,15 +158,15 @@ function createControlPanel() {
     const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
     moveButtonLabel.position.set(0, -0.04, 0.002);
     panel.add(moveButtonLabel);
-    
-    // Position the control panel on user's left
-    panel.position.set(-0.5, 0, -0.8);
-    panel.rotation.y = Math.PI / 6; // Angle slightly toward user
+
+    // Position the control panel in front of the user
+    panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
+    panel.rotation.x = -Math.PI / 8; // Tilt slightly up
     panel.userData = { type: 'controlPanel' };
     scene.add(panel);
 }
 
-function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -0.8)) {
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // Default position moved back
     const browserWindow = new THREE.Group();
     
     // Browser background with border
@@ -282,6 +290,102 @@ function createBrowserContentTexture(screenNumber) {
     texture.needsUpdate = true;
     
     return texture;
+}
+
+function onTouchStart(event) {
+    if (!touchEnabled || !event.touches[0]) return;
+    
+    event.preventDefault();
+    
+    // Store initial touch position
+    initialTouchPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+    initialTouchPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+    
+    // Cast ray from touch position
+    raycaster.setFromCamera(initialTouchPosition, camera);
+    
+    // Check for screen selection
+    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0]));
+    
+    if (screenIntersects.length > 0) {
+        const selectedObject = screenIntersects[0].object;
+        const screen = selectedObject.parent;
+        selectScreen(screen);
+        isTouchMoving = true;
+        return;
+    }
+    
+    // Check for control panel button interactions
+    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
+    let controlIntersects = [];
+    
+    controlPanels.forEach(panel => {
+        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
+        const buttonIntersects = raycaster.intersectObjects(buttons);
+        controlIntersects = controlIntersects.concat(buttonIntersects);
+    });
+    
+    if (controlIntersects.length > 0) {
+        const button = controlIntersects[0].object;
+        
+        // Handle button actions
+        if (button.userData.action === 'newScreen') {
+            // Create a new screen in front of the camera
+            const position = new THREE.Vector3(0, 0, -1.2);
+            position.applyMatrix4(camera.matrixWorld);
+            
+            newScreen = createNewBrowserScreen(position);
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+        }
+        
+        if (button.userData.action === 'moveScreen' && selectedScreen) {
+            // Start moving the selected screen
+            isMovingScreen = true;
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+        }
+    }
+}
+
+function onTouchMove(event) {
+    if (!touchEnabled || !event.touches[0] || !isTouchMoving || !selectedScreen) return;
+    
+    event.preventDefault();
+    
+    // Get current touch position
+    const currentTouchPosition = new THREE.Vector2(
+        (event.touches[0].clientX / window.innerWidth) * 2 - 1,
+        -(event.touches[0].clientY / window.innerHeight) * 2 + 1
+    );
+    
+    // Calculate movement delta
+    const deltaX = currentTouchPosition.x - initialTouchPosition.x;
+    const deltaY = currentTouchPosition.y - initialTouchPosition.y;
+    
+    // Update screen position based on touch movement
+    // Scale the movement to make it more natural
+    const movementScale = 2.0;
+    selectedScreen.position.x += deltaX * movementScale;
+    selectedScreen.position.y += deltaY * movementScale;
+    
+    // Update initial position for next move
+    initialTouchPosition.copy(currentTouchPosition);
+}
+
+function onTouchEnd(event) {
+    isTouchMoving = false;
+    isMovingScreen = false;
 }
 
 function createVirtualKeyboard() {
@@ -576,7 +680,7 @@ function animate() {
 
 function render() {
     // Handle screen placement or movement
-    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
+    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen && !isTouchMoving)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
         
         // Get controller position and direction
