@@ -159,24 +159,24 @@ export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
     
-    // Panel background
+    // Panel background - fully opaque now
     const panelSize = { width: 0.25, height: 0.15 };
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
     const panelMaterial = new THREE.MeshBasicMaterial({
         color: 0x111111,
-        transparent: true,
-        opacity: 0.9,
+        transparent: false, // Make fully opaque
+        opacity: 1.0,
         side: THREE.DoubleSide
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     controlPanel.add(panelMesh);
     
-    // Add glow effect around the panel
+    // Add stronger glow effect around the panel
     const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.02, panelSize.height + 0.02);
     const glowMaterial = new THREE.MeshBasicMaterial({
         color: 0x00ccff,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.7, // Increased opacity for better visibility
         side: THREE.DoubleSide
     });
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -203,7 +203,7 @@ export function createControlPanel() {
         const buttonMaterial = new THREE.MeshBasicMaterial({
             color: buttonColors[index],
             transparent: true,
-            opacity: 0.9,
+            opacity: 1.0, // Full opacity for buttons
             side: THREE.DoubleSide
         });
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
@@ -212,6 +212,8 @@ export function createControlPanel() {
             type: 'button',
             action: buttonActions[index],
             hoverColor: 0x4FC3F7,
+            activeColor: index === 0 ? 0x2196F3 : 0x44cc88, // New button is blue, others green when active
+            inactiveColor: 0x777777,
             originalColor: buttonColors[index],
             isToggle: index > 0, // Move and Rotate are toggles
             isActive: index === 0 // Only New Screen starts as active
@@ -231,11 +233,30 @@ export function createControlPanel() {
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
         iconMesh.position.z = 0.002;
         button.add(iconMesh);
+        
+        // Add subtle shadow/depth effect
+        const buttonShadowGeometry = new THREE.CircleGeometry(buttonSize / 2 + 0.002, 32);
+        const buttonShadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const buttonShadow = new THREE.Mesh(buttonShadowGeometry, buttonShadowMaterial);
+        buttonShadow.position.z = -0.001;
+        button.add(buttonShadow);
     });
     
     // Add control panel to scene
     controlPanel.position.set(0, -0.25, -0.5);
-    controlPanel.userData = { type: 'controlPanel' };
+    controlPanel.userData = { 
+        type: 'controlPanel',
+        // Store references to button states for easy access
+        buttonStates: {
+            isMoveModeActive: false,
+            isRotateModeActive: false
+        }
+    };
     
     // Make the control panel follow the camera
     controlPanel.userData.update = function() {
@@ -250,6 +271,28 @@ export function createControlPanel() {
         
         this.position.copy(position);
         this.quaternion.copy(camera.quaternion);
+        
+        // Update button states
+        const buttons = this.children.filter(child => 
+            child.userData && child.userData.type === 'button');
+        
+        buttons.forEach(button => {
+            if (button.userData.action === 'moveScreen') {
+                if (button.userData.isActive !== isMoveModeActive) {
+                    button.userData.isActive = isMoveModeActive;
+                    button.material.color.set(isMoveModeActive ? 
+                        button.userData.activeColor : 
+                        button.userData.inactiveColor);
+                }
+            } else if (button.userData.action === 'rotateScreen') {
+                if (button.userData.isActive !== isRotateModeActive) {
+                    button.userData.isActive = isRotateModeActive;
+                    button.material.color.set(isRotateModeActive ? 
+                        button.userData.activeColor : 
+                        button.userData.inactiveColor);
+                }
+            }
+        });
     };
     
     scene.add(controlPanel);

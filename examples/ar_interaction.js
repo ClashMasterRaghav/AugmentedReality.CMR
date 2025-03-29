@@ -191,7 +191,12 @@ function toggleMoveMode(button) {
     isMoveModeActive = !isMoveModeActive;
     
     // Update button color
-    button.material.color.set(isMoveModeActive ? 0x44cc88 : 0x777777);
+    button.material.color.set(isMoveModeActive ? 
+        button.userData.activeColor || 0x44cc88 : 
+        button.userData.inactiveColor || 0x777777);
+    
+    // Store the button state directly in the userData
+    button.userData.isActive = isMoveModeActive;
     
     // Deactivate rotate mode if move is active
     if (isMoveModeActive) {
@@ -200,7 +205,8 @@ function toggleMoveMode(button) {
         // Find and update rotate button
         const rotateButton = findButtonByAction('rotateScreen');
         if (rotateButton) {
-            rotateButton.material.color.set(0x777777);
+            rotateButton.material.color.set(rotateButton.userData.inactiveColor || 0x777777);
+            rotateButton.userData.isActive = false;
         }
     }
     
@@ -212,7 +218,12 @@ function toggleRotateMode(button) {
     isRotateModeActive = !isRotateModeActive;
     
     // Update button color
-    button.material.color.set(isRotateModeActive ? 0xf39c12 : 0x777777);
+    button.material.color.set(isRotateModeActive ? 
+        button.userData.activeColor || 0xf39c12 : 
+        button.userData.inactiveColor || 0x777777);
+    
+    // Store the button state directly in the userData
+    button.userData.isActive = isRotateModeActive;
     
     // Deactivate move mode if rotate is active
     if (isRotateModeActive) {
@@ -221,7 +232,8 @@ function toggleRotateMode(button) {
         // Find and update move button
         const moveButton = findButtonByAction('moveScreen');
         if (moveButton) {
-            moveButton.material.color.set(0x777777);
+            moveButton.material.color.set(moveButton.userData.inactiveColor || 0x777777);
+            moveButton.userData.isActive = false;
         }
     }
     
