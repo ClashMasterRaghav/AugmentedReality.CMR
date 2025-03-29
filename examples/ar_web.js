@@ -19,6 +19,13 @@ let isMovingScreen = false; // Flag to indicate if user is currently moving a sc
 let touchEnabled = true; // Flag to enable touch controls
 let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
 let isTouchMoving = false; // Flag to track if touch movement is in progress
+// New variables for enhanced features
+let fabButton; // Floating action button for adding screens
+let isDraggingScreen = false; // Flag for direct screen dragging
+let screenOffset = new THREE.Vector3(); // Offset for screen dragging
+let isResizingScreen = false; // Flag for screen resizing
+let screenMenu; // Context menu for screen operations
+let floatingUI; // Group for floating UI elements that follow the user
 
 init();
 animate();
@@ -50,7 +57,7 @@ function init() {
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
         // Create UI controls once font is loaded
-        createControlPanel();
+        createFloatingUI();
         createVirtualKeyboard();
     });
 
@@ -86,87 +93,90 @@ function init() {
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
-function createControlPanel() {
-    const panel = new THREE.Group();
+// Replace the control panel with a floating UI that follows the user
+function createFloatingUI() {
+    // Create a group for all floating UI elements
+    floatingUI = new THREE.Group();
     
-    // Panel background
-    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.15);
-    const panelMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x444444,
+    // Create Floating Action Button (FAB) for adding screens
+    const fabGeometry = new THREE.CircleGeometry(0.05, 32);
+    const fabMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x4CAF50, // Green color
         side: THREE.DoubleSide
     });
-    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-    panel.add(panelMesh);
+    fabButton = new THREE.Mesh(fabGeometry, fabMaterial);
     
-    // New Screen button
-    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
-    const buttonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x666666,
-        side: THREE.DoubleSide
-    });
-    const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    newScreenButton.position.set(0, 0.04, 0.001);
-    newScreenButton.userData = { type: 'button', action: 'newScreen' };
-    panel.add(newScreenButton);
+    // Create plus icon for the FAB
+    const plusCanvas = document.createElement('canvas');
+    plusCanvas.width = 128;
+    plusCanvas.height = 128;
+    const plusCtx = plusCanvas.getContext('2d');
+    plusCtx.fillStyle = '#ffffff';
+    plusCtx.fillRect(54, 24, 20, 80); // Vertical bar
+    plusCtx.fillRect(24, 54, 80, 20); // Horizontal bar
     
-    // New Screen button label
-    const buttonCanvas = document.createElement('canvas');
-    buttonCanvas.width = 256;
-    buttonCanvas.height = 64;
-    const btnCtx = buttonCanvas.getContext('2d');
-    btnCtx.fillStyle = '#ffffff';
-    btnCtx.font = '24px Arial';
-    btnCtx.textAlign = 'center';
-    btnCtx.textBaseline = 'middle';
-    btnCtx.fillText('Add New Screen', 128, 32);
-    
-    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
-    const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
-    const buttonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: buttonTexture,
+    const plusTexture = new THREE.CanvasTexture(plusCanvas);
+    const plusGeometry = new THREE.CircleGeometry(0.04, 32);
+    const plusMaterial = new THREE.MeshBasicMaterial({ 
+        map: plusTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
-    buttonLabel.position.set(0, 0.04, 0.002);
-    panel.add(buttonLabel);
+    const plusIcon = new THREE.Mesh(plusGeometry, plusMaterial);
+    plusIcon.position.z = 0.001;
     
-    // Move Screen button
-    const moveButtonMaterial = buttonMaterial.clone();
-    const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
-    moveScreenButton.position.set(0, -0.04, 0.001);
-    moveScreenButton.userData = { type: 'button', action: 'moveScreen' };
-    panel.add(moveScreenButton);
+    fabButton.add(plusIcon);
+    fabButton.userData = { type: 'button', action: 'newScreen' };
     
-    // Move Screen button label
-    const moveButtonCanvas = document.createElement('canvas');
-    moveButtonCanvas.width = 256;
-    moveButtonCanvas.height = 64;
-    const moveBtnCtx = moveButtonCanvas.getContext('2d');
-    moveBtnCtx.fillStyle = '#ffffff';
-    moveBtnCtx.font = '24px Arial';
-    moveBtnCtx.textAlign = 'center';
-    moveBtnCtx.textBaseline = 'middle';
-    moveBtnCtx.fillText('Move Selected Screen', 128, 32);
-    
-    const moveButtonTexture = new THREE.CanvasTexture(moveButtonCanvas);
-    const moveButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: moveButtonTexture,
-        transparent: true,
+    // Add a subtle shadow/glow effect to make the FAB stand out
+    const glowGeometry = new THREE.CircleGeometry(0.06, 32);
+    const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x000000, 
+        transparent: true, 
+        opacity: 0.2,
         side: THREE.DoubleSide
     });
-    const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
-    moveButtonLabel.position.set(0, -0.04, 0.002);
-    panel.add(moveButtonLabel);
-
-    // Position the control panel in front of the user
-    panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
-    panel.rotation.x = -Math.PI / 8; // Tilt slightly up
-    panel.userData = { type: 'controlPanel' };
-    scene.add(panel);
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.position.z = -0.001;
+    fabButton.add(glow);
+    
+    // Position the FAB in the lower right corner of the user's view
+    fabButton.position.set(0.2, -0.2, -0.5);
+    floatingUI.add(fabButton);
+    
+    // Create a tooltip for the FAB
+    const tooltipCanvas = document.createElement('canvas');
+    tooltipCanvas.width = 256;
+    tooltipCanvas.height = 64;
+    const tooltipCtx = tooltipCanvas.getContext('2d');
+    tooltipCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    tooltipCtx.roundRect(0, 0, 256, 64, 10);
+    tooltipCtx.fill();
+    tooltipCtx.fillStyle = '#ffffff';
+    tooltipCtx.font = '20px Arial';
+    tooltipCtx.textAlign = 'center';
+    tooltipCtx.textBaseline = 'middle';
+    tooltipCtx.fillText('Add New Screen', 128, 32);
+    
+    const tooltipTexture = new THREE.CanvasTexture(tooltipCanvas);
+    const tooltipGeometry = new THREE.PlaneGeometry(0.2, 0.05);
+    const tooltipMaterial = new THREE.MeshBasicMaterial({ 
+        map: tooltipTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        opacity: 0.9
+    });
+    const tooltip = new THREE.Mesh(tooltipGeometry, tooltipMaterial);
+    tooltip.position.set(0.2, -0.12, -0.5); // Position above the FAB
+    tooltip.visible = false; // Hide initially
+    fabButton.userData.tooltip = tooltip;
+    floatingUI.add(tooltip);
+    
+    // Add the floating UI to the scene
+    scene.add(floatingUI);
 }
 
-function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // Default position moved back
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
     const browserWindow = new THREE.Group();
     
     // Browser background with border
@@ -231,13 +241,91 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // D
     contentPanel.position.z = 0.001;
     browserWindow.add(contentPanel);
     
+    // Add close button
+    const closeButtonGeometry = new THREE.CircleGeometry(0.02, 32);
+    const closeButtonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xff5252, // Red color
+        side: THREE.DoubleSide
+    });
+    const closeButton = new THREE.Mesh(closeButtonGeometry, closeButtonMaterial);
+    closeButton.position.set(0.37, 0.28, 0.002);
+    closeButton.userData = { type: 'button', action: 'closeScreen' };
+    browserWindow.add(closeButton);
+    
+    // Add X icon to close button
+    const xCanvas = document.createElement('canvas');
+    xCanvas.width = 64;
+    xCanvas.height = 64;
+    const xCtx = xCanvas.getContext('2d');
+    xCtx.strokeStyle = '#ffffff';
+    xCtx.lineWidth = 6;
+    xCtx.beginPath();
+    xCtx.moveTo(16, 16);
+    xCtx.lineTo(48, 48);
+    xCtx.moveTo(48, 16);
+    xCtx.lineTo(16, 48);
+    xCtx.stroke();
+    
+    const xTexture = new THREE.CanvasTexture(xCanvas);
+    const xGeometry = new THREE.CircleGeometry(0.015, 32);
+    const xMaterial = new THREE.MeshBasicMaterial({ 
+        map: xTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const xIcon = new THREE.Mesh(xGeometry, xMaterial);
+    xIcon.position.set(0.37, 0.28, 0.003);
+    browserWindow.add(xIcon);
+    
+    // Add resize handle
+    const resizeHandleGeometry = new THREE.PlaneGeometry(0.04, 0.04);
+    const resizeHandleMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x9e9e9e,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    const resizeHandle = new THREE.Mesh(resizeHandleGeometry, resizeHandleMaterial);
+    resizeHandle.position.set(0.38, -0.28, 0.002);
+    resizeHandle.userData = { type: 'button', action: 'resizeScreen' };
+    browserWindow.add(resizeHandle);
+    
+    // Add resize icon
+    const resizeCanvas = document.createElement('canvas');
+    resizeCanvas.width = 64;
+    resizeCanvas.height = 64;
+    const resizeCtx = resizeCanvas.getContext('2d');
+    resizeCtx.strokeStyle = '#ffffff';
+    resizeCtx.lineWidth = 4;
+    resizeCtx.beginPath();
+    // Draw diagonal lines in the corner
+    resizeCtx.moveTo(32, 48);
+    resizeCtx.lineTo(48, 32);
+    resizeCtx.moveTo(24, 48);
+    resizeCtx.lineTo(48, 24);
+    resizeCtx.moveTo(16, 48);
+    resizeCtx.lineTo(48, 16);
+    resizeCtx.stroke();
+    
+    const resizeTexture = new THREE.CanvasTexture(resizeCanvas);
+    const resizeIconGeometry = new THREE.PlaneGeometry(0.03, 0.03);
+    const resizeIconMaterial = new THREE.MeshBasicMaterial({ 
+        map: resizeTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const resizeIcon = new THREE.Mesh(resizeIconGeometry, resizeIconMaterial);
+    resizeIcon.position.set(0.38, -0.28, 0.003);
+    browserWindow.add(resizeIcon);
+    
     // Position the window
     browserWindow.position.copy(position);
     browserWindow.userData = { 
         type: 'screen', 
         id: screens.length, 
         isSelected: false,
-        content: `Screen ${screens.length + 1} Content`
+        content: `Screen ${screens.length + 1} Content`,
+        originalScale: new THREE.Vector3(1, 1, 1) // Store original scale for resizing
     };
     
     scene.add(browserWindow);
@@ -292,6 +380,7 @@ function createBrowserContentTexture(screenNumber) {
     return texture;
 }
 
+// Enhanced touch handling for direct screen manipulation
 function onTouchStart(event) {
     if (!touchEnabled || !event.touches[0]) return;
     
@@ -304,62 +393,88 @@ function onTouchStart(event) {
     // Cast ray from touch position
     raycaster.setFromCamera(initialTouchPosition, camera);
     
-    // Check for screen selection
-    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0]));
-    
-    if (screenIntersects.length > 0) {
-        const selectedObject = screenIntersects[0].object;
-        const screen = selectedObject.parent;
-        selectScreen(screen);
-        isTouchMoving = true;
+    // Check for FAB button interaction
+    const fabIntersects = raycaster.intersectObject(fabButton);
+    if (fabIntersects.length > 0) {
+        // Create a new screen in front of the camera
+        const position = new THREE.Vector3(0, 0, -1.2);
+        position.applyMatrix4(camera.matrixWorld);
+        
+        newScreen = createNewBrowserScreen(position);
+        
+        // Visual feedback for button press
+        const originalColor = fabButton.material.color.clone();
+        fabButton.material.color.set(0x8BC34A); // Lighter green for feedback
+        setTimeout(() => {
+            fabButton.material.color.copy(originalColor);
+        }, 200);
         return;
     }
     
-    // Check for control panel button interactions
-    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
-    let controlIntersects = [];
-    
-    controlPanels.forEach(panel => {
-        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        controlIntersects = controlIntersects.concat(buttonIntersects);
+    // Check for screen interaction
+    let screenIntersects = [];
+    screens.forEach(screen => {
+        // Check all interactive elements of the screen
+        const screenParts = screen.children.filter(child => 
+            child.userData && (child.userData.type === 'button' || !child.userData.type));
+        
+        const intersects = raycaster.intersectObjects(screenParts);
+        if (intersects.length > 0) {
+            // Store the screen and the specific intersected part
+            intersects.forEach(intersect => {
+                intersect.object.parent = screen; // Ensure the parent reference is set
+                screenIntersects.push(intersect);
+            });
+        }
     });
     
-    if (controlIntersects.length > 0) {
-        const button = controlIntersects[0].object;
+    // Sort by distance
+    screenIntersects.sort((a, b) => a.distance - b.distance);
+    
+    if (screenIntersects.length > 0) {
+        const intersect = screenIntersects[0];
+        const screen = intersect.object.parent;
+        const part = intersect.object;
         
-        // Handle button actions
-        if (button.userData.action === 'newScreen') {
-            // Create a new screen in front of the camera
-            const position = new THREE.Vector3(0, 0, -1.2);
-            position.applyMatrix4(camera.matrixWorld);
+        // Select the screen first
+        selectScreen(screen);
+        
+        // Check if we clicked a special button
+        if (part.userData && part.userData.type === 'button') {
+            if (part.userData.action === 'closeScreen') {
+                // Remove the screen
+                scene.remove(screen);
+                screens = screens.filter(s => s !== screen);
+                if (selectedScreen === screen) {
+                    selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
+                    if (selectedScreen) {
+                        selectScreen(selectedScreen);
+                    }
+                }
+                return;
+            }
             
-            newScreen = createNewBrowserScreen(position);
-            
-            // Visual feedback for button press
-            const originalColor = button.material.color.clone();
-            button.material.color.set(0x4CAF50);
-            setTimeout(() => {
-                button.material.color.copy(originalColor);
-            }, 200);
+            if (part.userData.action === 'resizeScreen') {
+                // Start resizing the screen
+                isResizingScreen = true;
+                return;
+            }
         }
         
-        if (button.userData.action === 'moveScreen' && selectedScreen) {
-            // Start moving the selected screen
-            isMovingScreen = true;
-            
-            // Visual feedback for button press
-            const originalColor = button.material.color.clone();
-            button.material.color.set(0x4CAF50);
-            setTimeout(() => {
-                button.material.color.copy(originalColor);
-            }, 200);
-        }
+        // Otherwise start dragging the screen
+        isDraggingScreen = true;
+        
+        // Calculate the offset from the touch point to the screen center
+        // This ensures we drag from the point we touched, not from the center
+        const intersectionPoint = intersect.point.clone();
+        screenOffset.copy(screen.position).sub(intersectionPoint);
+        
+        return;
     }
 }
 
 function onTouchMove(event) {
-    if (!touchEnabled || !event.touches[0] || !isTouchMoving || !selectedScreen) return;
+    if (!touchEnabled || !event.touches[0]) return;
     
     event.preventDefault();
     
@@ -369,149 +484,84 @@ function onTouchMove(event) {
         -(event.touches[0].clientY / window.innerHeight) * 2 + 1
     );
     
-    // Calculate movement delta
-    const deltaX = currentTouchPosition.x - initialTouchPosition.x;
-    const deltaY = currentTouchPosition.y - initialTouchPosition.y;
+    // Update raycaster with new touch position
+    raycaster.setFromCamera(currentTouchPosition, camera);
     
-    // Update screen position based on touch movement
-    // Scale the movement to make it more natural
-    const movementScale = 2.0;
-    selectedScreen.position.x += deltaX * movementScale;
-    selectedScreen.position.y += deltaY * movementScale;
+    if (isDraggingScreen && selectedScreen) {
+        // Get the ray's intersection with the z-plane of the screen
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
+        
+        const plane = new THREE.Plane();
+        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
+        
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        // Move the screen to the new position, accounting for the initial offset
+        selectedScreen.position.copy(intersectionPoint.add(screenOffset));
+        
+        // Update keyboard position if visible
+        if (virtualKeyboard && virtualKeyboard.visible) {
+            updateKeyboardPosition();
+        }
+        
+        return;
+    }
     
-    // Update initial position for next move
-    initialTouchPosition.copy(currentTouchPosition);
+    if (isResizingScreen && selectedScreen) {
+        // Get ray intersection with screen plane
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
+        
+        const plane = new THREE.Plane();
+        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
+        
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        // Calculate distance from screen center to touch point
+        const distanceX = Math.abs(intersectionPoint.x - selectedScreen.position.x);
+        const distanceY = Math.abs(intersectionPoint.y - selectedScreen.position.y);
+        
+        // Calculate new scale (with some constraints)
+        const newScaleX = Math.max(0.5, Math.min(2.0, distanceX * 2.5));
+        const newScaleY = Math.max(0.5, Math.min(2.0, distanceY * 2.5));
+        
+        // Apply new scale
+        selectedScreen.scale.set(newScaleX, newScaleY, 1);
+        
+        return;
+    }
 }
 
 function onTouchEnd(event) {
+    isDraggingScreen = false;
+    isResizingScreen = false;
     isTouchMoving = false;
     isMovingScreen = false;
 }
 
-function createVirtualKeyboard() {
-    virtualKeyboard = new THREE.Group();
+function updateKeyboardPosition() {
+    if (!selectedScreen || !virtualKeyboard) return;
     
-    // Keyboard background
-    const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
-    const keyboardMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x333333,
-        side: THREE.DoubleSide
-    });
-    const keyboardPanel = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
-    virtualKeyboard.add(keyboardPanel);
+    const screenPos = selectedScreen.position.clone();
+    const screenScale = selectedScreen.scale.clone();
     
-    // Create keyboard keys
-    const rows = [
-        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '.', '/']
-    ];
+    // Position keyboard under selected screen, accounting for screen scale
+    virtualKeyboard.position.set(
+        screenPos.x, 
+        screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
+        screenPos.z + 0.02
+    );
     
-    const keySize = 0.05;
-    const keySpacing = 0.01;
-    const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
-    const keyMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x444444,
-        side: THREE.DoubleSide
-    });
-    const keyHoverMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x666666,
-        side: THREE.DoubleSide
-    });
+    // Scale keyboard proportionally to screen
+    const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
+    virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
     
-    // Track keys for interaction
-    const keys = [];
-    
-    // Create rows of keys
-    rows.forEach((row, rowIndex) => {
-        const rowWidth = row.length * (keySize + keySpacing) - keySpacing;
-        const startX = -rowWidth / 2;
-        
-        row.forEach((key, keyIndex) => {
-            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial.clone());
-            const x = startX + keyIndex * (keySize + keySpacing);
-            const y = 0.12 - rowIndex * (keySize + keySpacing);
-            keyMesh.position.set(x, y, 0.001);
-            
-            // Store key data for interaction
-            keyMesh.userData = { 
-                type: 'key',
-                key: key,
-                originalMaterial: keyMesh.material,
-                hoverMaterial: keyHoverMaterial.clone()
-            };
-            keys.push(keyMesh);
-            
-            virtualKeyboard.add(keyMesh);
-            
-            // Add key label using canvas texture
-            const labelCanvas = document.createElement('canvas');
-            labelCanvas.width = 64;
-            labelCanvas.height = 64;
-            const labelCtx = labelCanvas.getContext('2d');
-            labelCtx.fillStyle = '#ffffff';
-            labelCtx.font = '32px Arial';
-            labelCtx.textAlign = 'center';
-            labelCtx.textBaseline = 'middle';
-            labelCtx.fillText(key, 32, 32);
-            
-            const labelTexture = new THREE.CanvasTexture(labelCanvas);
-            const labelGeometry = new THREE.PlaneGeometry(keySize * 0.8, keySize * 0.8);
-            const labelMaterial = new THREE.MeshBasicMaterial({ 
-                map: labelTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-            labelMesh.position.set(x, y, 0.002);
-            virtualKeyboard.add(labelMesh);
-        });
-    });
-    
-    // Add space bar
-    const spaceBarGeometry = new THREE.PlaneGeometry(0.3, keySize);
-    const spaceBar = new THREE.Mesh(spaceBarGeometry, keyMaterial.clone());
-    spaceBar.position.set(0, -0.12, 0.001);
-    spaceBar.userData = { 
-        type: 'key',
-        key: ' ',
-        originalMaterial: spaceBar.material,
-        hoverMaterial: keyHoverMaterial.clone()
-    };
-    keys.push(spaceBar);
-    virtualKeyboard.add(spaceBar);
-    
-    // Add "SPACE" label for space bar
-    const spaceCanvas = document.createElement('canvas');
-    spaceCanvas.width = 200;
-    spaceCanvas.height = 50;
-    const spaceCtx = spaceCanvas.getContext('2d');
-    spaceCtx.fillStyle = '#ffffff';
-    spaceCtx.font = '24px Arial';
-    spaceCtx.textAlign = 'center';
-    spaceCtx.textBaseline = 'middle';
-    spaceCtx.fillText('SPACE', 100, 25);
-    
-    const spaceTexture = new THREE.CanvasTexture(spaceCanvas);
-    const spaceLabelGeometry = new THREE.PlaneGeometry(0.2, 0.03);
-    const spaceLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: spaceTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const spaceLabelMesh = new THREE.Mesh(spaceLabelGeometry, spaceLabelMaterial);
-    spaceLabelMesh.position.set(0, -0.12, 0.002);
-    virtualKeyboard.add(spaceLabelMesh);
-    
-    // Store the keys array for interaction
-    virtualKeyboard.userData = { type: 'keyboard', keys: keys };
-    
-    // Position the keyboard below the browser window and bring it forward
-    virtualKeyboard.position.set(0, -0.45, -0.78);
+    // Make keyboard face the user
+    virtualKeyboard.lookAt(camera.position);
     virtualKeyboard.rotation.x = -Math.PI / 8;
-    virtualKeyboard.visible = false; // Hide keyboard initially
-    scene.add(virtualKeyboard);
 }
 
 function selectScreen(screen) {
@@ -532,36 +582,12 @@ function selectScreen(screen) {
         
         // Position keyboard under selected screen if needed
         if (virtualKeyboard) {
-            const screenPos = selectedScreen.position.clone();
-            virtualKeyboard.position.set(screenPos.x, screenPos.y - 0.45, screenPos.z + 0.02);
-            virtualKeyboard.lookAt(camera.position);
-            virtualKeyboard.rotation.x = -Math.PI / 8;
+            updateKeyboardPosition();
         }
     }
 }
 
-function onSelectStart(event) {
-    if (isPlacingScreen || isMovingScreen) {
-        // We're in placement mode, so select start begins the commitment
-        return;
-    }
-}
-
-function onSelectEnd(event) {
-    if (isPlacingScreen && newScreen) {
-        // Finalize the placement of the new screen
-        isPlacingScreen = false;
-        newScreen = null;
-        return;
-    }
-    
-    if (isMovingScreen && selectedScreen) {
-        // Finalize the movement of the selected screen
-        isMovingScreen = false;
-        return;
-    }
-}
-
+// Enhanced controller interaction
 function onSelect(event) {
     // Raycast to detect interactive elements
     const tempMatrix = new THREE.Matrix4();
@@ -569,26 +595,87 @@ function onSelect(event) {
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
-    if (isPlacingScreen) {
-        // Finalize placement of new screen
-        isPlacingScreen = false;
-        newScreen = null;
+    // Check for FAB button interaction
+    const fabIntersects = raycaster.intersectObject(fabButton);
+    if (fabIntersects.length > 0) {
+        // Create a new screen at controller position + direction
+        isPlacingScreen = true;
+        
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(controller.matrixWorld);
+        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        position.addScaledVector(direction, 0.8);
+        
+        newScreen = createNewBrowserScreen(position);
+        
+        // Visual feedback for button press
+        const originalColor = fabButton.material.color.clone();
+        fabButton.material.color.set(0x8BC34A); // Lighter green for feedback
+        setTimeout(() => {
+            fabButton.material.color.copy(originalColor);
+        }, 200);
+        
         return;
     }
     
-    if (isMovingScreen) {
-        // Finalize movement of selected screen
-        isMovingScreen = false;
-        return;
-    }
+    // Check for screen interaction - checking all parts of all screens
+    let screenIntersects = [];
+    screens.forEach(screen => {
+        // Check all interactive elements of the screen
+        const screenParts = screen.children.filter(child => 
+            child.userData && (child.userData.type === 'button' || !child.userData.type));
+        
+        const intersects = raycaster.intersectObjects(screenParts);
+        if (intersects.length > 0) {
+            // Store the screen and the specific intersected part
+            intersects.forEach(intersect => {
+                intersect.object.parent = screen; // Ensure the parent reference is set
+                screenIntersects.push(intersect);
+            });
+        }
+    });
     
-    // Check for screen selection
-    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0])); // Intersect with main panel
+    // Sort by distance
+    screenIntersects.sort((a, b) => a.distance - b.distance);
     
     if (screenIntersects.length > 0) {
-        const selectedObject = screenIntersects[0].object;
-        const screen = selectedObject.parent;
+        const intersect = screenIntersects[0];
+        const screen = intersect.object.parent;
+        const part = intersect.object;
+        
+        // Select the screen first
         selectScreen(screen);
+        
+        // Check if we clicked a special button
+        if (part.userData && part.userData.type === 'button') {
+            if (part.userData.action === 'closeScreen') {
+                // Remove the screen
+                scene.remove(screen);
+                screens = screens.filter(s => s !== screen);
+                if (selectedScreen === screen) {
+                    selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
+                    if (selectedScreen) {
+                        selectScreen(selectedScreen);
+                    }
+                }
+                return;
+            }
+            
+            if (part.userData.action === 'resizeScreen') {
+                // Start resizing the screen
+                isResizingScreen = true;
+                return;
+            }
+        }
+        
+        // Otherwise start dragging the screen
+        isDraggingScreen = true;
+        
+        // Calculate the offset from the touch point to the screen center
+        // This ensures we drag from the point we touched, not from the center
+        const intersectionPoint = intersect.point.clone();
+        screenOffset.copy(screen.position).sub(intersectionPoint);
+        
         return;
     }
     
@@ -614,57 +701,34 @@ function onSelect(event) {
             return;
         }
     }
+}
+
+function onSelectStart(event) {
+    // This would handle the start of a controller selection
+    // For advanced cases like showing tooltip on hover before selection
     
-    // Check for control panel button interactions
-    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
-    let controlIntersects = [];
+    // Show tooltip for FAB on hover
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
-    controlPanels.forEach(panel => {
-        // Get all button children
-        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        controlIntersects = controlIntersects.concat(buttonIntersects);
-    });
+    const fabIntersects = raycaster.intersectObject(fabButton);
+    if (fabIntersects.length > 0 && fabButton.userData.tooltip) {
+        fabButton.userData.tooltip.visible = true;
+    }
+}
+
+function onSelectEnd(event) {
+    // Reset states when controller selection ends
+    isDraggingScreen = false;
+    isResizingScreen = false;
+    isPlacingScreen = false;
+    isMovingScreen = false;
     
-    if (controlIntersects.length > 0) {
-        const button = controlIntersects[0].object;
-        
-        // Handle button actions
-        if (button.userData.action === 'newScreen') {
-            // Start placing a new screen
-            isPlacingScreen = true;
-            
-            // Create a new screen at controller position + direction
-            const position = new THREE.Vector3();
-            position.setFromMatrixPosition(controller.matrixWorld);
-            const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
-            position.addScaledVector(direction, 0.8);
-            
-            newScreen = createNewBrowserScreen(position);
-            
-            // Visual feedback for button press
-            const originalColor = button.material.color.clone();
-            button.material.color.set(0x4CAF50);
-            setTimeout(() => {
-                button.material.color.copy(originalColor);
-            }, 200);
-            
-            return;
-        }
-        
-        if (button.userData.action === 'moveScreen' && selectedScreen) {
-            // Start moving the selected screen
-            isMovingScreen = true;
-            
-            // Visual feedback for button press
-            const originalColor = button.material.color.clone();
-            button.material.color.set(0x4CAF50);
-            setTimeout(() => {
-                button.material.color.copy(originalColor);
-            }, 200);
-            
-            return;
-        }
+    // Hide tooltip
+    if (fabButton && fabButton.userData.tooltip) {
+        fabButton.userData.tooltip.visible = false;
     }
 }
 
@@ -679,26 +743,86 @@ function animate() {
 }
 
 function render() {
-    // Handle screen placement or movement
-    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen && !isTouchMoving)) {
-        const target = isPlacingScreen ? newScreen : selectedScreen;
+    // Update floating UI to always face the user and stay in view
+    if (floatingUI) {
+        // Position the floating UI to follow the camera
+        const cameraWorldPosition = new THREE.Vector3();
+        camera.getWorldPosition(cameraWorldPosition);
         
-        // Get controller position and direction
-        const tempMatrix = new THREE.Matrix4();
-        tempMatrix.identity().extractRotation(controller.matrixWorld);
-        const position = new THREE.Vector3();
-        position.setFromMatrixPosition(controller.matrixWorld);
-        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        // Calculate position relative to camera view
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(camera.quaternion);
         
-        // Set position in front of controller
-        const targetPosition = position.clone().addScaledVector(direction, 0.8);
-        target.position.copy(targetPosition);
+        floatingUI.position.copy(cameraWorldPosition);
+        floatingUI.position.addScaledVector(cameraDirection, -0.5); // Position it 0.5 units in front
         
-        // Make screen face the user
-        target.lookAt(camera.position);
+        // Shift to bottom right corner
+        const right = new THREE.Vector3(1, 0, 0);
+        right.applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0);
+        up.applyQuaternion(camera.quaternion);
+        
+        floatingUI.position.addScaledVector(right, 0.2);
+        floatingUI.position.addScaledVector(up, -0.2);
+        
+        // Make it face the user
+        floatingUI.lookAt(cameraWorldPosition);
     }
     
-    // Highlight keys when hovered
+    // Handle screen dragging with controller
+    if (isDraggingScreen && selectedScreen) {
+        // Get controller position
+        const controllerPosition = new THREE.Vector3();
+        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
+        
+        // Get controller direction
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // Cast ray from controller
+        raycaster.ray.origin.copy(controllerPosition);
+        raycaster.ray.direction.copy(direction);
+        
+        // Create a plane perpendicular to the camera view
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
+        
+        const plane = new THREE.Plane();
+        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
+        
+        // Get intersection point with plane
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        // Move the screen to the new position, considering the initial offset
+        selectedScreen.position.copy(intersectionPoint.add(screenOffset));
+        
+        // Update keyboard position if visible
+        if (virtualKeyboard && virtualKeyboard.visible) {
+            updateKeyboardPosition();
+        }
+    }
+    
+    // Handle screen resizing with controller
+    if (isResizingScreen && selectedScreen) {
+        // Get controller position
+        const controllerPosition = new THREE.Vector3();
+        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
+        
+        // Calculate distance from screen center to controller
+        const distanceX = Math.abs(controllerPosition.x - selectedScreen.position.x);
+        const distanceY = Math.abs(controllerPosition.y - selectedScreen.position.y);
+        
+        // Calculate new scale (with constraints)
+        const newScaleX = Math.max(0.5, Math.min(2.0, distanceX * 2.5));
+        const newScaleY = Math.max(0.5, Math.min(2.0, distanceY * 2.5));
+        
+        // Apply new scale
+        selectedScreen.scale.set(newScaleX, newScaleY, 1);
+    }
+    
+    // Handle keyboard key hover effects
     if (controller && virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
         // Reset previously selected key if any
         if (selectedKey) {
