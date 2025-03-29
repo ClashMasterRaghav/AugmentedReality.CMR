@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { scene, camera } from './ar_core.js';
 import { screens } from './ar_screens.js';
-import { createNotification } from './ar_ui.js';
 
 // Export video texture reference
 export let videoTexture;
@@ -236,6 +235,23 @@ export function createVideoOverlay(videoUrl, width = 0.76, height = 0.46) {
     return group;
 }
 
+// Update video textures in render loop
+export function updateVideoTextures() {
+    // Update main video texture
+    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
+        videoTexture.needsUpdate = true;
+    }
+    
+    // Update any other video textures in the scene
+    scene.traverse(object => {
+        if (object.userData && object.userData.texture && object.userData.video) {
+            if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
+                object.userData.texture.needsUpdate = true;
+            }
+        }
+    });
+}
+
 // Play spatial audio at a location
 export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
     // Create audio element
@@ -299,21 +315,4 @@ export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
             sphere.position.copy(newPosition);
         }
     };
-}
-
-// Update video textures in render loop
-export function updateVideoTextures() {
-    // Update main video texture
-    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
-        videoTexture.needsUpdate = true;
-    }
-    
-    // Update any other video textures in the scene
-    scene.traverse(object => {
-        if (object.userData && object.userData.texture && object.userData.video) {
-            if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
-                object.userData.texture.needsUpdate = true;
-            }
-        }
-    });
 } 

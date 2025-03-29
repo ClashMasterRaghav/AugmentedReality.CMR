@@ -6,7 +6,7 @@ import {
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition } from './ar_screens.js';
-import { virtualKeyboard, showNotification } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton } from './ar_ui.js';
 
 // Touch interaction variables
 let touchEnabled = true;
@@ -19,6 +19,7 @@ let isResizingScreen = false;
 let screenOffset = new THREE.Vector3();
 let initialRotation = new THREE.Euler();
 let initialTilt = new THREE.Euler();
+let initialScale = new THREE.Vector3(1, 1, 1);
 
 // Setup event listeners
 export function setupEventListeners() {

@@ -18,6 +18,131 @@ export function initUI() {
     createVirtualKeyboard();
 }
 
+// Create notification in both DOM and 3D space
+export function createNotification(message, type = 'info') {
+    console.log(`Notification (${type}): ${message}`);
+    
+    // Create DOM notification
+    createDOMNotification(message, type);
+    
+    // Create 3D notification if renderer is available
+    if (renderer && camera) {
+        create3DNotification(message, type);
+    }
+}
+
+// Create a notification in the DOM
+function createDOMNotification(message, type = 'info') {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    
+    // Add type-specific styling
+    switch(type) {
+        case 'error':
+            notification.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+            break;
+        case 'success':
+            notification.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+            break;
+        case 'warning':
+            notification.style.backgroundColor = 'rgba(255, 165, 0, 0.7)';
+            break;
+        default:
+            notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    }
+    
+    // Add to container
+    container.appendChild(notification);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+        if (notification.parentNode === container) {
+            container.removeChild(notification);
+        }
+    }, 3000);
+}
+
+// Create a 3D notification in space
+function create3DNotification(message, type = 'info') {
+    if (!camera) return;
+    
+    // Create canvas for the notification
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    
+    // Set background color based on type
+    let bgColor;
+    switch(type) {
+        case 'error':
+            bgColor = 'rgba(255, 0, 0, 0.7)';
+            break;
+        case 'success':
+            bgColor = 'rgba(0, 255, 0, 0.7)';
+            break;
+        case 'warning':
+            bgColor = 'rgba(255, 165, 0, 0.7)';
+            break;
+        default:
+            bgColor = 'rgba(0, 0, 0, 0.7)';
+    }
+    
+    // Draw background
+    context.fillStyle = bgColor;
+    context.roundRect(0, 0, canvas.width, canvas.height, 20);
+    context.fill();
+    
+    // Draw text
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 24px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(message, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    // Create notification panel
+    const geometry = new THREE.PlaneGeometry(0.5, 0.125);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const notificationMesh = new THREE.Mesh(geometry, material);
+    
+    // Position notification in front of camera
+    const direction = new THREE.Vector3(0, 0, -1);
+    direction.applyQuaternion(camera.quaternion);
+    
+    const position = new THREE.Vector3();
+    position.copy(camera.position).add(direction.multiplyScalar(1));
+    position.y += 0.2; // Position above eye level
+    
+    notificationMesh.position.copy(position);
+    notificationMesh.quaternion.copy(camera.quaternion);
+    
+    // Add to scene
+    scene.add(notificationMesh);
+    
+    // Remove after timeout
+    setTimeout(() => {
+        scene.remove(notificationMesh);
+        material.dispose();
+        geometry.dispose();
+        texture.dispose();
+    }, 3000);
+}
+
+// Alias for backward compatibility
+export const showNotification = createNotification;
+
 // Create a control panel with buttons
 export function createControlPanel() {
     // Create panel group
