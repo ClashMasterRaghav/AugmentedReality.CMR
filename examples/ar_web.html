@@ -1,18 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>three.js ar - cones</title>
+		<title>AR Multi-Screen Experience</title>
 		<meta charset="utf-8" />
 		<meta
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, user-scalable=no"
 		/>
 		<link type="text/css" rel="stylesheet" href="main.css" />
+		<style>
+			#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				color: #fff;
+				background-color: rgba(0, 0, 0, 0.5);
+				padding: 10px;
+				border-radius: 5px;
+				font-family: Arial, sans-serif;
+				pointer-events: none;
+				z-index: 100;
+			}
+			#info a {
+				color: #4af;
+				pointer-events: auto;
+			}
+			#startButton {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				padding: 12px 24px;
+				background-color: #4488ff;
+				color: white;
+				border: none;
+				border-radius: 5px;
+				font-size: 16px;
+				cursor: pointer;
+				z-index: 100;
+			}
+		</style>
 	</head>
 	<body>
 		<div id="info">
 			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
-			ar - cones<br />(Chrome Android 81+)
+			AR Multi-Screen Experience<br />
+			Touch screens to select and move them
 		</div>
 
 		<script type="importmap">
@@ -24,7 +58,6 @@
 			}
 		</script>
 
-		
 		<script type="module" src="ar_web.js"></script>
 	</body>
 </html>

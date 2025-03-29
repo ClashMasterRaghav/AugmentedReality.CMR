@@ -16,6 +16,9 @@ let selectedScreen = null; // Currently selected screen
 let isPlacingScreen = false; // Flag to indicate if user is currently placing a screen
 let newScreen = null; // Reference to a new screen being placed
 let isMovingScreen = false; // Flag to indicate if user is currently moving a screen
+let touchEnabled = true; // Flag to enable touch controls
+let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
+let isTouchMoving = false; // Flag to track if touch movement is in progress
 
 init();
 animate();
@@ -64,53 +67,74 @@ function init() {
     controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
     scene.add(controllerGrip);
 
-    // Pointer for interaction
-    const geometry = new THREE.SphereGeometry(0.01, 16, 16);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    // Pointer for interaction - SMALLER SIZE
+    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced from 0.01 to 0.005
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Changed color to cyan for better visibility
     const pointer = new THREE.Mesh(geometry, material);
     pointer.position.z = -0.1;
     controller.add(pointer);
 
     // Create a default browser window
-    createNewBrowserScreen();
+    createNewBrowserScreen(new THREE.Vector3(0, 0, -1.2)); // Position further back
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
+    
+    // Add touch event listeners
+    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
 function createControlPanel() {
     const panel = new THREE.Group();
     
-    // Panel background
+    // Panel background with rounded corners effect
     const panelGeometry = new THREE.PlaneGeometry(0.3, 0.15);
     const panelMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x444444,
-        side: THREE.DoubleSide
+        color: 0x333333,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     panel.add(panelMesh);
     
-    // New Screen button
+    // Add panel border glow
+    const glowGeometry = new THREE.PlaneGeometry(0.31, 0.16);
+    const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x4488ff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.5
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.002;
+    panel.add(glowMesh);
+    
+    // New Screen button with improved design
     const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
     const buttonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x666666,
-        side: THREE.DoubleSide
+        color: 0x4488ff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
     });
     const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
     newScreenButton.position.set(0, 0.04, 0.001);
     newScreenButton.userData = { type: 'button', action: 'newScreen' };
     panel.add(newScreenButton);
     
-    // New Screen button label
+    // New Screen button label with improved text
     const buttonCanvas = document.createElement('canvas');
     buttonCanvas.width = 256;
     buttonCanvas.height = 64;
     const btnCtx = buttonCanvas.getContext('2d');
     btnCtx.fillStyle = '#ffffff';
-    btnCtx.font = '24px Arial';
+    btnCtx.font = 'bold 24px Arial';
     btnCtx.textAlign = 'center';
     btnCtx.textBaseline = 'middle';
-    btnCtx.fillText('Add New Screen', 128, 32);
+    btnCtx.fillText('+ New Screen', 128, 32);
     
     const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
     const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
@@ -123,23 +147,28 @@ function createControlPanel() {
     buttonLabel.position.set(0, 0.04, 0.002);
     panel.add(buttonLabel);
     
-    // Move Screen button
-    const moveButtonMaterial = buttonMaterial.clone();
+    // Move Screen button with improved design
+    const moveButtonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x44cc88,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    });
     const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
     moveScreenButton.position.set(0, -0.04, 0.001);
     moveScreenButton.userData = { type: 'button', action: 'moveScreen' };
     panel.add(moveScreenButton);
     
-    // Move Screen button label
+    // Move Screen button label with improved text
     const moveButtonCanvas = document.createElement('canvas');
     moveButtonCanvas.width = 256;
     moveButtonCanvas.height = 64;
     const moveBtnCtx = moveButtonCanvas.getContext('2d');
     moveBtnCtx.fillStyle = '#ffffff';
-    moveBtnCtx.font = '24px Arial';
+    moveBtnCtx.font = 'bold 24px Arial';
     moveBtnCtx.textAlign = 'center';
     moveBtnCtx.textBaseline = 'middle';
-    moveBtnCtx.fillText('Move Selected Screen', 128, 32);
+    moveBtnCtx.fillText('Move Screen', 128, 32);
     
     const moveButtonTexture = new THREE.CanvasTexture(moveButtonCanvas);
     const moveButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
@@ -151,17 +180,17 @@ function createControlPanel() {
     moveButtonLabel.position.set(0, -0.04, 0.002);
     panel.add(moveButtonLabel);
     
-    // Position the control panel on user's left
-    panel.position.set(-0.5, 0, -0.8);
-    panel.rotation.y = Math.PI / 6; // Angle slightly toward user
+    // Position the control panel in front of the user
+    panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
+    panel.rotation.x = -Math.PI / 8; // Tilt slightly up
     panel.userData = { type: 'controlPanel' };
     scene.add(panel);
 }
 
-function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -0.8)) {
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) { // Default position moved back
     const browserWindow = new THREE.Group();
     
-    // Browser background with border
+    // Browser background with improved design
     const browserGeometry = new THREE.PlaneGeometry(0.8, 0.6);
     const browserMaterial = new THREE.MeshBasicMaterial({ 
         color: 0xffffff,
@@ -170,17 +199,31 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -0.8)) {
     const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
     browserWindow.add(browserPanel);
     
-    // Create border by adding a slightly larger background panel
+    // Create border with improved design
     const borderGeometry = new THREE.PlaneGeometry(0.82, 0.62);
     const borderMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x2196F3, // Blue border
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
     browserWindow.add(borderPanel);
     
-    // Address bar background
+    // Add a subtle shadow effect
+    const shadowGeometry = new THREE.PlaneGeometry(0.84, 0.64);
+    const shadowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x000000,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.2
+    });
+    const shadowPanel = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowPanel.position.z = -0.003;
+    browserWindow.add(shadowPanel);
+    
+    // Address bar with improved design
     const addressBarGeometry = new THREE.PlaneGeometry(0.76, 0.06);
     const addressBarMaterial = new THREE.MeshBasicMaterial({ 
         color: 0xf0f0f0,
@@ -575,8 +618,8 @@ function animate() {
 }
 
 function render() {
-    // Handle screen placement or movement
-    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
+    // Handle screen placement or movement with controller
+    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen && !isTouchMoving)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
         
         // Get controller position and direction
@@ -627,4 +670,100 @@ function render() {
     });
     
     renderer.render(scene, camera);
+}
+
+function onTouchStart(event) {
+    if (!touchEnabled || !event.touches[0]) return;
+    
+    event.preventDefault();
+    
+    // Store initial touch position
+    initialTouchPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+    initialTouchPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+    
+    // Cast ray from touch position
+    raycaster.setFromCamera(initialTouchPosition, camera);
+    
+    // Check for screen selection
+    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0]));
+    
+    if (screenIntersects.length > 0) {
+        const selectedObject = screenIntersects[0].object;
+        const screen = selectedObject.parent;
+        selectScreen(screen);
+        isTouchMoving = true;
+        return;
+    }
+    
+    // Check for control panel button interactions
+    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
+    let controlIntersects = [];
+    
+    controlPanels.forEach(panel => {
+        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
+        const buttonIntersects = raycaster.intersectObjects(buttons);
+        controlIntersects = controlIntersects.concat(buttonIntersects);
+    });
+    
+    if (controlIntersects.length > 0) {
+        const button = controlIntersects[0].object;
+        
+        // Handle button actions
+        if (button.userData.action === 'newScreen') {
+            // Create a new screen in front of the camera
+            const position = new THREE.Vector3(0, 0, -1.2);
+            position.applyMatrix4(camera.matrixWorld);
+            
+            newScreen = createNewBrowserScreen(position);
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+        }
+        
+        if (button.userData.action === 'moveScreen' && selectedScreen) {
+            // Start moving the selected screen
+            isMovingScreen = true;
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+        }
+    }
+}
+
+function onTouchMove(event) {
+    if (!touchEnabled || !event.touches[0] || !isTouchMoving || !selectedScreen) return;
+    
+    event.preventDefault();
+    
+    // Get current touch position
+    const currentTouchPosition = new THREE.Vector2(
+        (event.touches[0].clientX / window.innerWidth) * 2 - 1,
+        -(event.touches[0].clientY / window.innerHeight) * 2 + 1
+    );
+    
+    // Calculate movement delta
+    const deltaX = currentTouchPosition.x - initialTouchPosition.x;
+    const deltaY = currentTouchPosition.y - initialTouchPosition.y;
+    
+    // Update screen position based on touch movement
+    // Scale the movement to make it more natural
+    const movementScale = 2.0;
+    selectedScreen.position.x += deltaX * movementScale;
+    selectedScreen.position.y += deltaY * movementScale;
+    
+    // Update initial position for next move
+    initialTouchPosition.copy(currentTouchPosition);
+}
+
+function onTouchEnd(event) {
+    isTouchMoving = false;
+    isMovingScreen = false;
 }
