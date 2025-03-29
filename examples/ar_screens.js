@@ -16,7 +16,8 @@ export function createNewBrowserScreen(position, url = null) {
     const screenDepth = 0.01;
     const topBarHeight = 0.04; // Thin top bar
     
-    console.log("Creating new screen at position:", position);
+    console.log("CREATING NEW SCREEN - LOOK DIRECTLY IN FRONT OF YOU");
+    console.log("Screen position:", position);
     
     // Group to hold all screen components
     const screenGroup = new THREE.Group();
@@ -24,24 +25,14 @@ export function createNewBrowserScreen(position, url = null) {
     // Create background plane - use box for more visibility
     const planeGeometry = new THREE.BoxGeometry(screenWidth, screenHeight, screenDepth, 1, 1, 1);
     
-    // Create background material - use video texture if available
-    let backgroundMaterial;
-    if (videoElement && videoElement.readyState >= 2) {
-        const videoTexture = new THREE.VideoTexture(videoElement);
-        videoTexture.minFilter = THREE.LinearFilter;
-        videoTexture.magFilter = THREE.LinearFilter;
-        videoTexture.format = THREE.RGBFormat;
-        backgroundMaterial = new THREE.MeshBasicMaterial({
-            map: videoTexture,
-            side: THREE.DoubleSide
-        });
-    } else {
-        // Fallback with light gray background for better visibility
-        backgroundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x333333, // Lighter color for visibility
-            side: THREE.DoubleSide
-        });
-    }
+    // Create background material - ALWAYS use a bright, visible color first
+    // even if video texture is available
+    const backgroundMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ffff, // Bright cyan for maximum visibility
+        side: THREE.DoubleSide,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.5
+    });
     
     const backgroundPlane = new THREE.Mesh(planeGeometry, backgroundMaterial);
     
@@ -60,72 +51,17 @@ export function createNewBrowserScreen(position, url = null) {
         isBackground: true
     };
     
-    // Create top bar for dragging (full width)
+    // Create top bar for dragging (full width) - WITH BRIGHT COLOR
     const topBarGeometry = new THREE.BoxGeometry(screenWidth, topBarHeight, screenDepth * 1.5);
-    
-    // Create canvas for top bar texture with grip pattern
-    const topBarCanvas = document.createElement('canvas');
-    const topBarTexture = new THREE.CanvasTexture(topBarCanvas);
-    const context = topBarCanvas.getContext('2d');
-    
-    // Set canvas size - higher resolution for better text quality
-    topBarCanvas.width = 1024;
-    topBarCanvas.height = 128;
-    
-    // Draw gradient background for top bar - brighter colors
-    const gradient = context.createLinearGradient(0, 0, 0, topBarCanvas.height);
-    gradient.addColorStop(0, '#444444'); // Lighter gray at top
-    gradient.addColorStop(1, '#222222'); // Darker at bottom
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, topBarCanvas.width, topBarCanvas.height);
-    
-    // Draw grip dots - brighter for visibility
-    context.fillStyle = 'rgba(255,255,255,0.7)'; // Brighter dots
-    const dotSpacing = 50;
-    const dotSize = 6; // Larger dots
-    const centerY = topBarCanvas.height / 2;
-    
-    // Draw three rows of dots
-    for (let row = 0; row < 3; row++) {
-        const rowOffset = (row - 1) * 12;
-        for (let i = 0; i < 15; i++) {
-            context.beginPath();
-            context.arc(
-                topBarCanvas.width / 2 - (dotSpacing * 7) + i * dotSpacing,
-                centerY + rowOffset, 
-                dotSize, 
-                0, 
-                Math.PI * 2
-            );
-            context.fill();
-        }
-    }
-    
-    // Add screen title text - brighter and bigger
-    context.font = 'bold 38px Arial'; // Larger font
-    context.fillStyle = 'white';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    
-    // Add text shadow for better readability
-    context.shadowColor = 'rgba(0,0,0,0.7)';
-    context.shadowBlur = 6;
-    context.shadowOffsetX = 2;
-    context.shadowOffsetY = 2;
-    
-    context.fillText(`Screen ${screenNumber}`, topBarCanvas.width / 2, centerY);
-    
-    // Apply texture to top bar
     const topBarMaterial = new THREE.MeshBasicMaterial({
-        map: topBarTexture,
-        transparent: true,
-        opacity: 1.0 // Full opacity for visibility
+        color: 0xff00ff, // Bright magenta
+        transparent: false,
+        opacity: 1.0
     });
     
     const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
     
     // Position top bar at the top center of the screen
-    // Slightly outside the screen for better visibility
     topBar.position.y = screenHeight / 2 + topBarHeight / 2 - 0.005;
     topBar.position.z = 0.005; // Slightly in front of background for visibility
     
@@ -133,20 +69,20 @@ export function createNewBrowserScreen(position, url = null) {
     topBar.userData = {
         type: 'dragHandle',
         screenNumber: screenNumber,
-        originalColor: '#444444',
+        originalColor: '#ff00ff',
         isDraggable: true
     };
     
-    // Add video progress bar
-    const progressBarHeight = 0.015; // Slightly thicker for visibility
-    const progressBarWidth = screenWidth * 0.9; // FULL WIDTH progress bar
+    // Add progress bar and controls (very visible)
+    const progressBarHeight = 0.02; // Thicker for visibility
+    const progressBarWidth = screenWidth * 0.9;
     
-    // Progress bar background - brighter for visibility
+    // Progress bar background with bright color
     const progressBgGeometry = new THREE.BoxGeometry(progressBarWidth, progressBarHeight, screenDepth * 2);
     const progressBgMaterial = new THREE.MeshBasicMaterial({
-        color: 0x555555, // Lighter gray
-        opacity: 0.9, // More opaque
-        transparent: true
+        color: 0xff0000, // Bright red
+        opacity: 1.0,
+        transparent: false
     });
     
     const progressBarBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
@@ -163,10 +99,10 @@ export function createNewBrowserScreen(position, url = null) {
         screenNumber: screenNumber
     };
     
-    // Progress bar fill indicator - brighter color
+    // Progress bar fill indicator - bright color
     const progressFillGeometry = new THREE.BoxGeometry(0.01, progressBarHeight, screenDepth * 3);
     const progressFillMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4499ff // Brighter blue
+        color: 0xffff00 // Bright yellow
     });
     
     const progressBarFill = new THREE.Mesh(progressFillGeometry, progressFillMaterial);
@@ -182,33 +118,17 @@ export function createNewBrowserScreen(position, url = null) {
         screenNumber: screenNumber
     };
     
-    // Video control buttons - larger and brighter
-    const buttonSize = 0.05; // Larger buttons
+    // Video control buttons - large and bright
+    const buttonSize = 0.06; // Larger buttons
     const buttonDepth = screenDepth * 2;
     const buttonSpacing = 0.07;
     const buttonY = -(screenHeight / 2) + 3.5 * progressBarHeight + buttonSize / 2;
     
     // Play/Pause button
     const playButtonGeometry = new THREE.BoxGeometry(buttonSize, buttonSize, buttonDepth);
-    const playButtonCanvas = document.createElement('canvas');
-    playButtonCanvas.width = 128;
-    playButtonCanvas.height = 128;
-    const playContext = playButtonCanvas.getContext('2d');
-    
-    // Draw play icon - brighter
-    playContext.fillStyle = '#222222'; // Dark gray background
-    playContext.fillRect(0, 0, 128, 128);
-    playContext.fillStyle = '#ffffff'; // White icon
-    playContext.beginPath();
-    playContext.moveTo(40, 30);
-    playContext.lineTo(40, 98);
-    playContext.lineTo(98, 64);
-    playContext.closePath();
-    playContext.fill();
-    
-    const playButtonTexture = new THREE.CanvasTexture(playButtonCanvas);
     const playButtonMaterial = new THREE.MeshBasicMaterial({
-        map: playButtonTexture
+        color: 0x00ff00, // Bright green
+        transparent: false
     });
     
     const playButton = new THREE.Mesh(playButtonGeometry, playButtonMaterial);
@@ -223,39 +143,9 @@ export function createNewBrowserScreen(position, url = null) {
     
     // Volume/Mute button
     const volumeButtonGeometry = new THREE.BoxGeometry(buttonSize, buttonSize, buttonDepth);
-    const volumeButtonCanvas = document.createElement('canvas');
-    volumeButtonCanvas.width = 128;
-    volumeButtonCanvas.height = 128;
-    const volumeContext = volumeButtonCanvas.getContext('2d');
-    
-    // Draw volume icon - brighter
-    volumeContext.fillStyle = '#222222'; // Dark gray background
-    volumeContext.fillRect(0, 0, 128, 128);
-    volumeContext.fillStyle = '#ffffff'; // White icon
-    
-    // Speaker icon
-    volumeContext.beginPath();
-    volumeContext.moveTo(40, 45);
-    volumeContext.lineTo(55, 45);
-    volumeContext.lineTo(75, 25);
-    volumeContext.lineTo(75, 103);
-    volumeContext.lineTo(55, 83);
-    volumeContext.lineTo(40, 83);
-    volumeContext.closePath();
-    volumeContext.fill();
-    
-    // Sound waves
-    volumeContext.lineWidth = 4; // Thicker lines
-    volumeContext.beginPath();
-    volumeContext.arc(75, 64, 15, -Math.PI / 3, Math.PI / 3);
-    volumeContext.stroke();
-    volumeContext.beginPath();
-    volumeContext.arc(75, 64, 25, -Math.PI / 3, Math.PI / 3);
-    volumeContext.stroke();
-    
-    const volumeButtonTexture = new THREE.CanvasTexture(volumeButtonCanvas);
     const volumeButtonMaterial = new THREE.MeshBasicMaterial({
-        map: volumeButtonTexture
+        color: 0xffff00, // Bright yellow
+        transparent: false
     });
     
     const volumeButton = new THREE.Mesh(volumeButtonGeometry, volumeButtonMaterial);
@@ -276,17 +166,31 @@ export function createNewBrowserScreen(position, url = null) {
     screenGroup.add(playButton);
     screenGroup.add(volumeButton);
     
-    // Add bold border outline to make screen edges visible
+    // Add bright glowing border to make screen edges extremely visible
     const borderGeometry = new THREE.EdgesGeometry(planeGeometry);
     const borderMaterial = new THREE.LineBasicMaterial({
-        color: 0x88ccff, // Bright blue for visibility
-        transparent: true,
-        opacity: 0.8, // More opaque
-        linewidth: 2 // Thicker line (not supported on all platforms)
+        color: 0xff00ff, // Bright magenta
+        transparent: false,
+        opacity: 1.0,
+        linewidth: 5 // Thicker line (not supported on all platforms)
     });
     
     const border = new THREE.LineSegments(borderGeometry, borderMaterial);
     screenGroup.add(border);
+    
+    // Add outer glow to the screen
+    const glowGeometry = new THREE.PlaneGeometry(screenWidth + 0.2, screenHeight + 0.2);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff00ff, // Bright magenta
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        depthTest: false // Show through other objects
+    });
+    
+    const glowPlane = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowPlane.position.z = -0.02; // Behind the screen
+    screenGroup.add(glowPlane);
     
     // Set screen position and add to scene
     screenGroup.position.copy(position);
@@ -301,7 +205,23 @@ export function createNewBrowserScreen(position, url = null) {
         originalScale: new THREE.Vector3(1, 1, 1) // Store original scale
     };
     
-    console.log(`Screen ${screenNumber} created and added to scene at`, position);
+    // Replace with video texture after a short delay to ensure screen is visible first
+    if (videoElement && videoElement.readyState >= 2) {
+        setTimeout(() => {
+            const videoTexture = new THREE.VideoTexture(videoElement);
+            videoTexture.minFilter = THREE.LinearFilter;
+            videoTexture.magFilter = THREE.LinearFilter;
+            videoTexture.format = THREE.RGBFormat;
+            
+            backgroundMaterial.map = videoTexture;
+            backgroundMaterial.color.set(0xffffff); // Switch to white to show video correctly
+            backgroundMaterial.needsUpdate = true;
+            
+            console.log("Video texture applied to screen");
+        }, 5000); // 5 second delay to ensure screen is seen first
+    }
+    
+    console.log(`Screen ${screenNumber} created and added to scene`);
     
     return screenGroup;
 }
