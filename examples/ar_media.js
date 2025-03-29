@@ -18,14 +18,28 @@ export function loadVideoTexture() {
         
         if (!videoElement) {
             console.error('Video element not found in HTML!');
-            createNotification('Video element not found in HTML!', 'error');
-            return null;
+            return createFallbackTexture("Video element not found");
         }
         
         // Check if video source is available
-        if (!videoElement.querySelector('source') || !videoElement.querySelector('source').src) {
-            console.warn('Video source not found or empty');
-            createNotification('Video source not found or empty', 'warning');
+        const sources = videoElement.querySelectorAll('source');
+        if (!sources || sources.length === 0) {
+            console.warn('No video sources found');
+            return createFallbackTexture("No video sources found");
+        }
+        
+        let sourceFound = false;
+        for (const source of sources) {
+            if (source.src) {
+                sourceFound = true;
+                console.log("Using video source:", source.src);
+                break;
+            }
+        }
+        
+        if (!sourceFound) {
+            console.warn('All video sources are empty');
+            return createFallbackTexture("Video source not available");
         }
         
         // Create video texture
@@ -38,36 +52,33 @@ export function loadVideoTexture() {
         // Add event listeners for video load status
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
-            createNotification('Video loaded successfully', 'success');
+            updateExistingScreensWithVideo();
         });
         
         videoElement.addEventListener('error', (e) => {
             console.error('Video load error:', e);
-            createNotification('Error loading video: ' + (e.message || 'Unknown error'), 'error');
+            videoTexture = createFallbackTexture("Error loading video");
+            updateExistingScreensWithVideo();
         });
         
         // Start playing video (will be muted)
+        videoElement.muted = true;
         videoElement.play().catch(e => {
             console.error("Video play error:", e);
-            createNotification('Video play error: ' + e.message, 'error');
+            // Continue without failing - the texture will still be usable
         });
         
-        // Update existing screens with video
-        updateExistingScreensWithVideo();
-        
-        console.log("Video texture loaded");
+        console.log("Video texture created");
         return videoTexture;
     } catch (error) {
         console.error("Error in loadVideoTexture:", error);
-        createNotification('Error loading video texture: ' + error.message, 'error');
-        
-        // Return a blank texture instead of failing
-        return createFallbackTexture();
+        return createFallbackTexture("Error: " + error.message);
     }
 }
 
 // Create a fallback texture when video fails
-function createFallbackTexture() {
+function createFallbackTexture(errorMessage = "Video not available") {
+    console.log("Creating fallback texture:", errorMessage);
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
@@ -81,9 +92,9 @@ function createFallbackTexture() {
     ctx.fillStyle = '#ffffff';
     ctx.font = '24px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Video not available', canvas.width/2, canvas.height/2 - 20);
+    ctx.fillText(errorMessage, canvas.width/2, canvas.height/2 - 20);
     ctx.font = '16px Arial';
-    ctx.fillText('Please check console for errors', canvas.width/2, canvas.height/2 + 20);
+    ctx.fillText('Video will appear when available', canvas.width/2, canvas.height/2 + 20);
     
     // Create a texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
@@ -95,17 +106,18 @@ function updateExistingScreensWithVideo() {
     if (!videoTexture) return;
     
     screens.forEach(screen => {
-        // Find the content panel in the screen (usually child index 3 or 4)
-        const contentPanel = screen.children.find(child => 
-            child.geometry && 
-            child.geometry.type === 'PlaneGeometry' &&
-            child.position.y === -0.03
-        );
-        
-        if (contentPanel) {
-            // Update material with video texture
-            contentPanel.material.map = videoTexture;
-            contentPanel.material.needsUpdate = true;
+        // Look for the content panel in the screen
+        for (const child of screen.children) {
+            if (child.geometry && 
+                child.geometry.type === 'PlaneGeometry' &&
+                child.material && 
+                child.material.type === 'MeshBasicMaterial') {
+                
+                // Update material with video texture
+                child.material.map = videoTexture;
+                child.material.needsUpdate = true;
+                break;
+            }
         }
     });
 }

@@ -22,10 +22,10 @@ export let selectedScreen = null;
 export let selectedKey = null;
 
 // Main initialization function called from ar_main.js
-export function init() {
+export function initAR() {
     try {
         console.log("Initializing AR application...");
-        initAR();
+        initAREnvironment();
         return true;
     } catch (error) {
         console.error("Error initializing AR:", error);
@@ -36,7 +36,7 @@ export function init() {
 }
 
 // Initialize the AR environment
-export function initAR() {
+function initAREnvironment() {
     const container = document.createElement('div');
     document.body.appendChild(container);
 

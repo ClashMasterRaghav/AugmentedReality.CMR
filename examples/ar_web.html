@@ -85,6 +85,28 @@
 				90% { opacity: 1; transform: translateY(0); }
 				100% { opacity: 0; transform: translateY(-20px); }
 			}
+			/* Error message for unsupported browsers */
+			#errorMessage {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #fff;
+				background-color: rgba(255, 0, 0, 0.7);
+				padding: 20px 30px;
+				border-radius: 10px;
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				z-index: 300;
+				text-align: center;
+				display: none;
+			}
+			#errorMessage h2 {
+				margin-top: 0;
+			}
+			#errorMessage p {
+				margin-bottom: 20px;
+			}
 		</style>
 	</head>
 	<body>
@@ -96,7 +118,10 @@
 
 		<!-- Hidden video element that will be used as texture -->
 		<video id="videoElement" loop muted crossorigin="anonymous">
+			<source src="textures/ar_videoplayback.mp4" type="video/mp4">
+			<!-- Fallback to existing videos if ar_videoplayback.mp4 is not found -->
 			<source src="textures/sintel.mp4" type="video/mp4">
+			<source src="textures/pano.mp4" type="video/mp4">
 		</video>
 		
 		<!-- Loading message -->
@@ -104,6 +129,13 @@
 		
 		<!-- Notification container -->
 		<div id="notificationContainer"></div>
+
+		<!-- Error message for unsupported browsers -->
+		<div id="errorMessage">
+			<h2>WebXR AR Not Supported</h2>
+			<p>Your browser or device does not support WebXR Augmented Reality.</p>
+			<p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+		</div>
 
 		<script type="importmap">
 			{
