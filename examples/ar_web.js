@@ -30,6 +30,10 @@ let isRotating = false; // Flag to track if rotation is in progress
 init();
 animate();
 
+// Add a new variable for video mute state
+let isVideoMuted = true; // Start with video muted
+
+// Update the init function to fix video setup
 function init() {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -54,10 +58,11 @@ function init() {
     videoTexture = new THREE.VideoTexture(videoElement);
     videoTexture.minFilter = THREE.LinearFilter;
     videoTexture.magFilter = THREE.LinearFilter;
-    // Fix: Use correct format for video texture
     videoTexture.format = THREE.RGBAFormat;
     
-    // Start video (will be muted)
+    // Start video (will be muted initially)
+    videoElement.muted = true;
+    videoElement.loop = true;
     videoElement.play().catch(e => console.error("Video play error:", e));
 
     // AR Button with session end event handling
@@ -116,76 +121,79 @@ function init() {
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
+// Update the createControlPanel function
 function createControlPanel() {
     const panel = new THREE.Group();
     
-    // Panel background with rounded corners effect
-    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.25); // Increased height for more buttons
+    // Panel background with modern design - smaller size
+    const panelGeometry = new THREE.PlaneGeometry(0.25, 0.20); // Reduced size
     const panelMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x333333,
+        color: 0x222222, // Darker background for modern look
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.9
+        opacity: 0.85 // Slightly more transparent
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     panel.add(panelMesh);
     
-    // Add panel border glow
-    const glowGeometry = new THREE.PlaneGeometry(0.31, 0.26); // Adjusted for new panel size
+    // Add subtle panel border
+    const glowGeometry = new THREE.PlaneGeometry(0.26, 0.21); // Adjusted for new panel size
     const glowMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x4488ff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.5
+        opacity: 0.3 // More subtle glow
     });
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     glowMesh.position.z = -0.002;
     panel.add(glowMesh);
     
-    // New Screen button with improved design
-    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
+    // Smaller button size for modern look
+    const buttonGeometry = new THREE.PlaneGeometry(0.20, 0.04);
     const buttonMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x4488ff,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
+    
+    // New Screen button
     const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    newScreenButton.position.set(0, 0.09, 0.001);
+    newScreenButton.position.set(0, 0.07, 0.001);
     newScreenButton.userData = { type: 'button', action: 'newScreen' };
     panel.add(newScreenButton);
     
-    // New Screen button label with improved text
+    // New Screen button label
     const buttonCanvas = document.createElement('canvas');
     buttonCanvas.width = 256;
     buttonCanvas.height = 64;
     const btnCtx = buttonCanvas.getContext('2d');
     btnCtx.fillStyle = '#ffffff';
-    btnCtx.font = 'bold 24px Arial';
+    btnCtx.font = 'bold 22px Arial';
     btnCtx.textAlign = 'center';
     btnCtx.textBaseline = 'middle';
     btnCtx.fillText('+ New Screen', 128, 32);
     
     const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
-    const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
+    const buttonLabelGeometry = new THREE.PlaneGeometry(0.19, 0.035);
     const buttonLabelMaterial = new THREE.MeshBasicMaterial({ 
         map: buttonTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
     const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
-    buttonLabel.position.set(0, 0.09, 0.002);
+    buttonLabel.position.set(0, 0.07, 0.002);
     panel.add(buttonLabel);
     
-    // Move Screen button with toggle functionality
+    // Move Screen button with toggle functionality - grey when inactive
     const moveButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x44cc88,
+        color: 0x777777, // Grey when inactive
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
     const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
-    moveScreenButton.position.set(0, 0.03, 0.001);
+    moveScreenButton.position.set(0, 0.02, 0.001);
     moveScreenButton.userData = { 
         type: 'button',
         action: 'moveScreen',
@@ -200,7 +208,7 @@ function createControlPanel() {
     moveButtonCanvas.height = 64;
     const moveBtnCtx = moveButtonCanvas.getContext('2d');
     moveBtnCtx.fillStyle = '#ffffff';
-    moveBtnCtx.font = 'bold 24px Arial';
+    moveBtnCtx.font = 'bold 22px Arial';
     moveBtnCtx.textAlign = 'center';
     moveBtnCtx.textBaseline = 'middle';
     moveBtnCtx.fillText('Move Screen', 128, 32);
@@ -212,12 +220,12 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
-    moveButtonLabel.position.set(0, 0.03, 0.002);
+    moveButtonLabel.position.set(0, 0.02, 0.002);
     panel.add(moveButtonLabel);
     
-    // Rotate Screen button
+    // Rotate Screen button - grey when inactive
     const rotateButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xf39c12, // Orange color
+        color: 0x777777, // Grey when inactive
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
@@ -238,7 +246,7 @@ function createControlPanel() {
     rotateButtonCanvas.height = 64;
     const rotateBtnCtx = rotateButtonCanvas.getContext('2d');
     rotateBtnCtx.fillStyle = '#ffffff';
-    rotateBtnCtx.font = 'bold 24px Arial';
+    rotateBtnCtx.font = 'bold 22px Arial';
     rotateBtnCtx.textAlign = 'center';
     rotateBtnCtx.textBaseline = 'middle';
     rotateBtnCtx.fillText('Rotate Screen', 128, 32);
@@ -253,43 +261,51 @@ function createControlPanel() {
     rotateButtonLabel.position.set(0, -0.03, 0.002);
     panel.add(rotateButtonLabel);
     
-    // End AR button
-    const endARButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xe74c3c, // Red color
+    // Toggle Audio button
+    const audioButtonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x777777, // Grey when muted
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
-    const endARButton = new THREE.Mesh(buttonGeometry, endARButtonMaterial);
-    endARButton.position.set(0, -0.09, 0.001);
-    endARButton.userData = { type: 'button', action: 'endAR' };
-    panel.add(endARButton);
+    const audioButton = new THREE.Mesh(buttonGeometry, audioButtonMaterial);
+    audioButton.position.set(0, -0.08, 0.001);
+    audioButton.userData = { 
+        type: 'button',
+        action: 'toggleAudio',
+        isToggle: true,
+        isActive: false
+    };
+    panel.add(audioButton);
     
-    // End AR button label
-    const endARButtonCanvas = document.createElement('canvas');
-    endARButtonCanvas.width = 256;
-    endARButtonCanvas.height = 64;
-    const endARBtnCtx = endARButtonCanvas.getContext('2d');
-    endARBtnCtx.fillStyle = '#ffffff';
-    endARBtnCtx.font = 'bold 24px Arial';
-    endARBtnCtx.textAlign = 'center';
-    endARBtnCtx.textBaseline = 'middle';
-    endARBtnCtx.fillText('End AR', 128, 32);
+    // Audio button label
+    const audioButtonCanvas = document.createElement('canvas');
+    audioButtonCanvas.width = 256;
+    audioButtonCanvas.height = 64;
+    const audioBtnCtx = audioButtonCanvas.getContext('2d');
+    audioBtnCtx.fillStyle = '#ffffff';
+    audioBtnCtx.font = 'bold 22px Arial';
+    audioBtnCtx.textAlign = 'center';
+    audioBtnCtx.textBaseline = 'middle';
+    audioBtnCtx.fillText('Unmute Video', 128, 32);
     
-    const endARButtonTexture = new THREE.CanvasTexture(endARButtonCanvas);
-    const endARButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: endARButtonTexture,
+    const audioButtonTexture = new THREE.CanvasTexture(audioButtonCanvas);
+    const audioButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: audioButtonTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const endARButtonLabel = new THREE.Mesh(buttonLabelGeometry, endARButtonLabelMaterial);
-    endARButtonLabel.position.set(0, -0.09, 0.002);
-    panel.add(endARButtonLabel);
+    const audioButtonLabel = new THREE.Mesh(buttonLabelGeometry, audioButtonLabelMaterial);
+    audioButtonLabel.position.set(0, -0.08, 0.002);
+    panel.add(audioButtonLabel);
     
     // Position the control panel in front of the user
-    panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
+    panel.position.set(0, -0.15, -0.5); // Moved forward and slightly down
     panel.rotation.x = -Math.PI / 8; // Tilt slightly up
-    panel.userData = { type: 'controlPanel' };
+    panel.userData = { 
+        type: 'controlPanel',
+        audioLabel: audioButtonLabel // Store reference to audio label for updating
+    };
     scene.add(panel);
 }
 
@@ -709,6 +725,74 @@ function onSelect(event) {
             
             return;
         }
+        
+        if (button.userData.action === 'rotateScreen') {
+            // Toggle rotate mode
+            if (button.userData.isToggle) {
+                button.userData.isActive = !button.userData.isActive;
+                isRotateModeActive = button.userData.isActive;
+                
+                // Update button color based on state
+                if (button.userData.isActive) {
+                    button.material.color.set(0x4CAF50); // Green when active
+                    
+                    // Deactivate move mode if it's active
+                    if (isMoveModeActive) {
+                        const moveButtons = scene.children
+                            .filter(obj => obj.userData && obj.userData.type === 'controlPanel')
+                            .flatMap(panel => panel.children.filter(obj => obj.userData && obj.userData.action === 'moveScreen'));
+                        
+                        if (moveButtons.length > 0) {
+                            moveButtons[0].userData.isActive = false;
+                            moveButtons[0].material.color.set(0x777777); // Grey when inactive
+                            isMoveModeActive = false;
+                            isMovingScreen = false;
+                        }
+                    }
+                } else {
+                    button.material.color.set(0x777777); // Grey when inactive
+                    isRotating = false; // Stop any ongoing rotation
+                }
+            }
+            
+            return;
+        }
+        
+        if (button.userData.action === 'toggleAudio') {
+            // Toggle video audio
+            isVideoMuted = !isVideoMuted;
+            videoElement.muted = isVideoMuted;
+            
+            // Update button state
+            button.userData.isActive = !isVideoMuted;
+            
+            // Update button color based on state
+            if (!isVideoMuted) {
+                button.material.color.set(0x4CAF50); // Green when unmuted
+            } else {
+                button.material.color.set(0x777777); // Grey when muted
+            }
+            
+            // Update button label
+            const panel = scene.children.find(obj => obj.userData && obj.userData.type === 'controlPanel');
+            if (panel && panel.userData.audioLabel) {
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 256;
+                labelCanvas.height = 64;
+                const labelCtx = labelCanvas.getContext('2d');
+                labelCtx.fillStyle = '#ffffff';
+                labelCtx.font = 'bold 22px Arial';
+                labelCtx.textAlign = 'center';
+                labelCtx.textBaseline = 'middle';
+                labelCtx.fillText(isVideoMuted ? 'Unmute Video' : 'Mute Video', 128, 32);
+                
+                const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                panel.userData.audioLabel.material.map = labelTexture;
+                panel.userData.audioLabel.material.map.needsUpdate = true;
+            }
+            
+            return;
+        }
     }
 }
 
@@ -870,6 +954,74 @@ function onTouchStart(event) {
             setTimeout(() => {
                 button.material.color.copy(originalColor);
             }, 200);
+            
+            return;
+        }
+        
+        if (button.userData.action === 'rotateScreen') {
+            // Toggle rotate mode
+            if (button.userData.isToggle) {
+                button.userData.isActive = !button.userData.isActive;
+                isRotateModeActive = button.userData.isActive;
+                
+                // Update button color based on state
+                if (button.userData.isActive) {
+                    button.material.color.set(0x4CAF50); // Green when active
+                    
+                    // Deactivate move mode if it's active
+                    if (isMoveModeActive) {
+                        const moveButtons = scene.children
+                            .filter(obj => obj.userData && obj.userData.type === 'controlPanel')
+                            .flatMap(panel => panel.children.filter(obj => obj.userData && obj.userData.action === 'moveScreen'));
+                        
+                        if (moveButtons.length > 0) {
+                            moveButtons[0].userData.isActive = false;
+                            moveButtons[0].material.color.set(0x777777); // Grey when inactive
+                            isMoveModeActive = false;
+                            isMovingScreen = false;
+                        }
+                    }
+                } else {
+                    button.material.color.set(0x777777); // Grey when inactive
+                    isRotating = false; // Stop any ongoing rotation
+                }
+            }
+            
+            return;
+        }
+        
+        if (button.userData.action === 'toggleAudio') {
+            // Toggle video audio
+            isVideoMuted = !isVideoMuted;
+            videoElement.muted = isVideoMuted;
+            
+            // Update button state
+            button.userData.isActive = !isVideoMuted;
+            
+            // Update button color based on state
+            if (!isVideoMuted) {
+                button.material.color.set(0x4CAF50); // Green when unmuted
+            } else {
+                button.material.color.set(0x777777); // Grey when muted
+            }
+            
+            // Update button label
+            const panel = scene.children.find(obj => obj.userData && obj.userData.type === 'controlPanel');
+            if (panel && panel.userData.audioLabel) {
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 256;
+                labelCanvas.height = 64;
+                const labelCtx = labelCanvas.getContext('2d');
+                labelCtx.fillStyle = '#ffffff';
+                labelCtx.font = 'bold 22px Arial';
+                labelCtx.textAlign = 'center';
+                labelCtx.textBaseline = 'middle';
+                labelCtx.fillText(isVideoMuted ? 'Unmute Video' : 'Mute Video', 128, 32);
+                
+                const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                panel.userData.audioLabel.material.map = labelTexture;
+                panel.userData.audioLabel.material.map.needsUpdate = true;
+            }
         }
     }
 }
