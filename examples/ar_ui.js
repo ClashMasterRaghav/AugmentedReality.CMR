@@ -6,6 +6,42 @@ import { createNewBrowserScreen } from './ar_screens.js';
 // Export virtual keyboard reference
 export let virtualKeyboard;
 
+// Create DOM notification
+export function createNotification(message, type = 'info') {
+    // Add to DOM notification container
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    
+    // Add color based on type
+    if (type === 'error') {
+        notification.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+    } else if (type === 'success') {
+        notification.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+    } else if (type === 'warning') {
+        notification.style.backgroundColor = 'rgba(255, 165, 0, 0.7)';
+    }
+    
+    // Add to container
+    container.appendChild(notification);
+    
+    // Also show in 3D space if renderer is available
+    if (scene && camera) {
+        showNotification(message);
+    }
+    
+    // Remove after timeout
+    setTimeout(() => {
+        if (container.contains(notification)) {
+            container.removeChild(notification);
+        }
+    }, 3000);
+}
+
 // Create the control panel with buttons for AR experience
 export function createControlPanel() {
     const panel = new THREE.Group();

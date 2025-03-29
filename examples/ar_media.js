@@ -1,7 +1,8 @@
 // Media handling for AR experience (video and audio)
 import * as THREE from 'three';
-import { scene } from './ar_core.js';
+import { scene, camera } from './ar_core.js';
 import { screens } from './ar_screens.js';
+import { createNotification } from './ar_ui.js';
 
 // Export video texture reference
 export let videoTexture;
@@ -9,28 +10,84 @@ export let videoElement;
 
 // Load video texture for AR content
 export function loadVideoTexture() {
-    // Get video element from HTML
-    videoElement = document.getElementById('videoElement');
-    
-    if (!videoElement) {
-        console.error('Video element not found in HTML!');
-        return;
+    try {
+        console.log("Loading video texture...");
+        
+        // Get video element from HTML
+        videoElement = document.getElementById('videoElement');
+        
+        if (!videoElement) {
+            console.error('Video element not found in HTML!');
+            createNotification('Video element not found in HTML!', 'error');
+            return null;
+        }
+        
+        // Check if video source is available
+        if (!videoElement.querySelector('source') || !videoElement.querySelector('source').src) {
+            console.warn('Video source not found or empty');
+            createNotification('Video source not found or empty', 'warning');
+        }
+        
+        // Create video texture
+        videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+        videoTexture.format = THREE.RGBAFormat;
+        videoTexture.crossOrigin = 'anonymous';
+        
+        // Add event listeners for video load status
+        videoElement.addEventListener('loadeddata', () => {
+            console.log('Video loaded successfully');
+            createNotification('Video loaded successfully', 'success');
+        });
+        
+        videoElement.addEventListener('error', (e) => {
+            console.error('Video load error:', e);
+            createNotification('Error loading video: ' + (e.message || 'Unknown error'), 'error');
+        });
+        
+        // Start playing video (will be muted)
+        videoElement.play().catch(e => {
+            console.error("Video play error:", e);
+            createNotification('Video play error: ' + e.message, 'error');
+        });
+        
+        // Update existing screens with video
+        updateExistingScreensWithVideo();
+        
+        console.log("Video texture loaded");
+        return videoTexture;
+    } catch (error) {
+        console.error("Error in loadVideoTexture:", error);
+        createNotification('Error loading video texture: ' + error.message, 'error');
+        
+        // Return a blank texture instead of failing
+        return createFallbackTexture();
     }
+}
+
+// Create a fallback texture when video fails
+function createFallbackTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
     
-    // Create video texture
-    videoTexture = new THREE.VideoTexture(videoElement);
-    videoTexture.minFilter = THREE.LinearFilter;
-    videoTexture.magFilter = THREE.LinearFilter;
-    videoTexture.format = THREE.RGBAFormat;
-    videoTexture.crossOrigin = 'anonymous';
+    // Fill background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Start playing video (will be muted)
-    videoElement.play().catch(e => console.error("Video play error:", e));
+    // Add text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Video not available', canvas.width/2, canvas.height/2 - 20);
+    ctx.font = '16px Arial';
+    ctx.fillText('Please check console for errors', canvas.width/2, canvas.height/2 + 20);
     
-    // Update existing screens with video
-    updateExistingScreensWithVideo();
-    
-    return videoTexture;
+    // Create a texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
 }
 
 // Update existing screens with video texture

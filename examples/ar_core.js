@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel } from './ar_ui.js';
+import { createControlPanel, createNotification } from './ar_ui.js';
 import { createVirtualKeyboard } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 
@@ -20,6 +20,20 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let selectedScreen = null;
 export let selectedKey = null;
+
+// Main initialization function called from ar_main.js
+export function init() {
+    try {
+        console.log("Initializing AR application...");
+        initAR();
+        return true;
+    } catch (error) {
+        console.error("Error initializing AR:", error);
+        // Show error in notification
+        createNotification("Error initializing AR: " + error.message, "error");
+        return false;
+    }
+}
 
 // Initialize the AR environment
 export function initAR() {
