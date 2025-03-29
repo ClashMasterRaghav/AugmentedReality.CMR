@@ -1143,10 +1143,11 @@ function findScreenFromDragHandle(dragHandle) {
 }
 
 // Setup function to be called with imports
-export function setupVideoControls(videoControls) {
-    if (videoControls) {
-        videoControlFunctions.togglePlayback = videoControls.toggleVideoPlayback;
-        videoControlFunctions.toggleMute = videoControls.toggleVideoMute;
+export function setupVideoControls(mediaModule) {
+    if (mediaModule) {
+        // Store references to functions rather than redefining them
+        videoControlFunctions.togglePlayback = mediaModule.toggleVideoPlayback;
+        videoControlFunctions.toggleMute = mediaModule.toggleVideoMute;
         console.log("Video controls setup complete");
     }
 } 
