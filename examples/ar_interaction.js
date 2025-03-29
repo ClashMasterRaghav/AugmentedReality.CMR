@@ -428,7 +428,7 @@ function findAllButtons() {
 function onTouchStart(event) {
     event.preventDefault();
     
-    console.log("Touch start detected");
+    console.log("Touch start detected in AR");
     
     // Single touch handling
     const touch = event.touches[0];
@@ -437,8 +437,6 @@ function onTouchStart(event) {
         console.log("No valid touch point");
         return;
     }
-    
-    console.log("Processing single touch");
     
     // Convert touch to normalized device coordinates
     initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
@@ -455,12 +453,17 @@ function onTouchStart(event) {
     const doubleTapDetected = (now - lastTapTime) < 300;
     lastTapTime = now;
     
-    // FIRST CHECK FOR DRAG HANDLES
-    // Create a list of all drag handles in the scene
+    // Priority 1: Check for top bar drag handles
     const dragHandles = [];
     screens.forEach(screen => {
         if (screen.userData && screen.userData.dragHandle) {
             dragHandles.push(screen.userData.dragHandle);
+            // Also directly check all children of the drag handle
+            if (screen.userData.dragHandle.children) {
+                screen.userData.dragHandle.children.forEach(child => {
+                    if (child.isMesh) dragHandles.push(child);
+                });
+            }
         }
     });
     
@@ -471,14 +474,22 @@ function onTouchStart(event) {
         const hitObject = handleIntersects[0].object;
         console.log("Hit a drag handle or its child:", hitObject.uuid);
         
-        // Find the actual handle (might be the child icon)
+        // Find the actual handle - may be the hit object, its parent, or its grandparent
         let dragHandle = hitObject;
+        
+        // Check if it's the grip inside the top bar
         if (hitObject.parent && hitObject.parent.userData && hitObject.parent.userData.type === 'dragHandle') {
             dragHandle = hitObject.parent;
         }
+        // Check if it's a child of the grip
+        else if (hitObject.parent && hitObject.parent.parent && 
+                 hitObject.parent.parent.userData && hitObject.parent.parent.userData.type === 'dragHandle') {
+            dragHandle = hitObject.parent.parent;
+        }
         
         // Get the screen this handle belongs to
-        const screen = dragHandle.userData.screen;
+        const screen = findScreenFromDragHandle(dragHandle);
+        
         if (screen) {
             console.log("Starting drag on screen:", screen.userData.id);
             
@@ -503,22 +514,9 @@ function onTouchStart(event) {
             const intersectionPoint = handleIntersects[0].point;
             dragOffset.copy(screen.position).sub(intersectionPoint);
             
-            // Visual feedback - make handle "glow"
+            // Visual feedback for top bar - subtle highlight effect
             const originalColor = dragHandle.material.color.clone();
-            dragHandle.material.color.set(0x00ff00); // Bright green
-            
-            // Scale up slightly for visual feedback
-            dragHandle.scale.set(1.2, 1.2, 1.2);
-            
-            // Reset after a moment
-            setTimeout(() => {
-                if (isDraggingHandle) {
-                    dragHandle.material.color.set(0x4CAF50); // Back to regular green but maintain scale
-                } else {
-                    dragHandle.material.color.copy(originalColor);
-                    dragHandle.scale.set(1, 1, 1);
-                }
-            }, 300);
+            dragHandle.material.color.set(0x4CAF50); // Green for highlight
             
             // Provide haptic feedback if available
             if (navigator.vibrate) {
@@ -674,14 +672,8 @@ function flashScreenHighlight(screen) {
     requestAnimationFrame(fadeIn);
 }
 
-// Touch move handler
+// Touch move handler - make the movement more responsive and direct
 function onTouchMove(event) {
-    // EXTREME VERBOSE LOGGING FOR DEBUGGING
-    console.log("===== TOUCH MOVE EVENT =====");
-    console.log("Number of touches:", event.touches.length);
-    console.log("isDraggingHandle:", isDraggingHandle);
-    console.log("draggedScreen:", draggedScreen ? draggedScreen.userData.id : "none");
-    
     // Always prevent default to avoid browser gestures
     event.preventDefault();
     
@@ -697,19 +689,9 @@ function onTouchMove(event) {
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    console.log("Touch position:", 
-        currentTouchPosition.x.toFixed(3), 
-        currentTouchPosition.y.toFixed(3));
-    console.log("Previous position:", 
-        previousTouchPosition.x.toFixed(3), 
-        previousTouchPosition.y.toFixed(3));
-    console.log("Delta:", 
-        (currentTouchPosition.x - previousTouchPosition.x).toFixed(3),
-        (currentTouchPosition.y - previousTouchPosition.y).toFixed(3));
-    
-    // Handle dragging via the drag handle
+    // Handle dragging via the drag handle - even more direct approach
     if (isDraggingHandle && draggedScreen) {
-        console.log("ATTEMPTING TO MOVE SCREEN");
+        console.log("Moving screen via drag handle");
         
         try {
             // Preserve original scale
@@ -718,7 +700,7 @@ function onTouchMove(event) {
                 draggedScreen.scale.copy(draggedScreen.userData.originalScale);
             }
             
-            // SIMPLE DIRECT MOVEMENT APPROACH - Should work regardless of raycasting
+            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
             // Calculate movement delta from touch
             const deltaX = currentTouchPosition.x - previousTouchPosition.x;
             const deltaY = currentTouchPosition.y - previousTouchPosition.y;
@@ -727,18 +709,13 @@ function onTouchMove(event) {
             const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
             const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
             
-            // Scale for more noticeable movement
-            const moveScale = 0.15; // Slightly increase sensitivity
+            // Scale for more noticeable movement in AR
+            const moveScale = 0.2; // Increased for better AR response
             
             // Create movement vector
             const movement = new THREE.Vector3()
                 .addScaledVector(cameraRight, deltaX * moveScale)
                 .addScaledVector(cameraUp, deltaY * moveScale);
-            
-            console.log("Direct movement vector:", 
-                movement.x.toFixed(5),
-                movement.y.toFixed(5),
-                movement.z.toFixed(5));
             
             // Apply movement directly
             draggedScreen.position.add(movement);
@@ -746,10 +723,8 @@ function onTouchMove(event) {
             // Make screen face the camera
             draggedScreen.lookAt(camera.position);
             
-            // Create visual feedback
+            // Optional visual feedback
             createMoveIndicator(draggedScreen.position.clone(), 0.03);
-            
-            // No need for the raycasting approach since direct movement works well
             
         } catch (error) {
             console.error("Error in drag movement:", error);
@@ -878,10 +853,10 @@ function onTouchEnd(event) {
     if (isDraggingHandle && draggedScreen) {
         console.log("Finished dragging screen:", draggedScreen.userData.id);
         
-        // Reset the drag handle appearance
+        // Reset the drag handle appearance if it exists
         if (draggedScreen.userData.dragHandle) {
-            draggedScreen.userData.dragHandle.material.color.set(0x4CAF50);
-            draggedScreen.userData.dragHandle.scale.set(1, 1, 1);
+            // Just reset the color without changing scale for top bar
+            draggedScreen.userData.dragHandle.material.color.set(0x333333); // Reset to original dark color
         }
         
         // Save the current position in userData
@@ -1034,4 +1009,42 @@ function createModeChangeIndicator(message) {
     }
     
     requestAnimationFrame(fadeOut);
+}
+
+// Helper function to find a screen from a drag handle
+function findScreenFromDragHandle(dragHandle) {
+    // Direct reference in userData
+    if (dragHandle.userData && dragHandle.userData.screen) {
+        return dragHandle.userData.screen;
+    }
+    
+    // Search for screen by UUID
+    if (dragHandle.userData && dragHandle.userData.screenUUID) {
+        for (let i = 0; i < screens.length; i++) {
+            if (screens[i].uuid === dragHandle.userData.screenUUID) {
+                return screens[i];
+            }
+        }
+    }
+    
+    // Try to find by traversing upwards in the scene graph
+    let parent = dragHandle.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'screen') {
+            return parent;
+        }
+        parent = parent.parent;
+    }
+    
+    // Last resort - check if this handle is a direct child of any screen
+    for (let i = 0; i < screens.length; i++) {
+        for (let j = 0; j < screens[i].children.length; j++) {
+            if (screens[i].children[j] === dragHandle) {
+                return screens[i];
+            }
+        }
+    }
+    
+    console.warn("Could not find screen for drag handle:", dragHandle.uuid);
+    return null;
 } 

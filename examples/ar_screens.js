@@ -16,7 +16,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     
-    console.log("Creating screen with corner handle");
+    console.log("Creating screen with draggable top bar");
     
     // Basic identification data
     browserWindow.userData = { 
@@ -26,15 +26,6 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1) // Store original scale to prevent scaling issues
     };
-    
-    // Background plane
-    const bgGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
-    const bgMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x121212, // Dark background
-        side: THREE.DoubleSide
-    });
-    const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
-    browserWindow.add(bgPanel);
     
     // Add border for better visibility
     const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
@@ -46,98 +37,82 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     borderPanel.position.z = -0.001;
     browserWindow.add(borderPanel);
     
-    // Create a SMALL, SUBTLE corner drag handle
-    const handleSize = 0.05; // Small handle
-    const handleGeometry = new THREE.CircleGeometry(handleSize/2, 32);
-    const handleMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4CAF50, // Green color
-        transparent: true,
-        opacity: 0.8,
-        depthTest: false
+    // Background plane
+    const bgGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    const bgMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x121212, // Dark background
+        side: THREE.DoubleSide
     });
-    const dragHandle = new THREE.Mesh(handleGeometry, handleMaterial);
+    const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
+    browserWindow.add(bgPanel);
     
-    // Position in top-right corner
-    dragHandle.position.set(
-        screenWidth/2 - handleSize/2, // Right edge, inset by handle radius
-        screenHeight/2 - handleSize/2, // Top edge, inset by handle radius
-        0.01 // Slightly in front of screen
+    // Add draggable top bar - spans the entire width of the screen
+    const topBarHeight = 0.08; // Height of the top bar
+    const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
+    const topBarMaterial = new THREE.MeshBasicMaterial({
+        color: 0x333333, // Darker than the background
+        transparent: true,
+        opacity: 1.0,
+        side: THREE.DoubleSide,
+        depthTest: false // Ensure it's always visible
+    });
+    const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
+    
+    // Position at the top of the screen
+    topBar.position.set(
+        0, // Centered horizontally
+        screenHeight/2 - topBarHeight/2, // Top edge
+        0.005 // Slightly in front
     );
-    dragHandle.renderOrder = 100; // Ensure it renders on top
+    topBar.renderOrder = 100; // Ensure it renders on top
     
-    // Create a move icon for the handle
-    const handleCanvas = document.createElement('canvas');
-    handleCanvas.width = 64;
-    handleCanvas.height = 64;
-    const ctx = handleCanvas.getContext('2d');
+    // Add a grip pattern to indicate draggability
+    const gripCanvas = document.createElement('canvas');
+    gripCanvas.width = 512;
+    gripCanvas.height = 64;
+    const ctx = gripCanvas.getContext('2d');
     
-    // Draw a subtle crosshair/move icon
+    // Draw grip pattern (dots)
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+        const x = 30 + i * 56; // Evenly spaced dots
+        ctx.beginPath();
+        ctx.arc(x, 32, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
     
-    // Draw move arrows
-    // Horizontal arrow
-    ctx.beginPath();
-    ctx.moveTo(16, 32);
-    ctx.lineTo(48, 32);
-    ctx.stroke();
-    // Left arrowhead
-    ctx.beginPath();
-    ctx.moveTo(22, 26);
-    ctx.lineTo(16, 32);
-    ctx.lineTo(22, 38);
-    ctx.stroke();
-    // Right arrowhead
-    ctx.beginPath();
-    ctx.moveTo(42, 26);
-    ctx.lineTo(48, 32);
-    ctx.lineTo(42, 38);
-    ctx.stroke();
+    // Add screen title text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Screen ${browserWindow.userData.id + 1}`, 256, 32);
     
-    // Vertical arrow
-    ctx.beginPath();
-    ctx.moveTo(32, 16);
-    ctx.lineTo(32, 48);
-    ctx.stroke();
-    // Up arrowhead
-    ctx.beginPath();
-    ctx.moveTo(26, 22);
-    ctx.lineTo(32, 16);
-    ctx.lineTo(38, 22);
-    ctx.stroke();
-    // Down arrowhead
-    ctx.beginPath();
-    ctx.moveTo(26, 42);
-    ctx.lineTo(32, 48);
-    ctx.lineTo(38, 42);
-    ctx.stroke();
-    
-    const handleIconTexture = new THREE.CanvasTexture(handleCanvas);
-    const handleIconGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
-    const handleIconMaterial = new THREE.MeshBasicMaterial({
-        map: handleIconTexture,
+    const gripTexture = new THREE.CanvasTexture(gripCanvas);
+    const gripGeometry = new THREE.PlaneGeometry(screenWidth * 0.95, topBarHeight * 0.8);
+    const gripMaterial = new THREE.MeshBasicMaterial({
+        map: gripTexture,
         transparent: true,
+        side: THREE.DoubleSide,
         depthTest: false
     });
-    const handleIcon = new THREE.Mesh(handleIconGeometry, handleIconMaterial);
-    handleIcon.position.z = 0.001; // Slightly in front of handle
-    dragHandle.add(handleIcon);
+    const gripMesh = new THREE.Mesh(gripGeometry, gripMaterial);
+    gripMesh.position.z = 0.001; // Slightly in front of the top bar
+    topBar.add(gripMesh);
     
-    // Set userData for the drag handle
-    dragHandle.userData = {
+    // Set userData for the top bar to enable dragging
+    topBar.userData = {
         type: 'dragHandle',
         action: 'moveScreen',
         screen: browserWindow,
         isDraggable: true
     };
     
-    // Add the handle to the browserWindow
-    browserWindow.add(dragHandle);
+    // Add the top bar to the browserWindow
+    browserWindow.add(topBar);
     
     // Store reference to the drag handle on the screen object
-    browserWindow.userData.dragHandle = dragHandle;
+    browserWindow.userData.dragHandle = topBar;
     
     // Position the window
     browserWindow.position.copy(position);
