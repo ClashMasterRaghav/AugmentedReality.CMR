@@ -7,7 +7,7 @@ import {
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
-import { videoElement, duration } from './ar_media.js';
+import { videoElement, duration, updateVideoProgress } from './ar_media.js';
 
 // Touch interaction variables
 let touchEnabled = true;
@@ -487,435 +487,314 @@ function findAllButtons() {
     return buttons;
 }
 
-// Touch start handler - improved detection for AR
-function onTouchStart(event) {
-    event.preventDefault();
-    
-    // Get touch position
+// Handle touch start event
+export function onTouchStart(event) {
+    // Get the first touch
     const touch = event.touches[0];
-    const touchX = (touch.clientX / window.innerWidth) * 2 - 1;
-    const touchY = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Store touch start position for drag reference
-    touchStartX = touchX;
-    touchStartY = touchY;
+    // Remember touch start position for movement calculations
+    touchStartPosition.x = touch.clientX;
+    touchStartPosition.y = touch.clientY;
     
-    // Log touch start for debugging
-    console.log("TOUCH START at:", touchX, touchY);
+    // Convert touch position to normalized position (-1 to 1)
+    const normalizedPosition = new THREE.Vector2(
+        (touch.clientX / window.innerWidth) * 2 - 1,
+        -(touch.clientY / window.innerHeight) * 2 + 1
+    );
     
-    // Update raycaster with touch position and camera
-    raycaster.setFromCamera(new THREE.Vector2(touchX, touchY), camera);
+    // Create a raycaster
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(normalizedPosition, camera);
     
-    // INCREASE THRESHOLD for better detection
-    raycaster.params.Line.threshold = 0.1;
-    raycaster.params.Points.threshold = 0.1;
+    // First, try to detect control buttons or progress bar
+    const allObjects = scene.children;
+    let hitButton = false;
+
+    // Variables to store what we've hit
+    let intersectedDragHandle = null;
+    let intersectedScreen = null;
     
-    // Search for intersections with all objects - increased tolerance
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    
-    // Show visual feedback at touch point
-    showTouchFeedback(touch.clientX, touch.clientY);
-    
-    // Log all intersections for debugging
-    console.log("Found intersections:", intersects.length);
-    if (intersects.length > 0) {
-        console.log("First intersection type:", intersects[0].object.userData.type);
+    // First, look specifically for drag handles and interactive controls with higher precision
+    const intersections = raycaster.intersectObjects(allObjects, true);
+    for (const intersection of intersections) {
+        const object = intersection.object;
+        
+        // Check if we hit a button, progress bar, or other control
+        if (object.userData.type === 'button' && object.userData.action) {
+            console.log("Touched button:", object.userData.action);
+            object.material.color.set(0xaaaaaa); // Visual feedback
+            object.userData.isPressed = true;
+            if (vibrateAvailable) navigator.vibrate(20); // Haptic feedback
+            hitButton = true;
+            if (object.userData.action === 'progressBar') {
+                console.log("Handling progress bar touch");
+                handleProgressBarTouch(object, intersection.point);
+            }
+            break;
+        }
+        
+        // Check if we hit a drag handle directly
+        if (object.userData.type === 'dragHandle' && object.userData.isDraggable) {
+            console.log("Direct drag handle hit:", object.userData.action);
+            intersectedDragHandle = object;
+            intersectedScreen = object.userData.screen;
+            
+            // Visual feedback for grab
+            object.material.color.set(0x4CAF50); // Green to indicate active
+            if (vibrateAvailable) navigator.vibrate([20, 30, 40]); // Haptic pattern for grab
+            
+            // Store reference to the dragged handle
+            currentDragHandle = object;
+            isDragging = true;
+            hitButton = true;
+            break;
+        }
     }
     
-    // If we hit something in the scene
-    if (intersects.length > 0) {
-        // Check if we hit a drag handle (top bar)
-        intersectedDragHandle = findObjectWithType(intersects, 'dragHandle');
-        
-        if (intersectedDragHandle) {
-            console.log("DRAG HANDLE TOUCHED!");
-            isDragging = true;
+    // If we didn't hit a button or drag handle directly, check if we hit a screen area that's draggable
+    if (!hitButton) {
+        // Find all screen objects
+        for (const intersection of intersections) {
+            const object = intersection.object;
             
-            // Get screen number from drag handle
-            const screenNumber = intersectedDragHandle.userData.screenNumber;
+            // Check if this is a screen or part of a screen
+            let screen = findScreenFromObject(object);
             
-            // Find corresponding screen in screens array
-            for (let i = 0; i < screens.length; i++) {
-                if (screens[i].number === screenNumber) {
-                    intersectedScreen = screens[i].group;
-                    break;
-                }
-            }
-            
-            // Visual feedback - change color to bright green
-            intersectedDragHandle.material.color.set(0x00ff00);
-            
-            // Haptic feedback for successful grab
-            if (navigator.vibrate) {
-                navigator.vibrate(100);
-            }
-            
-            // Store the original position of the screen for reference
-            if (intersectedScreen) {
-                originalPosition.copy(intersectedScreen.position);
+            if (screen) {
+                const screenHeight = 0.75; // Standard screen height
+                const hitPoint = intersection.point.clone();
                 
-                // Store the original scale
-                if (intersectedScreen.userData && intersectedScreen.userData.originalScale) {
-                    originalScale.copy(intersectedScreen.userData.originalScale);
-                } else {
-                    originalScale.set(1, 1, 1);
-                }
+                // Convert world point to local point relative to the screen
+                screen.worldToLocal(hitPoint);
                 
-                console.log("Screen grabbed:", screenNumber);
-                console.log("Original position:", originalPosition);
-            }
-        }
-        // Check if we hit a button
-        else {
-            const button = findObjectWithType(intersects, 'button');
-            if (button) {
-                console.log("BUTTON PRESSED:", button.userData.action);
-                handleButtonAction(button);
-            }
-            // Check if we hit a progress bar for video seeking
-            else {
-                const progressBar = findObjectWithType(intersects, 'progressBar');
-                if (progressBar) {
-                    console.log("PROGRESS BAR TOUCHED!");
-                    handleProgressBarTouch(progressBar, intersects[0].point.x);
-                }
-                // If we hit any part of a screen, allow dragging from anywhere
-                else {
-                    const screenBackground = findObjectWithType(intersects, 'screen');
-                    if (screenBackground) {
-                        console.log("SCREEN BACKGROUND TOUCHED - ALLOWING DRAG");
-                        isDragging = true;
-                        
-                        // Get screen number
-                        const screenNumber = screenBackground.userData.screenNumber;
-                        
-                        // Find corresponding screen in screens array
-                        for (let i = 0; i < screens.length; i++) {
-                            if (screens[i].number === screenNumber) {
-                                intersectedScreen = screens[i].group;
-                                break;
-                            }
-                        }
+                // Check if the hit is in the top 2/3 draggable area of the screen
+                if (screen.userData.draggableArea && 
+                    hitPoint.y <= screen.userData.draggableArea.top && 
+                    hitPoint.y >= screen.userData.draggableArea.bottom) {
+                    
+                    console.log("Hit in draggable area of screen:", screen.userData.id, "at y=", hitPoint.y);
+                    
+                    // Create virtual drag handle if none exists
+                    if (screen.userData.dragHandle) {
+                        intersectedDragHandle = screen.userData.dragHandle;
+                        intersectedScreen = screen;
                         
                         // Visual feedback
-                        if (navigator.vibrate) {
-                            navigator.vibrate(50);
-                        }
+                        screen.userData.dragHandle.material.color.set(0x4CAF50); // Green to indicate active
+                        if (vibrateAvailable) navigator.vibrate([20, 30, 40]); // Haptic pattern for grab
                         
-                        // Store original position and scale
-                        if (intersectedScreen) {
-                            originalPosition.copy(intersectedScreen.position);
-                            
-                            if (intersectedScreen.userData && intersectedScreen.userData.originalScale) {
-                                originalScale.copy(intersectedScreen.userData.originalScale);
-                            } else {
-                                originalScale.set(1, 1, 1);
-                            }
-                            
-                            console.log("Screen grabbed from background:", screenNumber);
+                        // Store reference to the dragged handle
+                        currentDragHandle = screen.userData.dragHandle;
+                        isDragging = true;
+                        
+                        // Store original scale on start drag to ensure we preserve it
+                        if (intersectedScreen && !intersectedScreen.userData.originalScaleStored) {
+                            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
+                            intersectedScreen.userData.originalScaleStored = true;
                         }
+                        break;
                     }
                 }
             }
         }
     }
-    // If we didn't hit any object, check if we should create a new screen
-    else {
-        // Create a new screen at touch point if user pressed hard/long enough
-        // This will be detected in touchend event for better reliability
-        isTouchStarted = true;
-    }
-}
-
-// Show visual feedback at touch point
-function showTouchFeedback(x, y) {
-    // Create a temporary bright circle at touch point
-    const feedback = document.createElement('div');
-    feedback.style.position = 'fixed';
-    feedback.style.width = '30px';
-    feedback.style.height = '30px';
-    feedback.style.borderRadius = '50%';
-    feedback.style.backgroundColor = 'rgba(0, 255, 255, 0.7)';
-    feedback.style.left = (x - 15) + 'px';
-    feedback.style.top = (y - 15) + 'px';
-    feedback.style.zIndex = '9999';
-    feedback.style.pointerEvents = 'none';
-    document.body.appendChild(feedback);
     
-    // Animate and remove
-    setTimeout(() => {
-        feedback.style.transition = 'all 0.3s';
-        feedback.style.opacity = '0';
-        feedback.style.transform = 'scale(1.5)';
-        setTimeout(() => {
-            document.body.removeChild(feedback);
-        }, 300);
-    }, 50);
-}
-
-// Function to handle touch move for dragging
-function onTouchMove(event) {
-    event.preventDefault();
-    
-    // Only process if we're dragging a screen
-    if (isDragging && intersectedScreen) {
-        console.log("DRAGGING SCREEN");
-        
-        // Get touch position
-        const touch = event.touches[0];
-        const touchX = (touch.clientX / window.innerWidth) * 2 - 1;
-        const touchY = -(touch.clientY / window.innerHeight) * 2 + 1;
-        
-        // Calculate movement delta
-        const deltaX = touchX - touchStartX;
-        const deltaY = touchY - touchStartY;
-        
-        // Create movement vector in camera space
-        const movementSpeed = 0.8; // INCREASED SPEED for better responsiveness
-        const movement = new THREE.Vector3(
-            deltaX * movementSpeed,
-            deltaY * movementSpeed,
-            0
-        );
-        
-        // Transform movement to world space based on camera orientation
-        const cameraMatrix = new THREE.Matrix4();
-        camera.updateMatrixWorld();
-        cameraMatrix.extractRotation(camera.matrixWorld);
-        movement.applyMatrix4(cameraMatrix);
-        
-        // Update screen position
-        intersectedScreen.position.copy(originalPosition).add(movement);
-        
-        // Visual feedback during dragging
-        showDragFeedback();
-        
-        // Ensure screen remains visible
-        ensureScreenVisibility(intersectedScreen);
-        
-        // Update touch position
-        touchStartX = touchX;
-        touchStartY = touchY;
-        originalPosition.copy(intersectedScreen.position);
-    }
-}
-
-// Show feedback during dragging
-function showDragFeedback() {
-    // Add a temporary bright outline to the dragged screen
-    if (intersectedScreen && !dragVisualFeedback) {
-        // Try to find the border/outline of the screen to highlight
-        intersectedScreen.traverse(child => {
-            if (child instanceof THREE.LineSegments) {
-                // Store original color
-                originalBorderColor = child.material.color.clone();
-                // Change to bright cyan
-                child.material.color.set(0x00ffff);
-                dragVisualFeedback = child;
-            }
-        });
-    }
-}
-
-// Make sure screen stays in view
-function ensureScreenVisibility(screen) {
-    // Get the camera's forward direction
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
-    cameraDirection.applyQuaternion(camera.quaternion);
-    
-    // Get vector from camera to screen
-    const cameraToScreen = new THREE.Vector3();
-    cameraToScreen.subVectors(screen.position, camera.position);
-    
-    // Check if screen is behind the camera
-    const dotProduct = cameraToScreen.dot(cameraDirection);
-    
-    // If screen is behind camera, move it in front
-    if (dotProduct < 0) {
-        console.log("Screen was behind camera - repositioning");
-        
-        // Position the screen 1 meter in front of the camera
-        const newPosition = new THREE.Vector3();
-        newPosition.copy(camera.position).add(cameraDirection.multiplyScalar(1));
-        screen.position.copy(newPosition);
-        
-        // Ensure screen faces the camera
-        screen.lookAt(camera.position);
-        
-        // Haptic feedback to notify user
-        if (navigator.vibrate) {
-            navigator.vibrate(100);
-        }
-    }
-    
-    // Check if screen is too far from the camera (>5 meters)
-    const distanceToCamera = cameraToScreen.length();
-    if (distanceToCamera > 5) {
-        console.log("Screen too far - bringing closer");
-        
-        // Move the screen closer to the camera
-        const direction = cameraToScreen.normalize();
-        const newPosition = new THREE.Vector3();
-        newPosition.copy(camera.position).add(direction.multiplyScalar(2));
-        screen.position.copy(newPosition);
-        
-        // Haptic feedback
-        if (navigator.vibrate) {
-            navigator.vibrate(50);
-        }
-    }
-}
-
-// Function to handle touch end
-function onTouchEnd(event) {
-    event.preventDefault();
-    
-    console.log("TOUCH END");
-    
-    // Reset drag handle color if we were dragging
-    if (isDragging && intersectedDragHandle) {
-        intersectedDragHandle.material.color.set(intersectedDragHandle.userData.originalColor || '#444444');
-    }
-    
-    // Reset any drag visual feedback
-    if (dragVisualFeedback && originalBorderColor) {
-        dragVisualFeedback.material.color.copy(originalBorderColor);
-        dragVisualFeedback = null;
-    }
-    
-    // If no drag and touch started, this might be a tap to create screen
-    if (!isDragging && isTouchStarted) {
-        console.log("TAP DETECTED - CREATING NEW SCREEN");
-        
-        // Position the new screen 1 meter in front of the camera
-        const cameraDirection = new THREE.Vector3(0, 0, -1);
-        cameraDirection.applyQuaternion(camera.quaternion);
-        
-        const newScreenPosition = new THREE.Vector3();
-        newScreenPosition.copy(camera.position).add(cameraDirection.multiplyScalar(1));
-        
-        // Create new screen
-        console.log("Creating new screen at position:", newScreenPosition);
-        createNewBrowserScreen(newScreenPosition);
-        
-        // Haptic feedback for screen creation
-        if (navigator.vibrate) {
-            navigator.vibrate([50, 50, 100]);
-        }
-    }
-    
-    // Reset all interaction state
-    isDragging = false;
-    isTouchStarted = false;
-    intersectedDragHandle = null;
-    intersectedScreen = null;
-}
-
-// Flash a highlight effect around a selected screen
-function flashScreenHighlight(screen) {
-    // Find the border or create one if it doesn't exist
-    let highlightMesh = screen.children.find(child => 
-        child.userData && child.userData.isHighlight);
-    
-    if (!highlightMesh) {
-        // Get screen dimensions (use the first plane geometry as reference)
-        const screenMesh = screen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry');
-        
-        let width = 1.05;
-        let height = 0.8;
-        
-        if (screenMesh && screenMesh.geometry) {
-            // Extract dimensions from existing geometry
-            const size = new THREE.Vector3();
-            screenMesh.geometry.computeBoundingBox();
-            screenMesh.geometry.boundingBox.getSize(size);
+    // If we're not interacting with any control or drag handle, check if we hit a screen for content interaction
+    if (!hitButton && !isDragging) {
+        for (const intersection of intersections) {
+            const object = intersection.object;
             
-            // Scale slightly larger than the original screen
-            width = size.x * 1.05;
-            height = size.y * 1.05;
+            // Check if this is a screen
+            const screen = findScreenFromObject(object);
+            
+            if (screen) {
+                // Handle general screen touch (like content selection)
+                console.log("Touched screen content:", screen.userData.id);
+                selectScreen(screen);
+                break;
+            }
         }
-        
-        // Create highlight mesh
-        const glowGeometry = new THREE.PlaneGeometry(width, height);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4fc3f7,
-            transparent: true,
-            opacity: 0,
-            side: THREE.DoubleSide
-        });
-        
-        highlightMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        highlightMesh.position.z = -0.01;
-        highlightMesh.userData = { isHighlight: true };
-        screen.add(highlightMesh);
     }
-    
-    // Animate the highlight
-    let opacity = 0;
-    const fadeIn = () => {
-        opacity += 0.1;
-        highlightMesh.material.opacity = opacity;
-        
-        if (opacity < 0.6) {
-            requestAnimationFrame(fadeIn);
-        } else {
-            // Fade out
-            const fadeOut = () => {
-                opacity -= 0.1;
-                highlightMesh.material.opacity = opacity;
-                
-                if (opacity > 0) {
-                    requestAnimationFrame(fadeOut);
-                }
-            };
-            requestAnimationFrame(fadeOut);
-        }
-    };
-    
-    requestAnimationFrame(fadeIn);
 }
 
-// Handle touch on progress bar
-function handleProgressBarTouch(progressBar, x) {
-    if (!videoElement) return;
+// Utility to find the screen object associated with any child mesh
+function findScreenFromObject(object) {
+    let current = object;
     
-    // Make sure this is a progress bar
-    if (progressBar.userData.type !== 'progressBar' && !progressBar.userData.isBackground) {
+    // Traverse up the parent chain
+    while (current) {
+        if (current.userData && current.userData.type === 'screen') {
+            return current;
+        }
+        current = current.parent;
+    }
+    
+    return null;
+}
+
+// Utility to find the screen object from a drag handle
+function findScreenFromDragHandle(handle) {
+    if (handle && handle.userData && handle.userData.screen) {
+        return handle.userData.screen;
+    }
+    return null;
+}
+
+// Handle touch move event
+export function onTouchMove(event) {
+    // Prevent default behavior to avoid page scrolling
+    event.preventDefault();
+    
+    // If we're not dragging, do nothing
+    if (!isDragging || !currentDragHandle) {
         return;
     }
     
-    // Get screen from user data
-    const screenNumber = progressBar.userData.screenNumber;
-    const screen = screens.find(s => s.group.userData.screenNumber === screenNumber);
+    // Get the first touch
+    const touch = event.touches[0];
     
-    if (!screen) return;
+    // Calculate movement since last touch
+    const moveX = touch.clientX - touchStartPosition.x;
+    const moveY = touch.clientY - touchStartPosition.y;
     
-    // Get intersection point relative to progress bar
-    const point = progressBar.worldToLocal(progressBar.position).clone();
+    // Update touch position for next frame
+    touchStartPosition.x = touch.clientX;
+    touchStartPosition.y = touch.clientY;
     
-    // Convert to local space of progress bar
-    progressBar.updateMatrixWorld();
-    const inverseMatrix = new THREE.Matrix4().copy(progressBar.matrixWorld).invert();
-    point.applyMatrix4(inverseMatrix);
+    // Find the associated screen
+    const screen = currentDragHandle.userData.screen;
     
-    // Calculate the progress based on X position (-0.45 to 0.45)
-    const progressBarWidth = screen.group.userData.screenWidth * 0.9;
-    const progressStart = -progressBarWidth / 2;
-    const progressEnd = progressBarWidth / 2;
+    // Ensure we have a screen to move
+    if (!screen) {
+        console.warn("No screen found for drag handle");
+        return;
+    }
     
-    // Calculate normalized position (0 to 1)
-    const normalizedPosition = (point.x - progressStart) / (progressEnd - progressStart);
-    const clampedPosition = Math.max(0, Math.min(1, normalizedPosition));
+    // Move the screen more responsively in AR
+    const moveScale = 0.35; // Higher sensitivity for better response in AR
     
-    // Set video time
-    const newTime = clampedPosition * duration;
-    videoElement.currentTime = newTime;
+    // Move the screen directly based on touch movement
+    screen.position.x += moveX * moveScale * 0.01;
+    screen.position.y += moveY * moveScale * 0.01;
+    
+    // Ensure we preserve the original scale
+    if (screen.userData.originalScale) {
+        screen.scale.copy(screen.userData.originalScale);
+    }
+    
+    // Log the movement for debugging
+    //console.log(`Moving screen ${screen.userData.id} by ${moveX * moveScale * 0.01}, ${moveY * moveScale * 0.01}`);
+}
+
+// Handle touch end event
+export function onTouchEnd(event) {
+    // Check if we were dragging
+    if (isDragging && currentDragHandle) {
+        // Reset drag handle appearance
+        currentDragHandle.material.color.set(0x2C3E50); // Reset to original dark color
+        
+        // Get the associated screen
+        const screen = currentDragHandle.userData.screen;
+        
+        // Ensure we have a screen
+        if (screen) {
+            // Ensure we preserve the original scale
+            if (screen.userData.originalScale) {
+                screen.scale.copy(screen.userData.originalScale);
+                
+                // Add a subtle "settle" animation
+                const startPosition = screen.position.clone();
+                const endPosition = startPosition.clone();
+                endPosition.y -= 0.01; // Slight drop
+                
+                // Animate the screen position for a subtle "settle" effect
+                const startTime = Date.now();
+                const duration = 200; // milliseconds
+                
+                function animateSettle() {
+                    const elapsedTime = Date.now() - startTime;
+                    const progress = Math.min(elapsedTime / duration, 1);
+                    
+                    // First half: drop slightly
+                    if (progress < 0.5) {
+                        const dropProgress = progress * 2; // Scale to 0-1 range
+                        screen.position.lerpVectors(startPosition, endPosition, dropProgress);
+                    } 
+                    // Second half: bounce back up
+                    else {
+                        const bounceProgress = (progress - 0.5) * 2; // Scale to 0-1 range
+                        screen.position.lerpVectors(endPosition, startPosition, bounceProgress);
+                    }
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animateSettle);
+                    }
+                }
+                
+                // Start the animation
+                animateSettle();
+            }
+        }
+    }
+    
+    // Reset all button states
+    const allObjects = scene.children;
+    allObjects.forEach(object => {
+        if (object.userData && object.userData.type === 'button' && object.userData.isPressed) {
+            object.material.color.set(0xffffff); // Reset to white
+            object.userData.isPressed = false;
+            
+            // Handle button action
+            handleButtonAction(object);
+        }
+    });
+    
+    // Reset dragging state
+    isDragging = false;
+    currentDragHandle = null;
+}
+
+// Handle progress bar touch
+function handleProgressBarTouch(progressBar, hitPoint) {
+    const screen = findScreenFromObject(progressBar);
+    if (!screen || !videoElement) return;
+    
+    // Convert world position to screen-local position
+    const localPoint = hitPoint.clone();
+    screen.worldToLocal(localPoint);
+    
+    // Calculate position relative to progress bar (which is 0.96 * screenWidth)
+    const screenWidth = 1.0;
+    const progressBarWidth = screenWidth * 0.96;
+    
+    // Map from local position to 0-1 range
+    // The progress bar spans from -progressBarWidth/2 to progressBarWidth/2
+    const normalizedX = (localPoint.x + (progressBarWidth/2)) / progressBarWidth;
+    const progress = Math.max(0, Math.min(1, normalizedX));
+    
+    console.log(`Seeking to ${progress * 100}% of video`);
+    
+    // Seek the video
+    if (videoElement && isFinite(videoElement.duration)) {
+        videoElement.currentTime = videoElement.duration * progress;
+        
+        // Update progress bar immediately for better responsiveness
+        if (screen.userData.controls && screen.userData.controls.progressBar) {
+            screen.userData.controls.progress = progress;
+            
+            // Call the updateVideoProgress function if available
+            if (typeof updateVideoProgress === 'function') {
+                updateVideoProgress(
+                    screen.userData.controls.progressBar, 
+                    progress,
+                    screen
+                );
+            }
+        }
+    }
     
     // Provide haptic feedback
-    if (navigator.vibrate) {
-        navigator.vibrate(10);
-    }
+    if (vibrateAvailable) navigator.vibrate(30);
 }
 
 // Create a floating text indicator for mode changes

@@ -85,33 +85,39 @@ export function loadVideoTexture() {
 }
 
 // Update video progress on all screens
-export function updateVideoProgress() {
+function updateVideoProgress() {
     if (!videoElement || !screens) return;
     
     const progress = currentTime / duration;
     
     screens.forEach(screen => {
-        const screenGroup = screen.group;
-        if (!screenGroup) return;
+        // Find progress bar in screen
+        const progressBar = screen.children.find(child => 
+            child.geometry && 
+            child.geometry.type === 'PlaneGeometry' && 
+            Math.abs(child.position.y - (-0.25)) < 0.01 &&
+            child.material.color.getHex() === 0xff0000);
         
-        // Find progress bar fill element
-        const progressBarFill = screenGroup.children.find(child => 
-            child.userData && 
-            child.userData.type === 'progressBarFill');
-        
-        if (progressBarFill) {
-            // Get screen width from user data
-            const screenWidth = screenGroup.userData.screenWidth || 1.5;
-            const progressBarWidth = screenWidth * 0.9; // Full width progress bar
+        if (progressBar) {
+            // Get screen width (for calculations)
+            const screenWidth = 1.0; // default screen width
             
-            // Update progress bar width
-            progressBarFill.scale.x = Math.max(0.01, progress * progressBarWidth);
+            // Update progress bar width and position
+            progressBar.scale.x = progress;
             
-            // Adjust position to keep left-aligned (starting from left edge)
-            progressBarFill.position.x = -(progressBarWidth / 2) + (progress * progressBarWidth / 2);
+            // Calculate position to keep the bar centered at 0% width and properly expanding
+            // This ensures it doesn't go outside the screen boundaries
+            const halfWidth = screenWidth * 0.48; // Half of the full width (96% of screen)
+            const currentWidth = halfWidth * progress;
+            const leftEdgePosition = -halfWidth + (currentWidth / 2);
             
-            // Update userData for the screen
-            screenGroup.userData.progress = progress;
+            // Adjust position to maintain proper alignment as it grows
+            progressBar.position.x = leftEdgePosition;
+            
+            // Update progress in userData
+            if (screen.userData && screen.userData.controls) {
+                screen.userData.controls.progress = progress;
+            }
         }
     });
 }
@@ -547,4 +553,77 @@ export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
             sphere.position.copy(newPosition);
         }
     };
+}
+
+// Update video progress bar position
+export function updateVideoProgress(progressBar, progress, screen) {
+    if (!progressBar || progress === undefined || !screen) {
+        console.warn("Missing required parameters for updateVideoProgress");
+        return;
+    }
+
+    try {
+        // Get screen dimensions
+        const screenWidth = 1.0; // Standard screen width
+        
+        // Calculate the correct position of the progress bar:
+        // 1. Start position is at the left edge of progress background (-screenWidth * 0.48)
+        // 2. As progress increases, the bar scales from 0 to 1 in width
+        // 3. We keep the bar's anchor at the left edge and scale it right
+        
+        // Update the scale to match the progress (0 to 0.96 width)
+        progressBar.scale.x = progress;
+        
+        // Set a maximum scale of 1 for safety
+        if (progressBar.scale.x > 1) progressBar.scale.x = 1;
+        
+        // Update the time indicator in the screen's control if available
+        updateTimeDisplay(screen);
+    }
+    catch (error) {
+        console.error("Error updating video progress:", error);
+    }
+}
+
+// Format time as MM:SS
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+// Update time display on video player
+function updateTimeDisplay(screen) {
+    if (!screen || !screen.userData.controls || !screen.userData.controls.timeContext) {
+        return;
+    }
+
+    try {
+        const ctx = screen.userData.controls.timeContext;
+        const canvas = screen.userData.controls.timeCanvas;
+        const texture = screen.userData.controls.timeTexture;
+        
+        if (!videoElement || !isFinite(videoElement.duration)) {
+            return;
+        }
+
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw the time text
+        const currentTime = formatTime(videoElement.currentTime);
+        const duration = formatTime(videoElement.duration);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${currentTime} / ${duration}`, canvas.width/2, canvas.height/2);
+        
+        // Update the texture
+        texture.needsUpdate = true;
+    }
+    catch (error) {
+        console.error("Error updating time display:", error);
+    }
 } 
