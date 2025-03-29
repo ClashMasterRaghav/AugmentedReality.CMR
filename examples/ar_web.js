@@ -26,6 +26,14 @@ let screenOffset = new THREE.Vector3(); // Offset for screen dragging
 let isResizingScreen = false; // Flag for screen resizing
 let screenMenu; // Context menu for screen operations
 let floatingUI; // Group for floating UI elements that follow the user
+// Controls for rotation, tilt, and zoom
+let isRotatingScreen = false; // Flag for screen rotation
+let isTiltingScreen = false; // Flag for screen tilting
+let rotationHandle; // Rotation handle reference
+let tiltHandle; // Tilt handle reference
+let initialRotation = new THREE.Euler(); // Store initial rotation
+let initialTilt = new THREE.Euler(); // Store initial tilt
+let videoTexture; // Video texture for funny looping video
 
 init();
 animate();
@@ -59,6 +67,9 @@ function init() {
         // Create UI controls once font is loaded
         createFloatingUI();
         createVirtualKeyboard();
+        
+        // Load video texture for funny loop
+        loadVideoTexture();
     });
 
     // Controller setup
@@ -91,6 +102,47 @@ function init() {
     renderer.domElement.addEventListener('touchstart', onTouchStart, false);
     renderer.domElement.addEventListener('touchmove', onTouchMove, false);
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+}
+
+// Load a funny looping video
+function loadVideoTexture() {
+    const video = document.createElement('video');
+    video.src = 'https://cdn.glitch.global/3e633414-27f7-41c1-a4c5-f307ecb4e51d/funny-cat.mp4?v=1651234680945';
+    video.crossOrigin = 'anonymous';
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    
+    // Start playing video once it's loaded enough
+    video.addEventListener('canplaythrough', () => {
+        video.play();
+    });
+    
+    // Create video texture
+    videoTexture = new THREE.VideoTexture(video);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    
+    // Update existing screens with video
+    screens.forEach(screen => {
+        addVideoToScreen(screen);
+    });
+}
+
+// Add video to a screen
+function addVideoToScreen(screen) {
+    if (!videoTexture) return;
+    
+    // Video container
+    const videoGeometry = new THREE.PlaneGeometry(0.25, 0.15);
+    const videoMaterial = new THREE.MeshBasicMaterial({
+        map: videoTexture,
+        side: THREE.DoubleSide
+    });
+    const videoPanel = new THREE.Mesh(videoGeometry, videoMaterial);
+    videoPanel.position.set(0.25, 0.1, 0.002); // Position beside text
+    videoPanel.userData = { type: 'video' };
+    screen.add(videoPanel);
 }
 
 // Replace the control panel with a floating UI that follows the user
@@ -318,6 +370,81 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
     resizeIcon.position.set(0.38, -0.28, 0.003);
     browserWindow.add(resizeIcon);
     
+    // Add rotation handle
+    const rotationHandleGeometry = new THREE.CircleGeometry(0.02, 32);
+    const rotationHandleMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x2196F3, // Blue color
+        side: THREE.DoubleSide
+    });
+    rotationHandle = new THREE.Mesh(rotationHandleGeometry, rotationHandleMaterial);
+    rotationHandle.position.set(-0.38, 0.28, 0.002);
+    rotationHandle.userData = { type: 'button', action: 'rotateScreen' };
+    browserWindow.add(rotationHandle);
+    
+    // Add rotation icon
+    const rotationCanvas = document.createElement('canvas');
+    rotationCanvas.width = 64;
+    rotationCanvas.height = 64;
+    const rotationCtx = rotationCanvas.getContext('2d');
+    rotationCtx.strokeStyle = '#ffffff';
+    rotationCtx.lineWidth = 4;
+    rotationCtx.beginPath();
+    rotationCtx.arc(32, 32, 20, 0, 1.5 * Math.PI);
+    rotationCtx.moveTo(32, 12);
+    rotationCtx.lineTo(25, 18);
+    rotationCtx.moveTo(32, 12);
+    rotationCtx.lineTo(39, 18);
+    rotationCtx.stroke();
+    
+    const rotationTexture = new THREE.CanvasTexture(rotationCanvas);
+    const rotationIconGeometry = new THREE.CircleGeometry(0.015, 32);
+    const rotationIconMaterial = new THREE.MeshBasicMaterial({ 
+        map: rotationTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const rotationIcon = new THREE.Mesh(rotationIconGeometry, rotationIconMaterial);
+    rotationIcon.position.set(-0.38, 0.28, 0.003);
+    browserWindow.add(rotationIcon);
+    
+    // Add tilt handle
+    const tiltHandleGeometry = new THREE.CircleGeometry(0.02, 32);
+    const tiltHandleMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xFF9800, // Orange color
+        side: THREE.DoubleSide
+    });
+    tiltHandle = new THREE.Mesh(tiltHandleGeometry, tiltHandleMaterial);
+    tiltHandle.position.set(-0.38, -0.28, 0.002);
+    tiltHandle.userData = { type: 'button', action: 'tiltScreen' };
+    browserWindow.add(tiltHandle);
+    
+    // Add tilt icon
+    const tiltCanvas = document.createElement('canvas');
+    tiltCanvas.width = 64;
+    tiltCanvas.height = 64;
+    const tiltCtx = tiltCanvas.getContext('2d');
+    tiltCtx.strokeStyle = '#ffffff';
+    tiltCtx.lineWidth = 4;
+    tiltCtx.beginPath();
+    tiltCtx.moveTo(22, 22);
+    tiltCtx.lineTo(42, 42);
+    tiltCtx.moveTo(22, 22);
+    tiltCtx.lineTo(12, 32);
+    tiltCtx.moveTo(42, 42);
+    tiltCtx.lineTo(52, 32);
+    tiltCtx.stroke();
+    
+    const tiltTexture = new THREE.CanvasTexture(tiltCanvas);
+    const tiltIconGeometry = new THREE.CircleGeometry(0.015, 32);
+    const tiltIconMaterial = new THREE.MeshBasicMaterial({ 
+        map: tiltTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const tiltIcon = new THREE.Mesh(tiltIconGeometry, tiltIconMaterial);
+    tiltIcon.position.set(-0.38, -0.28, 0.003);
+    browserWindow.add(tiltIcon);
+    
     // Position the window
     browserWindow.position.copy(position);
     browserWindow.userData = { 
@@ -325,11 +452,17 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
         id: screens.length, 
         isSelected: false,
         content: `Screen ${screens.length + 1} Content`,
-        originalScale: new THREE.Vector3(1, 1, 1) // Store original scale for resizing
+        originalScale: new THREE.Vector3(1, 1, 1), // Store original scale for resizing
+        initialRotation: new THREE.Euler() // Store initial rotation for rotation
     };
     
     scene.add(browserWindow);
     screens.push(browserWindow);
+    
+    // Add video if available
+    if (videoTexture) {
+        addVideoToScreen(browserWindow);
+    }
     
     // Set this as the selected screen
     selectScreen(browserWindow);
@@ -459,6 +592,22 @@ function onTouchStart(event) {
                 isResizingScreen = true;
                 return;
             }
+            
+            if (part.userData.action === 'rotateScreen') {
+                // Start rotating the screen
+                isRotatingScreen = true;
+                // Store initial rotation
+                initialRotation.copy(selectedScreen.rotation);
+                return;
+            }
+            
+            if (part.userData.action === 'tiltScreen') {
+                // Start tilting the screen
+                isTiltingScreen = true;
+                // Store initial tilt
+                initialTilt.copy(selectedScreen.rotation);
+                return;
+            }
         }
         
         // Otherwise start dragging the screen
@@ -512,7 +661,7 @@ function onTouchMove(event) {
     if (isResizingScreen && selectedScreen) {
         // Get ray intersection with screen plane
         const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
+        planeNormal.applyQuaternion(selectedScreen.quaternion);
         
         const plane = new THREE.Plane();
         plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
@@ -533,11 +682,63 @@ function onTouchMove(event) {
         
         return;
     }
+    
+    if (isRotatingScreen && selectedScreen) {
+        // Get ray intersection with screen plane
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
+        
+        const plane = new THREE.Plane();
+        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
+        
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        // Calculate angle between initial and current positions
+        const screenCenter = selectedScreen.position.clone();
+        const initialVector = new THREE.Vector2(0, 1); // Up vector as reference
+        const currentVector = new THREE.Vector2(
+            intersectionPoint.x - screenCenter.x,
+            intersectionPoint.y - screenCenter.y
+        ).normalize();
+        
+        // Calculate angle between vectors
+        let angle = Math.atan2(currentVector.y, currentVector.x) - Math.atan2(initialVector.y, initialVector.x);
+        
+        // Apply rotation around z-axis (can add more axes for more complex rotation)
+        selectedScreen.rotation.z = angle;
+        
+        return;
+    }
+    
+    if (isTiltingScreen && selectedScreen) {
+        // Get ray intersection with screen plane
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
+        
+        const plane = new THREE.Plane();
+        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
+        
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        // Calculate tilt based on vertical distance from center
+        const screenCenter = selectedScreen.position.clone();
+        const verticalDelta = intersectionPoint.y - screenCenter.y;
+        
+        // Apply tilt around x-axis
+        const tiltAmount = verticalDelta * 2; // Scale factor for more pronounced tilt
+        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, tiltAmount));
+        
+        return;
+    }
 }
 
 function onTouchEnd(event) {
     isDraggingScreen = false;
     isResizingScreen = false;
+    isRotatingScreen = false;
+    isTiltingScreen = false;
     isTouchMoving = false;
     isMovingScreen = false;
 }
@@ -562,6 +763,132 @@ function updateKeyboardPosition() {
     // Make keyboard face the user
     virtualKeyboard.lookAt(camera.position);
     virtualKeyboard.rotation.x = -Math.PI / 8;
+}
+
+function createVirtualKeyboard() {
+    virtualKeyboard = new THREE.Group();
+    
+    // Keyboard background
+    const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
+    const keyboardMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x333333,
+        side: THREE.DoubleSide
+    });
+    const keyboardPanel = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
+    virtualKeyboard.add(keyboardPanel);
+    
+    // Create keyboard keys
+    const rows = [
+        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '.', '/']
+    ];
+    
+    const keySize = 0.05;
+    const keySpacing = 0.01;
+    const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
+    const keyMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444,
+        side: THREE.DoubleSide
+    });
+    const keyHoverMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x666666,
+        side: THREE.DoubleSide
+    });
+    
+    // Track keys for interaction
+    const keys = [];
+    
+    // Create rows of keys
+    rows.forEach((row, rowIndex) => {
+        const rowWidth = row.length * (keySize + keySpacing) - keySpacing;
+        const startX = -rowWidth / 2;
+        
+        row.forEach((key, keyIndex) => {
+            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial.clone());
+            const x = startX + keyIndex * (keySize + keySpacing);
+            const y = 0.12 - rowIndex * (keySize + keySpacing);
+            keyMesh.position.set(x, y, 0.001);
+            
+            // Store key data for interaction
+            keyMesh.userData = { 
+                type: 'key',
+                key: key,
+                originalMaterial: keyMesh.material,
+                hoverMaterial: keyHoverMaterial.clone()
+            };
+            keys.push(keyMesh);
+            
+            virtualKeyboard.add(keyMesh);
+            
+            // Add key label using canvas texture
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 64;
+            labelCanvas.height = 64;
+            const labelCtx = labelCanvas.getContext('2d');
+            labelCtx.fillStyle = '#ffffff';
+            labelCtx.font = '32px Arial';
+            labelCtx.textAlign = 'center';
+            labelCtx.textBaseline = 'middle';
+            labelCtx.fillText(key, 32, 32);
+            
+            const labelTexture = new THREE.CanvasTexture(labelCanvas);
+            const labelGeometry = new THREE.PlaneGeometry(keySize * 0.8, keySize * 0.8);
+            const labelMaterial = new THREE.MeshBasicMaterial({ 
+                map: labelTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+            labelMesh.position.set(x, y, 0.002);
+            virtualKeyboard.add(labelMesh);
+        });
+    });
+    
+    // Add space bar
+    const spaceBarGeometry = new THREE.PlaneGeometry(0.3, keySize);
+    const spaceBar = new THREE.Mesh(spaceBarGeometry, keyMaterial.clone());
+    spaceBar.position.set(0, -0.12, 0.001);
+    spaceBar.userData = { 
+        type: 'key',
+        key: ' ',
+        originalMaterial: spaceBar.material,
+        hoverMaterial: keyHoverMaterial.clone()
+    };
+    keys.push(spaceBar);
+    virtualKeyboard.add(spaceBar);
+    
+    // Add "SPACE" label for space bar
+    const spaceCanvas = document.createElement('canvas');
+    spaceCanvas.width = 200;
+    spaceCanvas.height = 50;
+    const spaceCtx = spaceCanvas.getContext('2d');
+    spaceCtx.fillStyle = '#ffffff';
+    spaceCtx.font = '24px Arial';
+    spaceCtx.textAlign = 'center';
+    spaceCtx.textBaseline = 'middle';
+    spaceCtx.fillText('SPACE', 100, 25);
+    
+    const spaceTexture = new THREE.CanvasTexture(spaceCanvas);
+    const spaceLabelGeometry = new THREE.PlaneGeometry(0.2, 0.03);
+    const spaceLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: spaceTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const spaceLabelMesh = new THREE.Mesh(spaceLabelGeometry, spaceLabelMaterial);
+    spaceLabelMesh.position.set(0, -0.12, 0.002);
+    virtualKeyboard.add(spaceLabelMesh);
+    
+    // Store the keys array for interaction
+    virtualKeyboard.userData = { type: 'keyboard', keys: keys };
+    
+    // Position the keyboard below the browser window and bring it forward
+    virtualKeyboard.position.set(0, -0.45, -0.78);
+    virtualKeyboard.rotation.x = -Math.PI / 8;
+    virtualKeyboard.visible = false; // Hide keyboard initially
+    scene.add(virtualKeyboard);
 }
 
 function selectScreen(screen) {
@@ -666,6 +993,22 @@ function onSelect(event) {
                 isResizingScreen = true;
                 return;
             }
+            
+            if (part.userData.action === 'rotateScreen') {
+                // Start rotating the screen
+                isRotatingScreen = true;
+                // Store initial rotation
+                initialRotation.copy(selectedScreen.rotation);
+                return;
+            }
+            
+            if (part.userData.action === 'tiltScreen') {
+                // Start tilting the screen
+                isTiltingScreen = true;
+                // Store initial tilt
+                initialTilt.copy(selectedScreen.rotation);
+                return;
+            }
         }
         
         // Otherwise start dragging the screen
@@ -723,6 +1066,8 @@ function onSelectEnd(event) {
     // Reset states when controller selection ends
     isDraggingScreen = false;
     isResizingScreen = false;
+    isRotatingScreen = false;
+    isTiltingScreen = false;
     isPlacingScreen = false;
     isMovingScreen = false;
     
@@ -820,6 +1165,41 @@ function render() {
         
         // Apply new scale
         selectedScreen.scale.set(newScaleX, newScaleY, 1);
+    }
+    
+    // Handle screen rotation with controller
+    if (isRotatingScreen && selectedScreen) {
+        // Get controller position
+        const controllerPosition = new THREE.Vector3();
+        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
+        
+        // Calculate angle between screen center and controller
+        const screenCenter = selectedScreen.position.clone();
+        const direction = new THREE.Vector2(
+            controllerPosition.x - screenCenter.x,
+            controllerPosition.y - screenCenter.y
+        ).normalize();
+        
+        // Calculate rotation angle
+        const angle = Math.atan2(direction.y, direction.x) - Math.PI/2;
+        
+        // Apply rotation around z-axis
+        selectedScreen.rotation.z = angle;
+    }
+    
+    // Handle screen tilting with controller
+    if (isTiltingScreen && selectedScreen) {
+        // Get controller position
+        const controllerPosition = new THREE.Vector3();
+        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
+        
+        // Calculate tilt based on vertical distance from center
+        const screenCenter = selectedScreen.position.clone();
+        const verticalDelta = controllerPosition.y - screenCenter.y;
+        
+        // Apply tilt around x-axis
+        const tiltAmount = verticalDelta * 2; // Scale factor for more pronounced tilt
+        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, tiltAmount));
     }
     
     // Handle keyboard key hover effects
