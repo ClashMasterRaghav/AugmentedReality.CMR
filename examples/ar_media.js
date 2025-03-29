@@ -60,7 +60,16 @@ export function loadVideoTexture() {
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
             // Update progress bars on all screens
-            updateVideoProgress();
+            screens.forEach(screen => {
+                if (screen.userData && screen.userData.controls && screen.userData.controls.progressBar) {
+                    const progress = currentTime / duration;
+                    updateVideoProgress(
+                        screen.userData.controls.progressBar,
+                        progress,
+                        screen
+                    );
+                }
+            });
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -82,44 +91,6 @@ export function loadVideoTexture() {
         console.error("Error in loadVideoTexture:", error);
         return createFallbackTexture("Error: " + error.message);
     }
-}
-
-// Update video progress on all screens
-function updateVideoProgress() {
-    if (!videoElement || !screens) return;
-    
-    const progress = currentTime / duration;
-    
-    screens.forEach(screen => {
-        // Find progress bar in screen
-        const progressBar = screen.children.find(child => 
-            child.geometry && 
-            child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.y - (-0.25)) < 0.01 &&
-            child.material.color.getHex() === 0xff0000);
-        
-        if (progressBar) {
-            // Get screen width (for calculations)
-            const screenWidth = 1.0; // default screen width
-            
-            // Update progress bar width and position
-            progressBar.scale.x = progress;
-            
-            // Calculate position to keep the bar centered at 0% width and properly expanding
-            // This ensures it doesn't go outside the screen boundaries
-            const halfWidth = screenWidth * 0.48; // Half of the full width (96% of screen)
-            const currentWidth = halfWidth * progress;
-            const leftEdgePosition = -halfWidth + (currentWidth / 2);
-            
-            // Adjust position to maintain proper alignment as it grows
-            progressBar.position.x = leftEdgePosition;
-            
-            // Update progress in userData
-            if (screen.userData && screen.userData.controls) {
-                screen.userData.controls.progress = progress;
-            }
-        }
-    });
 }
 
 // Toggle video playback
