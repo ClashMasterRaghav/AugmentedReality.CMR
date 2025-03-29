@@ -74,12 +74,14 @@ function initAREnvironment() {
         window.location.reload();
     });
 
+    // Add persistent "+" button for adding new screens
+    createAddScreenButton();
+
     // Load font for text
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        // Create UI controls once font is loaded
-        createControlPanel();
+        // Create virtual keyboard only (no control panel)
         createVirtualKeyboard();
     });
 
@@ -113,8 +115,8 @@ function initAREnvironment() {
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
-    // Initialize UI elements
-    initUI();
+    // Initialize UI elements (minus control panel)
+    initUIWithoutControlPanel();
     
     // Preload video texture right after scene setup
     console.log("Initializing video functionality");
@@ -249,4 +251,59 @@ export function render() {
 // Create a welcome screen at the start
 function createStartScreen() {
     const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+}
+
+// Create a fixed add screen button in the top-right corner
+function createAddScreenButton() {
+    // Create a floating DOM button
+    const addButton = document.createElement('button');
+    addButton.style.position = 'fixed';
+    addButton.style.top = '20px';
+    addButton.style.right = '20px';
+    addButton.style.width = '50px';
+    addButton.style.height = '50px';
+    addButton.style.borderRadius = '25px';
+    addButton.style.background = '#4488ff';
+    addButton.style.color = 'white';
+    addButton.style.border = 'none';
+    addButton.style.fontSize = '30px';
+    addButton.style.fontWeight = 'bold';
+    addButton.style.zIndex = '1000';
+    addButton.style.cursor = 'pointer';
+    addButton.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3)';
+    addButton.innerHTML = '+';
+    
+    // Add event listener
+    addButton.addEventListener('click', () => {
+        // Create new screen
+        const matrix = new THREE.Matrix4();
+        matrix.makeRotationFromQuaternion(camera.quaternion);
+        
+        const position = new THREE.Vector3(0, 0, -1.0);
+        position.applyMatrix4(matrix);
+        position.add(camera.position);
+        
+        // Create the new screen
+        const newScreen = createNewBrowserScreen(position);
+        console.log("New screen created!");
+        
+        // Make it face the user
+        newScreen.lookAt(camera.position);
+        
+        // Provide visual/haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(30);
+        }
+        
+        // Show brief notification
+        createNotification('New Screen Created', 'success');
+    });
+    
+    document.body.appendChild(addButton);
+}
+
+// Initialize UI without control panel
+function initUIWithoutControlPanel() {
+    // Skip creating control panel, only initialize other UI elements
+    createVirtualKeyboard();
 }

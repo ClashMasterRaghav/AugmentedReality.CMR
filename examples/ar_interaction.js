@@ -577,7 +577,7 @@ function onTouchStart(event) {
         const screen = closestHit.screen;
         
         // Check if we hit the progress bar
-        if (handleProgressBarTouch(screen, closestHit.point)) {
+        if (handleProgressBarTouch(closestHit)) {
             console.log("Progress bar touched on screen:", screen.userData.id);
             return;
         }
@@ -745,66 +745,56 @@ function flashScreenHighlight(screen) {
 
 // Touch move handler - make the movement more responsive and direct
 function onTouchMove(event) {
-    // Always prevent default to avoid browser gestures
+    // Skip if not in AR mode
+    if (!renderer.xr.isPresenting) return;
+    
     event.preventDefault();
     
-    // Make sure we have a valid touch point
+    // Get the first touch from the event
     const touch = event.touches[0];
-    if (!touch) {
-        return;
-    }
     
-    // Convert touch to normalized device coordinates
-    const previousTouchPosition = currentTouchPosition.clone();
-    currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+    // Calculate movement since last touch
+    const movementX = touch.clientX - lastTouchX;
+    const movementY = touch.clientY - lastTouchY;
     
-    // Handle dragging via the drag handle - even more direct approach
-    if (isDraggingHandle && draggedScreen) {
-        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
+    // Update last position
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+    
+    // Handle screen dragging
+    if (intersectedScreen && isDragging) {
+        // Get the screen group
+        const screenGroup = intersectedScreen;
         
-        try {
-            // Preserve original scale
-            if (draggedScreen.userData && draggedScreen.userData.originalScale) {
-                // Ensure scale doesn't change during movement
-                draggedScreen.scale.copy(draggedScreen.userData.originalScale);
-            }
-            
-            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
-            // Calculate movement delta from touch
-            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
-            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
-            
-            // Get camera's right and up vectors for moving in screen space
-            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-            
-            // Scale for more noticeable movement in AR - INCREASED for faster movement
-            const moveScale = 0.35; // Significantly increased for better AR response
-            
-            // Create movement vector
-            const movement = new THREE.Vector3()
-                .addScaledVector(cameraRight, deltaX * moveScale)
-                .addScaledVector(cameraUp, deltaY * moveScale);
-            
-            // Apply movement directly
-            draggedScreen.position.add(movement);
-            
-            // Make screen face the camera
-            draggedScreen.lookAt(camera.position);
-            
-            // Optional visual feedback
-            createMoveIndicator(draggedScreen.position.clone(), 0.03);
-            
-        } catch (error) {
-            console.error("Error in drag movement:", error);
+        // Scale for movement sensitivity - INCREASED for better responsiveness
+        const moveScale = 0.5;
+        
+        // Copy current position
+        const currentPosition = screenGroup.position.clone();
+        
+        // Calculate movement in camera space based on touch movement
+        const movement = new THREE.Vector3(
+            -movementX * moveScale * 0.01,
+            movementY * moveScale * 0.01,
+            0
+        );
+        
+        // Apply camera rotation to movement
+        movement.applyQuaternion(camera.quaternion);
+        
+        // Apply movement
+        screenGroup.position.add(movement);
+        
+        // Save original scale if not already saved
+        if (!screenGroup.userData.originalScale) {
+            screenGroup.userData.originalScale = screenGroup.scale.clone();
         }
         
-        return;
+        // Ensure scale is maintained during drag
+        if (screenGroup.userData.originalScale) {
+            screenGroup.scale.copy(screenGroup.userData.originalScale);
+        }
     }
-    
-    // We're not handling other forms of movement to simplify the interaction model
-    // This keeps the drag handle as the primary way to move screens, which improves reliability
 }
 
 // Move screen based on touch movement
@@ -972,51 +962,48 @@ function onTouchEnd(event) {
     isPinching = false;
 }
 
-// Handle progress bar touch for video seeking
-function handleProgressBarTouch(screen, point) {
-    if (!screen || !screen.userData || !screen.userData.controls) return false;
-    
-    // Get screen dimensions
-    const screenWidth = 1.0; // default screen width
-    
-    // Get progress bar from screen
-    const progressBg = screen.children.find(child => 
-        child.geometry && 
-        child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.y - (-0.25)) < 0.01 &&
-        child.material.color.getHex() === 0x333333);
-    
-    if (!progressBg) return false;
-    
-    // Convert world point to local screen coordinates
-    let localPoint = point.clone();
-    if (screen.worldToLocal) {
-        localPoint = screen.worldToLocal(localPoint.clone());
-    }
-    
-    // Check if hit is within progress bar area
-    if (Math.abs(localPoint.y - (-0.25)) < 0.02 && 
-        Math.abs(localPoint.x) < screenWidth * 0.48) {
-        
-        // Calculate progress based on x position
-        const progress = (localPoint.x + (screenWidth * 0.48)) / (screenWidth * 0.96);
-        updateVideoTime(Math.max(0, Math.min(1, progress)));
-        return true;
-    }
-    
-    return false;
-}
-
-// Update video time based on progress
-function updateVideoTime(progress) {
+// Handle touch on progress bar
+function handleProgressBarTouch(intersection) {
     if (!videoElement) return;
     
-    // Clamp progress to 0-1 range
-    progress = Math.max(0, Math.min(1, progress));
+    const object = intersection.object;
+    
+    // Make sure this is a progress bar
+    if (object.userData.type !== 'progressBar' && !object.userData.isBackground) {
+        return;
+    }
+    
+    // Get screen from user data
+    const screenNumber = object.userData.screenNumber;
+    const screen = screens.find(s => s.group.userData.screenNumber === screenNumber);
+    
+    if (!screen) return;
+    
+    // Get intersection point relative to progress bar
+    const point = intersection.point.clone();
+    
+    // Convert to local space of progress bar
+    object.updateMatrixWorld();
+    const inverseMatrix = new THREE.Matrix4().copy(object.matrixWorld).invert();
+    point.applyMatrix4(inverseMatrix);
+    
+    // Calculate the progress based on X position (-0.45 to 0.45)
+    const progressBarWidth = screen.group.userData.screenWidth * 0.9;
+    const progressStart = -progressBarWidth / 2;
+    const progressEnd = progressBarWidth / 2;
+    
+    // Calculate normalized position (0 to 1)
+    const normalizedPosition = (point.x - progressStart) / (progressEnd - progressStart);
+    const clampedPosition = Math.max(0, Math.min(1, normalizedPosition));
     
     // Set video time
-    const newTime = duration * progress;
+    const newTime = clampedPosition * duration;
     videoElement.currentTime = newTime;
+    
+    // Provide haptic feedback
+    if (navigator.vibrate) {
+        navigator.vibrate(10);
+    }
 }
 
 // Create a floating text indicator for mode changes

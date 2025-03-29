@@ -85,32 +85,33 @@ export function loadVideoTexture() {
 }
 
 // Update video progress on all screens
-function updateVideoProgress() {
+export function updateVideoProgress() {
     if (!videoElement || !screens) return;
     
     const progress = currentTime / duration;
     
     screens.forEach(screen => {
-        // Find progress bar in screen
-        const progressBar = screen.children.find(child => 
-            child.geometry && 
-            child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.y - (-0.25)) < 0.01 &&
-            child.material.color.getHex() === 0xff0000);
+        const screenGroup = screen.group;
+        if (!screenGroup) return;
         
-        if (progressBar) {
-            // Get screen width (for calculations)
-            const screenWidth = 1.0; // default screen width
+        // Find progress bar fill element
+        const progressBarFill = screenGroup.children.find(child => 
+            child.userData && 
+            child.userData.type === 'progressBarFill');
+        
+        if (progressBarFill) {
+            // Get screen width from user data
+            const screenWidth = screenGroup.userData.screenWidth || 1.5;
+            const progressBarWidth = screenWidth * 0.9; // Full width progress bar
             
-            // Update progress bar width and position
-            progressBar.scale.x = progress;
-            // Adjust position to keep left-aligned
-            progressBar.position.x = -(screenWidth * 0.48) + (progress * screenWidth * 0.48);
+            // Update progress bar width
+            progressBarFill.scale.x = Math.max(0.01, progress * progressBarWidth);
             
-            // Update progress in userData
-            if (screen.userData && screen.userData.controls) {
-                screen.userData.controls.progress = progress;
-            }
+            // Adjust position to keep left-aligned (starting from left edge)
+            progressBarFill.position.x = -(progressBarWidth / 2) + (progress * progressBarWidth / 2);
+            
+            // Update userData for the screen
+            screenGroup.userData.progress = progress;
         }
     });
 }
