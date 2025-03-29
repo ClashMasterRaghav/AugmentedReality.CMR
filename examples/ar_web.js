@@ -6,11 +6,16 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
 let camera, scene, renderer;
 let controller, controllerGrip;
-let browserWindow, virtualKeyboard;
+let virtualKeyboard;
 let font;
 let raycaster = new THREE.Raycaster();
 let workingMatrix = new THREE.Matrix4();
 let selectedKey = null;
+let screens = []; // Array to store multiple screen objects
+let selectedScreen = null; // Currently selected screen
+let isPlacingScreen = false; // Flag to indicate if user is currently placing a screen
+let newScreen = null; // Reference to a new screen being placed
+let isMovingScreen = false; // Flag to indicate if user is currently moving a screen
 
 init();
 animate();
@@ -41,19 +46,16 @@ function init() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        // Create browser UI once font is loaded
-        createBrowserWindow();
+        // Create UI controls once font is loaded
+        createControlPanel();
         createVirtualKeyboard();
     });
-
-    // Create browser and keyboard without waiting for font
-    // We'll update them with text when the font loads
-    createBrowserWindow();
-    createVirtualKeyboard();
 
     // Controller setup
     controller = renderer.xr.getController(0);
     controller.addEventListener('select', onSelect);
+    controller.addEventListener('selectstart', onSelectStart);
+    controller.addEventListener('selectend', onSelectEnd);
     scene.add(controller);
 
     // Controller model
@@ -69,14 +71,97 @@ function init() {
     pointer.position.z = -0.1;
     controller.add(pointer);
 
+    // Create a default browser window
+    createNewBrowserScreen();
+
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 }
 
-function createBrowserWindow() {
-    browserWindow = new THREE.Group();
+function createControlPanel() {
+    const panel = new THREE.Group();
     
-    // Browser background
+    // Panel background
+    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.15);
+    const panelMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444,
+        side: THREE.DoubleSide
+    });
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    panel.add(panelMesh);
+    
+    // New Screen button
+    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
+    const buttonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x666666,
+        side: THREE.DoubleSide
+    });
+    const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    newScreenButton.position.set(0, 0.04, 0.001);
+    newScreenButton.userData = { type: 'button', action: 'newScreen' };
+    panel.add(newScreenButton);
+    
+    // New Screen button label
+    const buttonCanvas = document.createElement('canvas');
+    buttonCanvas.width = 256;
+    buttonCanvas.height = 64;
+    const btnCtx = buttonCanvas.getContext('2d');
+    btnCtx.fillStyle = '#ffffff';
+    btnCtx.font = '24px Arial';
+    btnCtx.textAlign = 'center';
+    btnCtx.textBaseline = 'middle';
+    btnCtx.fillText('Add New Screen', 128, 32);
+    
+    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+    const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
+    const buttonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: buttonTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
+    buttonLabel.position.set(0, 0.04, 0.002);
+    panel.add(buttonLabel);
+    
+    // Move Screen button
+    const moveButtonMaterial = buttonMaterial.clone();
+    const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
+    moveScreenButton.position.set(0, -0.04, 0.001);
+    moveScreenButton.userData = { type: 'button', action: 'moveScreen' };
+    panel.add(moveScreenButton);
+    
+    // Move Screen button label
+    const moveButtonCanvas = document.createElement('canvas');
+    moveButtonCanvas.width = 256;
+    moveButtonCanvas.height = 64;
+    const moveBtnCtx = moveButtonCanvas.getContext('2d');
+    moveBtnCtx.fillStyle = '#ffffff';
+    moveBtnCtx.font = '24px Arial';
+    moveBtnCtx.textAlign = 'center';
+    moveBtnCtx.textBaseline = 'middle';
+    moveBtnCtx.fillText('Move Selected Screen', 128, 32);
+    
+    const moveButtonTexture = new THREE.CanvasTexture(moveButtonCanvas);
+    const moveButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: moveButtonTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
+    moveButtonLabel.position.set(0, -0.04, 0.002);
+    panel.add(moveButtonLabel);
+    
+    // Position the control panel on user's left
+    panel.position.set(-0.5, 0, -0.8);
+    panel.rotation.y = Math.PI / 6; // Angle slightly toward user
+    panel.userData = { type: 'controlPanel' };
+    scene.add(panel);
+}
+
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -0.8)) {
+    const browserWindow = new THREE.Group();
+    
+    // Browser background with border
     const browserGeometry = new THREE.PlaneGeometry(0.8, 0.6);
     const browserMaterial = new THREE.MeshBasicMaterial({ 
         color: 0xffffff,
@@ -84,6 +169,16 @@ function createBrowserWindow() {
     });
     const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
     browserWindow.add(browserPanel);
+    
+    // Create border by adding a slightly larger background panel
+    const borderGeometry = new THREE.PlaneGeometry(0.82, 0.62);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x2196F3, // Blue border
+        side: THREE.DoubleSide
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    browserWindow.add(borderPanel);
     
     // Address bar background
     const addressBarGeometry = new THREE.PlaneGeometry(0.76, 0.06);
@@ -96,14 +191,14 @@ function createBrowserWindow() {
     addressBar.position.z = 0.001;
     browserWindow.add(addressBar);
     
-    // Add url text using canvas texture instead of TextGeometry
+    // Add url text
     const urlCanvas = document.createElement('canvas');
     urlCanvas.width = 380;
     urlCanvas.height = 30;
     const urlCtx = urlCanvas.getContext('2d');
     urlCtx.fillStyle = '#000000';
     urlCtx.font = '20px Arial';
-    urlCtx.fillText('example.com', 10, 20);
+    urlCtx.fillText(`example.com/screen${screens.length + 1}`, 10, 20);
     
     const urlTexture = new THREE.CanvasTexture(urlCanvas);
     const urlGeometry = new THREE.PlaneGeometry(0.38, 0.03);
@@ -118,7 +213,7 @@ function createBrowserWindow() {
     
     // Content area with example content
     const contentGeometry = new THREE.PlaneGeometry(0.76, 0.46);
-    const texture = createBrowserContentTexture();
+    const texture = createBrowserContentTexture(screens.length + 1);
     const contentMaterial = new THREE.MeshBasicMaterial({ 
         map: texture,
         side: THREE.DoubleSide
@@ -128,12 +223,25 @@ function createBrowserWindow() {
     contentPanel.position.z = 0.001;
     browserWindow.add(contentPanel);
     
-    // Position the window in front of the user - moved closer
-    browserWindow.position.set(0, 0, -0.8);
+    // Position the window
+    browserWindow.position.copy(position);
+    browserWindow.userData = { 
+        type: 'screen', 
+        id: screens.length, 
+        isSelected: false,
+        content: `Screen ${screens.length + 1} Content`
+    };
+    
     scene.add(browserWindow);
+    screens.push(browserWindow);
+    
+    // Set this as the selected screen
+    selectScreen(browserWindow);
+    
+    return browserWindow;
 }
 
-function createBrowserContentTexture() {
+function createBrowserContentTexture(screenNumber) {
     // Create a canvas to draw browser content
     const canvas = document.createElement('canvas');
     canvas.width = 760;
@@ -148,12 +256,12 @@ function createBrowserContentTexture() {
     // Draw header
     ctx.fillStyle = '#000000';
     ctx.font = '32px Arial';
-    ctx.fillText('Immersive AR Browser', 20, 50);
+    ctx.fillText(`AR Screen ${screenNumber}`, 20, 50);
     
     // Draw content
     ctx.font = '20px Arial';
-    ctx.fillText('This is a demonstration of an AR-based web browsing experience.', 20, 100);
-    ctx.fillText('In a full implementation, this would render actual web content.', 20, 130);
+    ctx.fillText('This is a multi-screen AR browsing experience.', 20, 100);
+    ctx.fillText('You can create multiple screens and place them anywhere.', 20, 130);
     
     // Draw feature box
     ctx.fillStyle = '#f8f8f8';
@@ -161,13 +269,13 @@ function createBrowserContentTexture() {
     
     ctx.fillStyle = '#000000';
     ctx.font = '24px Arial';
-    ctx.fillText('Features to implement:', 40, 210);
+    ctx.fillText('Screen features:', 40, 210);
     
     ctx.font = '18px Arial';
-    ctx.fillText('• Real web content rendering', 40, 250);
-    ctx.fillText('• Interaction with links and forms', 40, 280);
-    ctx.fillText('• Multiple browser windows', 40, 310);
-    ctx.fillText('• Spatial arrangements', 40, 340);
+    ctx.fillText('• Selectable screen with highlighted border', 40, 250);
+    ctx.fillText('• Movable to any position in AR space', 40, 280);
+    ctx.fillText(`• Screen ID: ${screenNumber}`, 40, 310);
+    ctx.fillText('• Persistent across AR sessions', 40, 340);
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
@@ -224,6 +332,7 @@ function createVirtualKeyboard() {
             
             // Store key data for interaction
             keyMesh.userData = { 
+                type: 'key',
                 key: key,
                 originalMaterial: keyMesh.material,
                 hoverMaterial: keyHoverMaterial.clone()
@@ -261,6 +370,7 @@ function createVirtualKeyboard() {
     const spaceBar = new THREE.Mesh(spaceBarGeometry, keyMaterial.clone());
     spaceBar.position.set(0, -0.12, 0.001);
     spaceBar.userData = { 
+        type: 'key',
         key: ' ',
         originalMaterial: spaceBar.material,
         hoverMaterial: keyHoverMaterial.clone()
@@ -291,12 +401,61 @@ function createVirtualKeyboard() {
     virtualKeyboard.add(spaceLabelMesh);
     
     // Store the keys array for interaction
-    virtualKeyboard.userData = { keys: keys };
+    virtualKeyboard.userData = { type: 'keyboard', keys: keys };
     
     // Position the keyboard below the browser window and bring it forward
-    virtualKeyboard.position.set(0, -0.45, -0.78); // Moved forward, less embedded in screen
-    virtualKeyboard.rotation.x = -Math.PI / 8; // Reduced angle for better visibility
+    virtualKeyboard.position.set(0, -0.45, -0.78);
+    virtualKeyboard.rotation.x = -Math.PI / 8;
+    virtualKeyboard.visible = false; // Hide keyboard initially
     scene.add(virtualKeyboard);
+}
+
+function selectScreen(screen) {
+    // Deselect previously selected screen
+    if (selectedScreen) {
+        // Change border color back to normal
+        selectedScreen.children[1].material.color.set(0x2196F3);
+        selectedScreen.userData.isSelected = false;
+    }
+    
+    // Select new screen
+    selectedScreen = screen;
+    
+    if (selectedScreen) {
+        // Highlight border for selected screen
+        selectedScreen.children[1].material.color.set(0x4CAF50); // Green for selected
+        selectedScreen.userData.isSelected = true;
+        
+        // Position keyboard under selected screen if needed
+        if (virtualKeyboard) {
+            const screenPos = selectedScreen.position.clone();
+            virtualKeyboard.position.set(screenPos.x, screenPos.y - 0.45, screenPos.z + 0.02);
+            virtualKeyboard.lookAt(camera.position);
+            virtualKeyboard.rotation.x = -Math.PI / 8;
+        }
+    }
+}
+
+function onSelectStart(event) {
+    if (isPlacingScreen || isMovingScreen) {
+        // We're in placement mode, so select start begins the commitment
+        return;
+    }
+}
+
+function onSelectEnd(event) {
+    if (isPlacingScreen && newScreen) {
+        // Finalize the placement of the new screen
+        isPlacingScreen = false;
+        newScreen = null;
+        return;
+    }
+    
+    if (isMovingScreen && selectedScreen) {
+        // Finalize the movement of the selected screen
+        isMovingScreen = false;
+        return;
+    }
 }
 
 function onSelect(event) {
@@ -306,12 +465,35 @@ function onSelect(event) {
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
+    if (isPlacingScreen) {
+        // Finalize placement of new screen
+        isPlacingScreen = false;
+        newScreen = null;
+        return;
+    }
+    
+    if (isMovingScreen) {
+        // Finalize movement of selected screen
+        isMovingScreen = false;
+        return;
+    }
+    
+    // Check for screen selection
+    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0])); // Intersect with main panel
+    
+    if (screenIntersects.length > 0) {
+        const selectedObject = screenIntersects[0].object;
+        const screen = selectedObject.parent;
+        selectScreen(screen);
+        return;
+    }
+    
     // Check for keyboard key intersections
-    if (virtualKeyboard && virtualKeyboard.userData.keys) {
-        const intersects = raycaster.intersectObjects(virtualKeyboard.userData.keys);
+    if (virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
+        const keyIntersects = raycaster.intersectObjects(virtualKeyboard.userData.keys);
         
-        if (intersects.length > 0) {
-            const key = intersects[0].object;
+        if (keyIntersects.length > 0) {
+            const key = keyIntersects[0].object;
             console.log(`Key pressed: ${key.userData.key}`);
             
             // Visual feedback on key press
@@ -324,6 +506,60 @@ function onSelect(event) {
             setTimeout(() => {
                 key.material.color.copy(originalColor);
             }, 200);
+            
+            return;
+        }
+    }
+    
+    // Check for control panel button interactions
+    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
+    let controlIntersects = [];
+    
+    controlPanels.forEach(panel => {
+        // Get all button children
+        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
+        const buttonIntersects = raycaster.intersectObjects(buttons);
+        controlIntersects = controlIntersects.concat(buttonIntersects);
+    });
+    
+    if (controlIntersects.length > 0) {
+        const button = controlIntersects[0].object;
+        
+        // Handle button actions
+        if (button.userData.action === 'newScreen') {
+            // Start placing a new screen
+            isPlacingScreen = true;
+            
+            // Create a new screen at controller position + direction
+            const position = new THREE.Vector3();
+            position.setFromMatrixPosition(controller.matrixWorld);
+            const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+            position.addScaledVector(direction, 0.8);
+            
+            newScreen = createNewBrowserScreen(position);
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+            
+            return;
+        }
+        
+        if (button.userData.action === 'moveScreen' && selectedScreen) {
+            // Start moving the selected screen
+            isMovingScreen = true;
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+            
+            return;
         }
     }
 }
@@ -339,10 +575,27 @@ function animate() {
 }
 
 function render() {
-    // Update browser position to follow user if needed
+    // Handle screen placement or movement
+    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
+        const target = isPlacingScreen ? newScreen : selectedScreen;
+        
+        // Get controller position and direction
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(controller.matrixWorld);
+        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // Set position in front of controller
+        const targetPosition = position.clone().addScaledVector(direction, 0.8);
+        target.position.copy(targetPosition);
+        
+        // Make screen face the user
+        target.lookAt(camera.position);
+    }
     
     // Highlight keys when hovered
-    if (controller && virtualKeyboard && virtualKeyboard.userData.keys) {
+    if (controller && virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
         // Reset previously selected key if any
         if (selectedKey) {
             selectedKey.material.copy(selectedKey.userData.originalMaterial);
@@ -362,6 +615,16 @@ function render() {
             selectedKey.material.copy(selectedKey.userData.hoverMaterial);
         }
     }
+    
+    // Update screen highlight effects
+    screens.forEach(screen => {
+        if (screen.userData.isSelected) {
+            // Subtle pulsing effect for selected screen's border
+            const time = Date.now() * 0.001;
+            const pulseIntensity = 0.1 * Math.sin(time * 2) + 0.9;
+            screen.children[1].material.color.setRGB(0.3 * pulseIntensity, 0.8 * pulseIntensity, 0.3 * pulseIntensity);
+        }
+    });
     
     renderer.render(scene, camera);
 }
