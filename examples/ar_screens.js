@@ -144,36 +144,37 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     
     // Add video controls at the bottom of the screen if video texture exists
     if (typeof videoTexture !== 'undefined' && videoTexture) {
-        // Progress bar background
-        const progressBgGeometry = new THREE.PlaneGeometry(0.5, 0.02);
+        // Progress bar background - full width
+        const progressBgGeometry = new THREE.PlaneGeometry(screenWidth * 0.96, 0.01);
         const progressBgMaterial = new THREE.MeshBasicMaterial({
             color: 0x333333,
             side: THREE.DoubleSide,
             depthTest: false
         });
         const progressBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
-        progressBg.position.set(0, -0.21, 0.005);
+        progressBg.position.set(0, -0.25, 0.005);
         progressBg.renderOrder = 90;
         browserWindow.add(progressBg);
         
-        // Progress bar (initially empty)
-        const progressGeometry = new THREE.PlaneGeometry(0.5, 0.02);
+        // Progress bar (initially empty) - full width
+        const progressGeometry = new THREE.PlaneGeometry(screenWidth * 0.96, 0.01);
         const progressMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000, // Red progress bar
             side: THREE.DoubleSide,
             depthTest: false
         });
         const progressBar = new THREE.Mesh(progressGeometry, progressMaterial);
-        progressBar.position.set(-0.25, -0.21, 0.006); // Start at left edge
+        progressBar.position.set(-(screenWidth * 0.48), -0.25, 0.006); // Start at left edge
         progressBar.scale.set(0, 1, 1); // Initially 0 width
         progressBar.renderOrder = 91;
         browserWindow.add(progressBar);
         
+        // Position buttons below the progress bar
         // Add play/pause button
-        const playButton = addControlButton(browserWindow, 'play', -0.3, -0.27, 0.03);
+        const playButton = addControlButton(browserWindow, 'play', -(screenWidth * 0.35), -0.31, 0.03);
         
         // Add volume/mute button
-        const volumeButton = addControlButton(browserWindow, 'volume', -0.2, -0.27, 0.03);
+        const volumeButton = addControlButton(browserWindow, 'volume', -(screenWidth * 0.25), -0.31, 0.03);
         
         // Store controls in userData
         browserWindow.userData.controls = {

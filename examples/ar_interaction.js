@@ -528,7 +528,8 @@ function onTouchStart(event) {
             screenIntersections.push({
                 screen: screen,
                 distance: intersects[0].distance,
-                object: intersects[0].object
+                object: intersects[0].object,
+                point: intersects[0].point // Store intersection point
             });
         }
     });
@@ -536,74 +537,7 @@ function onTouchStart(event) {
     // Sort by distance so we prioritize closer screens
     screenIntersections.sort((a, b) => a.distance - b.distance);
     
-    // PRIORITY 1: Check for direct hits on drag handles
-    let dragHandleHit = false;
-    let intersectedDragHandle = null;
-    let intersectedScreen = null;
-    
-    // Check for drag handle hits on the closest screens first
-    for (const hit of screenIntersections) {
-        const screen = hit.screen;
-        
-        if (screen.userData && screen.userData.dragHandle) {
-            const dragHandle = screen.userData.dragHandle;
-            
-            // Check if ray intersects with drag handle directly
-            const handleIntersects = raycaster.intersectObject(dragHandle, true);
-            if (handleIntersects.length > 0) {
-                intersectedDragHandle = dragHandle;
-                intersectedScreen = screen;
-                dragHandleHit = true;
-                break;
-            }
-            
-            // Check for hits near the top bar for easier dragging
-            if (hit.object === screen || hit.object === dragHandle) {
-                // If we directly hit the screen or drag handle 
-                intersectedDragHandle = dragHandle;
-                intersectedScreen = screen;
-                dragHandleHit = true;
-                break;
-            }
-        }
-    }
-    
-    // If we found a drag handle, set up for dragging
-    if (dragHandleHit && intersectedDragHandle && intersectedScreen) {
-        console.log("Starting drag on screen:", intersectedScreen.userData.id);
-        
-        // Set up drag state
-        isDraggingHandle = true;
-        draggedScreen = intersectedScreen;
-        
-        // Preserve original scale
-        if (!intersectedScreen.userData.originalScale) {
-            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
-        } else {
-            // Restore original scale when starting drag
-            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
-        }
-        
-        // Select this screen
-        selectScreen(intersectedScreen);
-        selectedScreen = intersectedScreen;
-        
-        // Calculate offset - use a fixed offset for better positioning
-        dragOffset.set(0, 0, 0);
-        
-        // Visual feedback for top bar - subtle highlight effect
-        intersectedDragHandle.material.color.set(0x4CAF50); // Green for highlight
-        
-        // Strong haptic feedback to confirm grab
-        if (navigator.vibrate) {
-            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
-        }
-        
-        createModeChangeIndicator('Dragging Screen');
-        return;
-    }
-    
-    // PRIORITY 2: Check for button intersections if not dragging
+    // PRIORITY 1: Check for button interactions
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
@@ -637,7 +571,83 @@ function onTouchStart(event) {
         }
     }
     
-    // PRIORITY 3: Regular screen selection - use the closest screen from our sorted list
+    // PRIORITY 2: Check closest screen for progress bar interaction
+    if (screenIntersections.length > 0) {
+        const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
+        
+        // Check if we hit the progress bar
+        if (handleProgressBarTouch(screen, closestHit.point)) {
+            console.log("Progress bar touched on screen:", screen.userData.id);
+            return;
+        }
+    }
+    
+    // PRIORITY 3: Check for draggable areas on screens
+    let draggableAreaHit = false;
+    let intersectedScreen = null;
+    
+    // Check for draggable area hits on the closest screens first
+    for (const hit of screenIntersections) {
+        const screen = hit.screen;
+        // Get position relative to the screen
+        let localPoint = hit.point.clone();
+        if (screen.worldToLocal) {
+            localPoint = screen.worldToLocal(localPoint.clone());
+        }
+        
+        // Screen dimensions
+        const screenHeight = 0.75; // Standard screen height
+        
+        // Check if we're in the top 2/3 of the screen
+        // The top of the screen is at y = screenHeight/2
+        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
+        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+            // We hit the draggable area
+            intersectedScreen = screen;
+            draggableAreaHit = true;
+            break;
+        }
+    }
+    
+    // If we found a draggable area, set up for dragging
+    if (draggableAreaHit && intersectedScreen) {
+        console.log("Starting drag on screen:", intersectedScreen.userData.id, "via draggable area");
+        
+        // Set up drag state
+        isDraggingHandle = true;
+        draggedScreen = intersectedScreen;
+        
+        // Preserve original scale
+        if (!intersectedScreen.userData.originalScale) {
+            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
+        } else {
+            // Restore original scale when starting drag
+            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
+        }
+        
+        // Select this screen
+        selectScreen(intersectedScreen);
+        selectedScreen = intersectedScreen;
+        
+        // Calculate offset - use a fixed offset for better positioning
+        dragOffset.set(0, 0, 0);
+        
+        // Visual feedback - highlight the top bar if available
+        if (intersectedScreen.userData.dragHandle) {
+            intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
+        }
+        
+        // Strong haptic feedback to confirm grab
+        if (navigator.vibrate) {
+            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
+        }
+        
+        createModeChangeIndicator('Dragging Screen');
+        return;
+    }
+    
+    // PRIORITY 4: Regular screen selection - use the closest screen from our sorted list
     if (screenIntersections.length > 0) {
         const closestHit = screenIntersections[0];
         const screen = closestHit.screen;
@@ -966,39 +976,32 @@ function onTouchEnd(event) {
 function handleProgressBarTouch(screen, point) {
     if (!screen || !screen.userData || !screen.userData.controls) return false;
     
+    // Get screen dimensions
+    const screenWidth = 1.0; // default screen width
+    
     // Get progress bar from screen
     const progressBg = screen.children.find(child => 
         child.geometry && 
         child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.y - (-0.21)) < 0.01 &&
+        Math.abs(child.position.y - (-0.25)) < 0.01 &&
         child.material.color.getHex() === 0x333333);
     
     if (!progressBg) return false;
     
-    // Check if point is within progress bar area
-    const screenPos = screen.position.clone();
-    const progressBarY = screenPos.y - 0.21;
-    const progressBarZ = screenPos.z + 0.005;
+    // Convert world point to local screen coordinates
+    let localPoint = point.clone();
+    if (screen.worldToLocal) {
+        localPoint = screen.worldToLocal(localPoint.clone());
+    }
     
-    // Create a plane at the progress bar position
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1));
-    plane.translate(new THREE.Vector3(0, progressBarY, progressBarZ));
-    
-    // Get intersection with the plane
-    const intersection = new THREE.Vector3();
-    const ray = raycaster.ray;
-    
-    if (ray.intersectPlane(plane, intersection)) {
-        // Check if intersection is within progress bar bounds
-        const hitX = intersection.x - screenPos.x;
-        const hitY = intersection.y - progressBarY;
+    // Check if hit is within progress bar area
+    if (Math.abs(localPoint.y - (-0.25)) < 0.02 && 
+        Math.abs(localPoint.x) < screenWidth * 0.48) {
         
-        if (Math.abs(hitX) < 0.25 && Math.abs(hitY) < 0.02) {
-            // Calculate progress (normalized between 0-1)
-            const progress = (hitX + 0.25) / 0.5;
-            updateVideoTime(progress);
-            return true;
-        }
+        // Calculate progress based on x position
+        const progress = (localPoint.x + (screenWidth * 0.48)) / (screenWidth * 0.96);
+        updateVideoTime(Math.max(0, Math.min(1, progress)));
+        return true;
     }
     
     return false;

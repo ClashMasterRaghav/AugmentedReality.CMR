@@ -95,14 +95,17 @@ function updateVideoProgress() {
         const progressBar = screen.children.find(child => 
             child.geometry && 
             child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.y - (-0.21)) < 0.001 &&
+            Math.abs(child.position.y - (-0.25)) < 0.01 &&
             child.material.color.getHex() === 0xff0000);
         
         if (progressBar) {
+            // Get screen width (for calculations)
+            const screenWidth = 1.0; // default screen width
+            
             // Update progress bar width and position
             progressBar.scale.x = progress;
             // Adjust position to keep left-aligned
-            progressBar.position.x = -0.25 + (progress * 0.25);
+            progressBar.position.x = -(screenWidth * 0.48) + (progress * screenWidth * 0.48);
             
             // Update progress in userData
             if (screen.userData && screen.userData.controls) {
