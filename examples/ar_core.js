@@ -206,6 +206,12 @@ export function render() {
         }
     }
     
+    // Check if screens array is empty and create a new screen if needed
+    if (!screens || screens.length === 0) {
+        console.log("Screens are missing, creating a new screen");
+        createNewBrowserScreen(new THREE.Vector3(0, 0, -1.2));
+    }
+    
     // Update screen visual effects
     updateScreenEffects();
     

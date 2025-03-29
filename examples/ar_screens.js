@@ -176,6 +176,48 @@ function createText(text, size = 0.04, color = 0xffffff) {
     return new THREE.Mesh(geometry, material);
 }
 
+// Create a video element for use in screens
+function createVideoElement() {
+    // Check if an existing video element is available in the DOM
+    let videoElement = document.getElementById('videoElement');
+    
+    if (videoElement) {
+        console.log("Using existing video element from DOM");
+        return videoElement;
+    }
+    
+    // Create a new video element if none exists
+    console.log("Creating new video element");
+    videoElement = document.createElement('video');
+    videoElement.id = 'videoElement';
+    videoElement.loop = true;
+    videoElement.muted = true;
+    videoElement.playsInline = true;
+    videoElement.crossOrigin = 'anonymous';
+    
+    // Set fallback content
+    videoElement.innerHTML = `
+        <p>Your browser doesn't support HTML5 video.</p>
+    `;
+    
+    // Create source elements for the video
+    const source = document.createElement('source');
+    source.src = '../textures/ar_videoplayback.mp4'; // Default path - update if needed
+    source.type = 'video/mp4';
+    videoElement.appendChild(source);
+    
+    // Hide the video element from the DOM but keep it for texture use
+    videoElement.style.display = 'none';
+    document.body.appendChild(videoElement);
+    
+    // Start playing the video (muted for autoplay)
+    videoElement.play().catch(error => {
+        console.error("Error starting video playback:", error);
+    });
+    
+    return videoElement;
+}
+
 // Add a control button to the screen
 function addControlButton(screen, type, x, y, size) {
     const buttonGeometry = new THREE.CircleGeometry(size, 32);
@@ -424,4 +466,47 @@ export function updateScreenEffects() {
             }
         }
     });
+}
+
+// Restore screens if they're missing
+export function restoreScreens() {
+    // Check if screens array is empty or undefined
+    if (!screens || screens.length === 0) {
+        console.log("No screens found, creating a new default screen");
+        
+        // Create a default position in front of the camera
+        const position = new THREE.Vector3(0, 0, -1.2);
+        if (camera) {
+            // Get camera direction and position screen in front of camera
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(camera.quaternion);
+            position.copy(camera.position).add(cameraDirection.multiplyScalar(1.2));
+        }
+        
+        // Create a new screen
+        const newScreen = createNewBrowserScreen(position);
+        console.log("Created new screen at position:", position);
+        
+        // Make screen face the camera
+        if (camera) {
+            newScreen.lookAt(camera.position);
+        }
+        
+        return newScreen;
+    } else {
+        // Check if screens are actually in the scene
+        const detachedScreens = screens.filter(screen => !scene.children.includes(screen));
+        
+        if (detachedScreens.length > 0) {
+            console.log(`Found ${detachedScreens.length} detached screens, re-adding to scene`);
+            
+            // Re-add detached screens to the scene
+            detachedScreens.forEach(screen => {
+                scene.add(screen);
+                console.log("Re-added screen to scene");
+            });
+        }
+        
+        return screens[0]; // Return the first screen
+    }
 } 
