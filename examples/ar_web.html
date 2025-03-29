@@ -2,14 +2,17 @@
 <html lang="en">
 	<head>
 		<title>three.js ar - cones</title>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-		<link type="text/css" rel="stylesheet" href="main.css">
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, user-scalable=no"
+		/>
+		<link type="text/css" rel="stylesheet" href="main.css" />
 	</head>
 	<body>
-
 		<div id="info">
-			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> ar - cones<br/>(Chrome Android 81+)
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+			ar - cones<br />(Chrome Android 81+)
 		</div>
 
 		<script type="importmap">
@@ -22,82 +25,233 @@
 		</script>
 
 		<script type="module">
-
-			import * as THREE from 'three';
-			import { ARButton } from 'three/addons/webxr/ARButton.js';
+			import * as THREE from "three";
+			import { ARButton } from "three/addons/webxr/ARButton.js";
+			import { HTMLMesh } from "three/addons/interactive/HTMLMesh.js";
+			import { InteractiveGroup } from "three/addons/interactive/InteractiveGroup.js";
+			import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
 			let camera, scene, renderer;
-			let controller;
+			let controller, controllerGrip;
+			let browserPlane, keyboardPlane;
+			let raycaster = new THREE.Raycaster();
+			let workingMatrix = new THREE.Matrix4();
+			let interactiveGroup;
+
+			// Browser content
+			let currentURL = "https://example.com";
+			let browserContent;
 
 			init();
+			animate();
 
 			function init() {
-
-				const container = document.createElement( 'div' );
-				document.body.appendChild( container );
+				const container = document.createElement("div");
+				document.body.appendChild(container);
 
 				scene = new THREE.Scene();
+				camera = new THREE.PerspectiveCamera(
+					70,
+					window.innerWidth / window.innerHeight,
+					0.01,
+					20
+				);
 
-				camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.01, 20 );
+				// Lighting
+				const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+				light.position.set(0.5, 1, 0.25);
+				scene.add(light);
 
-				const light = new THREE.HemisphereLight( 0xffffff, 0xbbbbff, 3 );
-				light.position.set( 0.5, 1, 0.25 );
-				scene.add( light );
-
-				//
-
-				renderer = new THREE.WebGLRenderer( { antialias: true, alpha: true } );
-				renderer.setPixelRatio( window.devicePixelRatio );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				renderer.setAnimationLoop( animate );
+				// Renderer
+				renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+				renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.setSize(window.innerWidth, window.innerHeight);
 				renderer.xr.enabled = true;
-				container.appendChild( renderer.domElement );
+				container.appendChild(renderer.domElement);
 
-				//
+				// AR Button
+				document.body.appendChild(ARButton.createButton(renderer));
 
-				document.body.appendChild( ARButton.createButton( renderer ) );
+				// Interactive group for handling input
+				interactiveGroup = new InteractiveGroup(renderer);
+				scene.add(interactiveGroup);
 
-				//
+				// Create browser window
+				createBrowserWindow();
 
-				const geometry = new THREE.CylinderGeometry( 0, 0.05, 0.2, 32 ).rotateX( Math.PI / 2 );
+				// Create virtual keyboard
+				createVirtualKeyboard();
 
-				function onSelect() {
+				// Controller setup
+				controller = renderer.xr.getController(0);
+				controller.addEventListener("select", onSelect);
+				scene.add(controller);
 
-					const material = new THREE.MeshPhongMaterial( { color: 0xffffff * Math.random() } );
-					const mesh = new THREE.Mesh( geometry, material );
-					mesh.position.set( 0, 0, - 0.3 ).applyMatrix4( controller.matrixWorld );
-					mesh.quaternion.setFromRotationMatrix( controller.matrixWorld );
-					scene.add( mesh );
+				// Controller model
+				const controllerModelFactory = new XRControllerModelFactory();
+				controllerGrip = renderer.xr.getControllerGrip(0);
+				controllerGrip.add(
+					controllerModelFactory.createControllerModel(controllerGrip)
+				);
+				scene.add(controllerGrip);
 
-				}
+				// Pointer for interaction
+				const geometry = new THREE.SphereGeometry(0.01, 16, 16);
+				const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+				const pointer = new THREE.Mesh(geometry, material);
+				pointer.position.z = -0.1;
+				controller.add(pointer);
 
-				controller = renderer.xr.getController( 0 );
-				controller.addEventListener( 'select', onSelect );
-				scene.add( controller );
+				// Window resize handler
+				window.addEventListener("resize", onWindowResize);
+			}
 
-				//
+			function createBrowserWindow() {
+				// Create a container for browser content
+				browserContent = document.createElement("div");
+				browserContent.style.width = "800px";
+				browserContent.style.height = "600px";
+				browserContent.style.backgroundColor = "white";
+				browserContent.style.padding = "10px";
+				browserContent.style.color = "black";
+				browserContent.style.fontFamily = "Arial, sans-serif";
+				browserContent.style.overflow = "hidden";
 
-				window.addEventListener( 'resize', onWindowResize );
+				// Add browser UI elements
+				browserContent.innerHTML = `
+        <div style="display: flex; align-items: center; background-color: #f0f0f0; padding: 5px; border-radius: 5px; margin-bottom: 10px;">
+            <button style="margin-right: 5px;">←</button>
+            <button style="margin-right: 5px;">→</button>
+            <button style="margin-right: 5px;">↻</button>
+            <input type="text" value="${currentURL}" style="flex-grow: 1; padding: 5px; border-radius: 3px; border: 1px solid #ccc;">
+        </div>
+        <div style="background-color: #fff; height: calc(100% - 50px); border-radius: 5px; padding: 10px; overflow: auto;">
+            <h1>Immersive AR Browser</h1>
+            <p>This is a demonstration of an AR-based web browsing experience.</p>
+            <p>In a full implementation, this area would render actual web content.</p>
+            <div style="margin-top: 20px; padding: 15px; background-color: #f8f8f8; border-radius: 5px;">
+                <h3>Features to implement:</h3>
+                <ul>
+                    <li>Real web content rendering</li>
+                    <li>Interaction with links and forms</li>
+                    <li>Multiple browser windows</li>
+                    <li>Spatial arrangements</li>
+                </ul>
+            </div>
+        </div>
+    `;
 
+				// Create HTML mesh from the content
+				const htmlMesh = new HTMLMesh(browserContent);
+				htmlMesh.scale.setScalar(0.001); // Scale down to appropriate size
+				htmlMesh.position.set(0, 0, -0.5); // Position in front of user
+
+				// Create container
+				browserPlane = new THREE.Group();
+				browserPlane.add(htmlMesh);
+
+				// Add a frame
+				const frameGeometry = new THREE.BoxGeometry(
+					0.8 * 0.001,
+					0.6 * 0.001,
+					0.01 * 0.001
+				);
+				const frameMaterial = new THREE.MeshPhongMaterial({ color: 0x505050 });
+				const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+				frame.position.z = -0.006 * 0.001;
+				browserPlane.add(frame);
+
+				interactiveGroup.add(browserPlane);
+			}
+
+			function createVirtualKeyboard() {
+				// Create keyboard container
+				const keyboardContent = document.createElement("div");
+				keyboardContent.style.width = "800px";
+				keyboardContent.style.height = "300px";
+				keyboardContent.style.backgroundColor = "#333";
+				keyboardContent.style.borderRadius = "10px";
+				keyboardContent.style.padding = "10px";
+
+				// Add keyboard keys
+				const rows = [
+					["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+					["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+					["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+					["z", "x", "c", "v", "b", "n", "m", ".", "/"],
+				];
+
+				let keyboardHTML =
+					'<div style="display: flex; flex-direction: column; gap: 5px;">';
+
+				rows.forEach((row) => {
+					keyboardHTML +=
+						'<div style="display: flex; justify-content: center; gap: 5px;">';
+					row.forEach((key) => {
+						keyboardHTML += `<button style="width: 50px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px; font-size: 20px;">${key}</button>`;
+					});
+					keyboardHTML += "</div>";
+				});
+
+				// Add space bar and special keys
+				keyboardHTML += `
+        <div style="display: flex; justify-content: center; gap: 5px; margin-top: 5px;">
+            <button style="width: 300px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px;">Space</button>
+            <button style="width: 100px; height: 50px; background-color: #444; color: white; border: none; border-radius: 5px;">Enter</button>
+        </div>
+    `;
+
+				keyboardHTML += "</div>";
+				keyboardContent.innerHTML = keyboardHTML;
+
+				// Create HTML mesh for keyboard
+				const keyboardMesh = new HTMLMesh(keyboardContent);
+				keyboardMesh.scale.setScalar(0.001); // Scale down
+
+				// Create container
+				keyboardPlane = new THREE.Group();
+				keyboardPlane.add(keyboardMesh);
+				keyboardPlane.position.set(0, -0.3, -0.5); // Position below browser
+				keyboardPlane.rotation.x = -Math.PI / 6; // Angle for better visibility
+
+				interactiveGroup.add(keyboardPlane);
+			}
+
+			function onSelect(event) {
+				// Implement selection/click functionality
+				// This would handle interactions with browser elements
+
+				// Raycast to detect interactive elements
+				const tempMatrix = new THREE.Matrix4();
+				tempMatrix.identity().extractRotation(controller.matrixWorld);
+				raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+				raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+				// In a full implementation:
+				// - Check for intersections with browser UI elements
+				// - Check for intersections with keyboard keys
+				// - Handle the appropriate actions
+				console.log("Select event triggered");
 			}
 
 			function onWindowResize() {
-
 				camera.aspect = window.innerWidth / window.innerHeight;
 				camera.updateProjectionMatrix();
-
-				renderer.setSize( window.innerWidth, window.innerHeight );
-
+				renderer.setSize(window.innerWidth, window.innerHeight);
 			}
-
-			//
 
 			function animate() {
-
-				renderer.render( scene, camera );
-
+				renderer.setAnimationLoop(render);
 			}
 
+			function render() {
+				// Update browser content if needed
+
+				// Make browser follow the user's view at a fixed distance if not being manipulated
+				// This would create a more Vision Pro-like experience
+
+				renderer.render(scene, camera);
+			}
 		</script>
 	</body>
 </html>
