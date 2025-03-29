@@ -29,6 +29,12 @@ let isDraggingHandle = false;
 let draggedScreen = null;
 let dragOffset = new THREE.Vector3();
 
+// Import necessary video functions
+let videoControlFunctions = {
+    togglePlayback: null,
+    toggleMute: null
+};
+
 // Setup event listeners
 export function setupEventListeners() {
     // Controller events
@@ -213,10 +219,10 @@ function handleButtonAction(button) {
     
     // Play/pause button
     if (action === 'playButton' && screen) {
-        // Check if toggleVideoPlayback exists
-        if (typeof toggleVideoPlayback === 'function') {
+        // Check if video control function exists
+        if (videoControlFunctions.togglePlayback) {
             // Toggle playback
-            toggleVideoPlayback();
+            videoControlFunctions.togglePlayback();
             console.log("Toggle video playback");
             
             // Visual feedback
@@ -234,15 +240,15 @@ function handleButtonAction(button) {
                 navigator.vibrate(20);
             }
         } else {
-            console.error("toggleVideoPlayback function not found");
+            console.error("Video playback function not found");
         }
     }
     // Volume/mute button
     else if (action === 'volumeButton' && screen) {
-        // Check if toggleVideoMute exists
-        if (typeof toggleVideoMute === 'function') {
+        // Check if mute function exists
+        if (videoControlFunctions.toggleMute) {
             // Toggle mute
-            toggleVideoMute();
+            videoControlFunctions.toggleMute();
             console.log("Toggle video mute");
             
             // Visual feedback
@@ -260,7 +266,7 @@ function handleButtonAction(button) {
                 navigator.vibrate(20);
             }
         } else {
-            console.error("toggleVideoMute function not found");
+            console.error("Video mute function not found");
         }
     }
     
@@ -1136,14 +1142,11 @@ function findScreenFromDragHandle(dragHandle) {
     return null;
 }
 
-// Import necessary video functions
-let toggleVideoPlayback, toggleVideoMute;
-
 // Setup function to be called with imports
 export function setupVideoControls(videoControls) {
     if (videoControls) {
-        toggleVideoPlayback = videoControls.toggleVideoPlayback;
-        toggleVideoMute = videoControls.toggleVideoMute;
+        videoControlFunctions.togglePlayback = videoControls.toggleVideoPlayback;
+        videoControlFunctions.toggleMute = videoControls.toggleVideoMute;
         console.log("Video controls setup complete");
     }
 } 
