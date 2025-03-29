@@ -7,7 +7,7 @@ import {
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
-import { toggleVideoPlayback, toggleVideoMute, videoElement, duration } from './ar_media.js';
+import { videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
 let touchEnabled = true;
