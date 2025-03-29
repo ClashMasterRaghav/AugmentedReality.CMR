@@ -5,7 +5,6 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { initAR, render, animate } from './ar_core.js';
 import { setupEventListeners } from './ar_interaction.js';
 import { loadVideoTexture } from './ar_media.js';
-import { restoreScreens } from './ar_screens.js';
 
 // Wait for DOM content to be loaded before initializing
 document.addEventListener('DOMContentLoaded', () => {
