@@ -24,6 +24,11 @@ let initialPinchDistance = 0;
 let initialScale = new THREE.Vector3(1, 1, 1);
 let isPinching = false;
 
+// Variables for drag handle functionality
+let isDraggingHandle = false;
+let draggedScreen = null;
+let dragOffset = new THREE.Vector3();
+
 // Setup event listeners
 export function setupEventListeners() {
     // Controller events
@@ -425,33 +430,6 @@ function onTouchStart(event) {
     
     console.log("Touch start detected");
     
-    // EMERGENCY FIX: Always make a touch immediately interactive
-    isTouchMovingScreen = true;
-    console.log("Force enabled touch movement mode");
-    
-    // Check for multi-touch (pinch gesture)
-    if (event.touches.length === 2 && selectedScreen) {
-        console.log("Two-finger touch detected, starting pinch");
-        // Start pinch-to-zoom
-        isPinching = true;
-        
-        // Calculate initial distance between fingers
-        const touch1 = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
-        const touch2 = new THREE.Vector2(event.touches[1].clientX, event.touches[1].clientY);
-        initialPinchDistance = touch1.distanceTo(touch2);
-        console.log("Initial pinch distance:", initialPinchDistance);
-        
-        // Store initial scale
-        initialScale.copy(selectedScreen.scale);
-        
-        // Provide haptic feedback if available
-        if (navigator.vibrate) {
-            navigator.vibrate(20);
-        }
-        
-        return;
-    }
-    
     // Single touch handling
     const touch = event.touches[0];
     
@@ -477,15 +455,74 @@ function onTouchStart(event) {
     const doubleTapDetected = (now - lastTapTime) < 300;
     lastTapTime = now;
     
-    // EMERGENCY FIX: Check all screens regardless of intersection
-    if (screens.length > 0 && !selectedScreen) {
-        console.log("No screen selected, selecting first screen as fallback");
-        selectScreen(screens[0]);
-        selectedScreen = screens[0];
-        createModeChangeIndicator('Screen Selected');
+    // FIRST CHECK FOR DRAG HANDLES
+    // Create a list of all drag handles in the scene
+    const dragHandles = [];
+    screens.forEach(screen => {
+        if (screen.userData && screen.userData.dragHandle) {
+            dragHandles.push(screen.userData.dragHandle);
+        }
+    });
+    
+    console.log("Checking for drag handles:", dragHandles.length);
+    const handleIntersects = raycaster.intersectObjects(dragHandles, true);
+    
+    if (handleIntersects.length > 0) {
+        const hitObject = handleIntersects[0].object;
+        console.log("Hit a drag handle or its child:", hitObject.uuid);
+        
+        // Find the actual handle (might be the child icon)
+        let dragHandle = hitObject;
+        if (hitObject.parent && hitObject.parent.userData && hitObject.parent.userData.type === 'dragHandle') {
+            dragHandle = hitObject.parent;
+        }
+        
+        // Get the screen this handle belongs to
+        const screen = dragHandle.userData.screen;
+        if (screen) {
+            console.log("Starting drag on screen:", screen.userData.id);
+            
+            // Set up drag state
+            isDraggingHandle = true;
+            draggedScreen = screen;
+            
+            // Select this screen
+            selectScreen(screen);
+            selectedScreen = screen;
+            
+            // Calculate offset from screen position to touch point
+            // This ensures the screen doesn't jump when starting to drag
+            const intersectionPoint = handleIntersects[0].point;
+            dragOffset.copy(screen.position).sub(intersectionPoint);
+            
+            // Visual feedback - make handle "glow"
+            const originalColor = dragHandle.material.color.clone();
+            dragHandle.material.color.set(0x00ff00); // Bright green
+            
+            // Scale up slightly for visual feedback
+            dragHandle.scale.set(1.2, 1.2, 1.2);
+            
+            // Reset after a moment
+            setTimeout(() => {
+                if (isDraggingHandle) {
+                    dragHandle.material.color.set(0x4CAF50); // Back to regular green but maintain scale
+                } else {
+                    dragHandle.material.color.copy(originalColor);
+                    dragHandle.scale.set(1, 1, 1);
+                }
+            }, 300);
+            
+            // Provide haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(40);
+            }
+            
+            createModeChangeIndicator('Dragging Screen');
+            return;
+        }
     }
     
-    // Check for button intersections first
+    // Check for button intersections if not dragging
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
@@ -519,21 +556,8 @@ function onTouchStart(event) {
         }
     }
     
-    // Check for screen intersections - IMPROVED DETECTION
-    console.log("Checking screens for intersection");
-    
-    // EMERGENCY FIX: Add all objects in scene to detection
-    const allObjects = [];
-    scene.traverse(obj => {
-        if (obj.isMesh || obj.isGroup) {
-            allObjects.push(obj);
-        }
-    });
-    console.log("Total scene objects to check:", allObjects.length);
-    const allIntersects = raycaster.intersectObjects(allObjects, true);
-    console.log("Found", allIntersects.length, "total intersections");
-    
-    // Regular approach with explicit screen objects
+    // Rest of code for regular screen interaction...
+    // Check for screen intersections
     const screenObjects = [];
     screens.forEach((screen, index) => {
         console.log("Adding screen", index, "to detection list");
@@ -545,12 +569,9 @@ function onTouchStart(event) {
         });
     });
     
-    console.log("Total screen objects to check for intersection:", screenObjects.length);
     const screenIntersects = raycaster.intersectObjects(screenObjects, true);
-    console.log("Found", screenIntersects.length, "screen intersections");
     
     if (screenIntersects.length > 0) {
-        console.log("Hit object:", screenIntersects[0].object.uuid);
         const screenObj = getScreenFromIntersect(screenIntersects[0].object);
         if (screenObj) {
             console.log("Screen touched:", screenObj.userData.id);
@@ -558,9 +579,6 @@ function onTouchStart(event) {
             // Select the screen
             selectScreen(screenObj);
             selectedScreen = screenObj;
-            
-            // Store initial touch positions for movement
-            initialTouchPosition.copy(currentTouchPosition);
             
             // Double tap to toggle resize
             if (doubleTapDetected) {
@@ -576,32 +594,10 @@ function onTouchStart(event) {
                 return;
             }
             
-            // IMPORTANT: ALWAYS enable screen movement on touch - regardless of mode
-            isTouchMovingScreen = true;
-            console.log("Screen movement enabled:", isTouchMovingScreen);
-            
-            // Provide haptic feedback
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-            
             // Flash highlight around selected screen
             flashScreenHighlight(screenObj);
-            
-            // If in rotate mode, also enable rotation
-            if (isRotateModeActive) {
-                isRotatingScreen = true;
-                initialRotation.copy(screenObj.rotation);
-                initialMousePosition.copy(initialTouchPosition);
-                console.log("Rotation mode also enabled");
-            }
-            
             createModeChangeIndicator('Screen Selected');
-        } else {
-            console.log("No screen found from intersection");
         }
-    } else {
-        console.log("No screen intersections found");
     }
 }
 
@@ -675,47 +671,15 @@ function onTouchMove(event) {
     // Always prevent default to avoid browser gestures
     event.preventDefault();
     
-    // Detailed debug logs
-    console.log("Touch move detected, touches:", event.touches.length);
-    console.log("Selected screen?", selectedScreen ? selectedScreen.userData.id : "none");
-    console.log("isTouchMovingScreen:", isTouchMovingScreen);
-    
-    // Bail early if nothing is selected
-    if (!selectedScreen) {
-        console.log("No screen selected, ignoring touch move");
+    // Bail early if nothing is happening
+    if (!selectedScreen && !isDraggingHandle) {
         return;
     }
     
-    // Handle pinch zoom with two fingers
-    if (event.touches.length === 2 && isPinching) {
-        const touch1 = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
-        const touch2 = new THREE.Vector2(event.touches[1].clientX, event.touches[1].clientY);
-        const currentPinchDistance = touch1.distanceTo(touch2);
-        
-        // Calculate scale factor based on pinch
-        const scaleFactor = currentPinchDistance / initialPinchDistance;
-        console.log("Pinch scaling, factor:", scaleFactor);
-        
-        // Apply new scale (with limits to prevent too small or too large)
-        const newScale = initialScale.clone().multiplyScalar(scaleFactor);
-        
-        // Clamp scale to reasonable values
-        newScale.x = THREE.MathUtils.clamp(newScale.x, 0.5, 2.5);
-        newScale.y = THREE.MathUtils.clamp(newScale.y, 0.5, 2.5);
-        newScale.z = 1; // Keep z scale at 1
-        
-        // Apply scale with smoothing
-        selectedScreen.scale.lerp(newScale, 0.3);
-        
-        // Store the new scale in userData for reference
-        selectedScreen.userData.currentScale = selectedScreen.scale.clone();
-        return;
-    }
-    
-    // Single touch handling for moving screens
-    const touch = event.touches[0];
+    console.log("Touch move detected");
     
     // Make sure we have a valid touch point
+    const touch = event.touches[0];
     if (!touch) {
         console.log("No valid touch point");
         return;
@@ -726,56 +690,41 @@ function onTouchMove(event) {
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Log touch position for debugging
-    console.log("Current touch position:", 
-        currentTouchPosition.x.toFixed(3), 
-        currentTouchPosition.y.toFixed(3));
+    // Handle dragging via the drag handle
+    if (isDraggingHandle && draggedScreen) {
+        console.log("Moving screen via drag handle");
         
-    // Calculate movement delta
-    const deltaX = currentTouchPosition.x - previousTouchPosition.x;
-    const deltaY = currentTouchPosition.y - previousTouchPosition.y;
-    console.log("Delta:", deltaX.toFixed(3), deltaY.toFixed(3));
-    
-    // FORCE ENABLE SCREEN MOVEMENT REGARDLESS OF MODE
-    // This is a key fix - we'll move the screen even if isTouchMovingScreen isn't set
-    if (true) {  // Always allow movement when a screen is selected
-        console.log("Moving screen");
+        // Update raycaster with current touch position
+        raycaster.setFromCamera(currentTouchPosition, camera);
         
-        // Create more direct movement with less complexity
-        // Use a simplified approach that always works
+        // Create a plane parallel to the camera
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        planeNormal.applyQuaternion(camera.quaternion);
         
-        // Get the camera's forward and right vectors
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        // Get distance from camera to screen
+        const cameraToScreen = draggedScreen.position.clone().sub(camera.position);
+        const distanceToScreen = cameraToScreen.dot(planeNormal);
         
-        // Scale the movement (adjust multiplier as needed)
-        const movementSpeed = 3.0; // Increased for more responsiveness
+        // Create a plane at that distance
+        const plane = new THREE.Plane(planeNormal, -distanceToScreen);
         
-        // Create movement vector in world space
-        const movement = new THREE.Vector3()
-            .addScaledVector(right, deltaX * movementSpeed)
-            .addScaledVector(new THREE.Vector3(0, 1, 0), deltaY * movementSpeed);
+        // Find intersection of ray with the plane
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
         
-        console.log("Movement vector:", 
-            movement.x.toFixed(3), 
-            movement.y.toFixed(3), 
-            movement.z.toFixed(3));
+        // Update screen position while maintaining the original offset
+        draggedScreen.position.copy(intersectionPoint.add(dragOffset));
         
-        // Apply movement directly
-        selectedScreen.position.add(movement);
-        console.log("New screen position:", 
-            selectedScreen.position.x.toFixed(3), 
-            selectedScreen.position.y.toFixed(3), 
-            selectedScreen.position.z.toFixed(3));
+        // Make screen face the camera
+        draggedScreen.lookAt(camera.position);
         
-        // Ensure screen always faces the camera
-        selectedScreen.lookAt(camera.position);
+        // Optional visual feedback
+        createMoveIndicator(draggedScreen.position.clone(), 0.03);
         
-        // Create visual feedback
-        createMoveIndicator(selectedScreen.position.clone(), 0.03);
+        return;
     }
     
-    // Rotate if in rotate mode
+    // Handle other touch interactions as before...
     if (isRotatingScreen) {
         console.log("Rotating screen");
         rotateScreenWithTouch();
@@ -891,58 +840,55 @@ function rotateScreenWithTouch() {
 
 // Touch end handler
 function onTouchEnd(event) {
-    console.log("Touch ended, was moving:", isTouchMovingScreen);
-    
-    // Check if we were doing something interactive
-    const wasInteractive = isTouchMovingScreen || isRotatingScreen || isPinching;
-    
-    // Reset interaction flags
-    isTouchMovingScreen = false;
-    isRotatingScreen = false;
-    isPinching = false;
-    
-    // If this was the last touch and we have a selected screen, save its current state
-    if (event.touches.length === 0 && selectedScreen) {
-        console.log("Saving screen state");
+    // Check if we were dragging with the handle
+    if (isDraggingHandle && draggedScreen) {
+        console.log("Finished dragging screen:", draggedScreen.userData.id);
         
-        // Save current scale
-        if (selectedScreen.userData.currentScale) {
-            selectedScreen.userData.originalScale = selectedScreen.userData.currentScale.clone();
+        // Reset the drag handle appearance
+        if (draggedScreen.userData.dragHandle) {
+            draggedScreen.userData.dragHandle.material.color.set(0x4CAF50);
+            draggedScreen.userData.dragHandle.scale.set(1, 1, 1);
         }
         
-        // Save current position
-        selectedScreen.userData.originalPosition = selectedScreen.position.clone();
+        // Save the current position in userData
+        draggedScreen.userData.originalPosition = draggedScreen.position.clone();
         
-        // Provide haptic feedback for interaction end (if we were doing something)
-        if (wasInteractive && navigator.vibrate) {
-            navigator.vibrate(15);  // Lighter vibration for release
+        // Provide haptic feedback for completing the drag
+        if (navigator.vibrate) {
+            navigator.vibrate(20);
         }
         
         // Create a subtle "settle" animation when dropping the screen
-        if (wasInteractive) {
-            // Small "bounce" effect when releasing
-            const originalPosition = selectedScreen.position.clone();
+        const originalPosition = draggedScreen.position.clone();
+        
+        // Slight drop effect
+        const dropAnimation = () => {
+            const downPos = originalPosition.clone();
+            downPos.y -= 0.01;  // Move slightly down
+            draggedScreen.position.lerp(downPos, 0.5);
             
-            // Slight drop effect
-            const dropAnimation = () => {
-                const downPos = originalPosition.clone();
-                downPos.y -= 0.01;  // Move slightly down
-                selectedScreen.position.lerp(downPos, 0.5);
-                
-                setTimeout(() => {
-                    // Bounce back up
-                    const upAnimation = () => {
-                        selectedScreen.position.lerp(originalPosition, 0.3);
-                    };
-                    requestAnimationFrame(upAnimation);
-                }, 100);
-            };
-            requestAnimationFrame(dropAnimation);
-            
-            // Show a brief confirmation indicator
-            createModeChangeIndicator('Position Saved');
-        }
+            setTimeout(() => {
+                // Bounce back up
+                const upAnimation = () => {
+                    draggedScreen.position.lerp(originalPosition, 0.3);
+                };
+                requestAnimationFrame(upAnimation);
+            }, 100);
+        };
+        requestAnimationFrame(dropAnimation);
+        
+        // Show a brief confirmation
+        createModeChangeIndicator('Position Saved');
+        
+        // Reset dragging state
+        isDraggingHandle = false;
+        draggedScreen = null;
     }
+    
+    // Reset other flags
+    isTouchMovingScreen = false;
+    isRotatingScreen = false;
+    isPinching = false;
 }
 
 // Progress bar touch handler

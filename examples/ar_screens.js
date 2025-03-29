@@ -83,6 +83,108 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     browserPanel.renderOrder = 2;
     browserWindow.add(browserPanel);
     
+    // Create a distinctive drag handle in the top-left corner
+    const handleSize = 0.08; // Size of the handle
+    const handleGeometry = new THREE.CircleGeometry(handleSize/2, 32);
+    const handleMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4CAF50, // Green for visibility
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthTest: false // Always visible
+    });
+    const dragHandle = new THREE.Mesh(handleGeometry, handleMaterial);
+    
+    // Position in top-left corner, slightly outside the screen for better visibility
+    dragHandle.position.set(
+        -screenWidth/2 - handleSize/2 + 0.05, // Left edge + slight offset
+        screenHeight/2 + handleSize/2 - 0.05, // Top edge + slight offset
+        0.025 // In front of everything, even interaction plane
+    );
+    dragHandle.renderOrder = 10000; // Extra high render order
+    
+    // Add grab icon to the handle
+    const handleIconCanvas = document.createElement('canvas');
+    handleIconCanvas.width = 128;
+    handleIconCanvas.height = 128;
+    const ctx = handleIconCanvas.getContext('2d');
+    
+    // Draw a "move" icon (4 directional arrows)
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    
+    // Draw arrows in four directions
+    // Up arrow
+    ctx.beginPath();
+    ctx.moveTo(64, 20);
+    ctx.lineTo(64, 48);
+    ctx.moveTo(50, 34);
+    ctx.lineTo(64, 20);
+    ctx.lineTo(78, 34);
+    ctx.stroke();
+    
+    // Right arrow
+    ctx.beginPath();
+    ctx.moveTo(108, 64);
+    ctx.lineTo(80, 64);
+    ctx.moveTo(94, 50);
+    ctx.lineTo(108, 64);
+    ctx.lineTo(94, 78);
+    ctx.stroke();
+    
+    // Down arrow
+    ctx.beginPath();
+    ctx.moveTo(64, 108);
+    ctx.lineTo(64, 80);
+    ctx.moveTo(50, 94);
+    ctx.lineTo(64, 108);
+    ctx.lineTo(78, 94);
+    ctx.stroke();
+    
+    // Left arrow
+    ctx.beginPath();
+    ctx.moveTo(20, 64);
+    ctx.lineTo(48, 64);
+    ctx.moveTo(34, 50);
+    ctx.lineTo(20, 64);
+    ctx.lineTo(34, 78);
+    ctx.stroke();
+    
+    // Add a subtle glow hint
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(64, 64, 48, 0, Math.PI * 2);
+    ctx.fill();
+    
+    const handleIconTexture = new THREE.CanvasTexture(handleIconCanvas);
+    const handleIconGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
+    const handleIconMaterial = new THREE.MeshBasicMaterial({
+        map: handleIconTexture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false
+    });
+    const handleIcon = new THREE.Mesh(handleIconGeometry, handleIconMaterial);
+    handleIcon.position.z = 0.001; // Slightly in front of handle
+    dragHandle.add(handleIcon);
+    
+    // Set userData for the drag handle
+    dragHandle.userData = {
+        type: 'dragHandle',
+        action: 'moveScreen',
+        screen: browserWindow, // Reference to parent screen
+        isDraggable: true
+    };
+    
+    // Add to the browserWindow
+    browserWindow.add(dragHandle);
+    
+    // Store reference to the drag handle on the screen object
+    browserWindow.userData.dragHandle = dragHandle;
+    
     // Content area with video - moved back to avoid blocking interactions
     const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
     
