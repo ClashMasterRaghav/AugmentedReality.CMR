@@ -12,42 +12,118 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     // Create a clean, simple group
     const browserWindow = new THREE.Group();
     
-    // Very basic dimensions
+    // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     
-    console.log("Creating ULTRA-MINIMAL screen for debugging");
+    console.log("Creating screen with corner handle");
     
     // Basic identification data
     browserWindow.userData = { 
         type: 'screen', 
         id: screens.length,
         isSelected: false,
-        isInteractive: true
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1) // Store original scale to prevent scaling issues
     };
     
-    // Single background plane - plain color for simplicity
+    // Background plane
     const bgGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
     const bgMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x333333, // Dark gray background
+        color: 0x121212, // Dark background
         side: THREE.DoubleSide
     });
     const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
     browserWindow.add(bgPanel);
     
-    // SUPER OBVIOUS DRAG HANDLE
-    // Make it unmissable and unmistakable
-    const handleSize = 0.3; // HUGE handle
-    const handleGeometry = new THREE.BoxGeometry(handleSize, handleSize, handleSize/10);
-    const handleMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff0000, // Bright RED
-        transparent: false,
+    // Add border for better visibility
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444, // Dark gray border
         side: THREE.DoubleSide
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    browserWindow.add(borderPanel);
+    
+    // Create a SMALL, SUBTLE corner drag handle
+    const handleSize = 0.05; // Small handle
+    const handleGeometry = new THREE.CircleGeometry(handleSize/2, 32);
+    const handleMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4CAF50, // Green color
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false
     });
     const dragHandle = new THREE.Mesh(handleGeometry, handleMaterial);
     
-    // Position in the center of the screen for maximum visibility
-    dragHandle.position.set(0, 0, 0.1); // Far in front
+    // Position in top-right corner
+    dragHandle.position.set(
+        screenWidth/2 - handleSize/2, // Right edge, inset by handle radius
+        screenHeight/2 - handleSize/2, // Top edge, inset by handle radius
+        0.01 // Slightly in front of screen
+    );
+    dragHandle.renderOrder = 100; // Ensure it renders on top
+    
+    // Create a move icon for the handle
+    const handleCanvas = document.createElement('canvas');
+    handleCanvas.width = 64;
+    handleCanvas.height = 64;
+    const ctx = handleCanvas.getContext('2d');
+    
+    // Draw a subtle crosshair/move icon
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    
+    // Draw move arrows
+    // Horizontal arrow
+    ctx.beginPath();
+    ctx.moveTo(16, 32);
+    ctx.lineTo(48, 32);
+    ctx.stroke();
+    // Left arrowhead
+    ctx.beginPath();
+    ctx.moveTo(22, 26);
+    ctx.lineTo(16, 32);
+    ctx.lineTo(22, 38);
+    ctx.stroke();
+    // Right arrowhead
+    ctx.beginPath();
+    ctx.moveTo(42, 26);
+    ctx.lineTo(48, 32);
+    ctx.lineTo(42, 38);
+    ctx.stroke();
+    
+    // Vertical arrow
+    ctx.beginPath();
+    ctx.moveTo(32, 16);
+    ctx.lineTo(32, 48);
+    ctx.stroke();
+    // Up arrowhead
+    ctx.beginPath();
+    ctx.moveTo(26, 22);
+    ctx.lineTo(32, 16);
+    ctx.lineTo(38, 22);
+    ctx.stroke();
+    // Down arrowhead
+    ctx.beginPath();
+    ctx.moveTo(26, 42);
+    ctx.lineTo(32, 48);
+    ctx.lineTo(38, 42);
+    ctx.stroke();
+    
+    const handleIconTexture = new THREE.CanvasTexture(handleCanvas);
+    const handleIconGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
+    const handleIconMaterial = new THREE.MeshBasicMaterial({
+        map: handleIconTexture,
+        transparent: true,
+        depthTest: false
+    });
+    const handleIcon = new THREE.Mesh(handleIconGeometry, handleIconMaterial);
+    handleIcon.position.z = 0.001; // Slightly in front of handle
+    dragHandle.add(handleIcon);
     
     // Set userData for the drag handle
     dragHandle.userData = {
@@ -57,7 +133,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         isDraggable: true
     };
     
-    // Add to the browserWindow
+    // Add the handle to the browserWindow
     browserWindow.add(dragHandle);
     
     // Store reference to the drag handle on the screen object
@@ -70,9 +146,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     scene.add(browserWindow);
     screens.push(browserWindow);
     
-    console.log("Created MINIMAL TEST SCREEN with ID:", browserWindow.userData.id);
-    console.log("Screen UUID:", browserWindow.uuid);
-    console.log("Drag handle UUID:", dragHandle.uuid);
+    console.log("Created screen with ID:", browserWindow.userData.id);
     
     // Select this as the current screen
     selectScreen(browserWindow);
