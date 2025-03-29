@@ -16,24 +16,6 @@ let selectedScreen = null; // Currently selected screen
 let isPlacingScreen = false; // Flag to indicate if user is currently placing a screen
 let newScreen = null; // Reference to a new screen being placed
 let isMovingScreen = false; // Flag to indicate if user is currently moving a screen
-let touchEnabled = true; // Flag to enable touch controls
-let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
-let isTouchMoving = false; // Flag to track if touch movement is in progress
-// New variables for enhanced features
-let fabButton; // Floating action button for adding screens
-let isDraggingScreen = false; // Flag for direct screen dragging
-let screenOffset = new THREE.Vector3(); // Offset for screen dragging
-let isResizingScreen = false; // Flag for screen resizing
-let screenMenu; // Context menu for screen operations
-let floatingUI; // Group for floating UI elements that follow the user
-// Controls for rotation, tilt, and zoom
-let isRotatingScreen = false; // Flag for screen rotation
-let isTiltingScreen = false; // Flag for screen tilting
-let rotationHandle; // Rotation handle reference
-let tiltHandle; // Tilt handle reference
-let initialRotation = new THREE.Euler(); // Store initial rotation
-let initialTilt = new THREE.Euler(); // Store initial tilt
-let videoTexture; // Video texture for funny looping video
 
 init();
 animate();
@@ -65,11 +47,8 @@ function init() {
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
         // Create UI controls once font is loaded
-        createFloatingUI();
+        createControlPanel();
         createVirtualKeyboard();
-        
-        // Load video texture for funny loop
-        loadVideoTexture();
     });
 
     // Controller setup
@@ -97,138 +76,89 @@ function init() {
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
-    
-    // Add touch event listeners
-    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
-// Load a funny looping video
-function loadVideoTexture() {
-    const video = document.createElement('video');
-    video.src = 'https://cdn.glitch.global/3e633414-27f7-41c1-a4c5-f307ecb4e51d/funny-cat.mp4?v=1651234680945';
-    video.crossOrigin = 'anonymous';
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
+function createControlPanel() {
+    const panel = new THREE.Group();
     
-    // Start playing video once it's loaded enough
-    video.addEventListener('canplaythrough', () => {
-        video.play();
-    });
-    
-    // Create video texture
-    videoTexture = new THREE.VideoTexture(video);
-    videoTexture.minFilter = THREE.LinearFilter;
-    videoTexture.magFilter = THREE.LinearFilter;
-    
-    // Update existing screens with video
-    screens.forEach(screen => {
-        addVideoToScreen(screen);
-    });
-}
-
-// Add video to a screen
-function addVideoToScreen(screen) {
-    if (!videoTexture) return;
-    
-    // Video container
-    const videoGeometry = new THREE.PlaneGeometry(0.25, 0.15);
-    const videoMaterial = new THREE.MeshBasicMaterial({
-        map: videoTexture,
+    // Panel background
+    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.15);
+    const panelMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444,
         side: THREE.DoubleSide
     });
-    const videoPanel = new THREE.Mesh(videoGeometry, videoMaterial);
-    videoPanel.position.set(0.25, 0.1, 0.002); // Position beside text
-    videoPanel.userData = { type: 'video' };
-    screen.add(videoPanel);
-}
-
-// Replace the control panel with a floating UI that follows the user
-function createFloatingUI() {
-    // Create a group for all floating UI elements
-    floatingUI = new THREE.Group();
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    panel.add(panelMesh);
     
-    // Create Floating Action Button (FAB) for adding screens
-    const fabGeometry = new THREE.CircleGeometry(0.05, 32);
-    const fabMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x4CAF50, // Green color
+    // New Screen button
+    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
+    const buttonMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x666666,
         side: THREE.DoubleSide
     });
-    fabButton = new THREE.Mesh(fabGeometry, fabMaterial);
+    const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    newScreenButton.position.set(0, 0.04, 0.001);
+    newScreenButton.userData = { type: 'button', action: 'newScreen' };
+    panel.add(newScreenButton);
     
-    // Create plus icon for the FAB
-    const plusCanvas = document.createElement('canvas');
-    plusCanvas.width = 128;
-    plusCanvas.height = 128;
-    const plusCtx = plusCanvas.getContext('2d');
-    plusCtx.fillStyle = '#ffffff';
-    plusCtx.fillRect(54, 24, 20, 80); // Vertical bar
-    plusCtx.fillRect(24, 54, 80, 20); // Horizontal bar
+    // New Screen button label
+    const buttonCanvas = document.createElement('canvas');
+    buttonCanvas.width = 256;
+    buttonCanvas.height = 64;
+    const btnCtx = buttonCanvas.getContext('2d');
+    btnCtx.fillStyle = '#ffffff';
+    btnCtx.font = '24px Arial';
+    btnCtx.textAlign = 'center';
+    btnCtx.textBaseline = 'middle';
+    btnCtx.fillText('Add New Screen', 128, 32);
     
-    const plusTexture = new THREE.CanvasTexture(plusCanvas);
-    const plusGeometry = new THREE.CircleGeometry(0.04, 32);
-    const plusMaterial = new THREE.MeshBasicMaterial({ 
-        map: plusTexture,
+    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+    const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
+    const buttonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: buttonTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const plusIcon = new THREE.Mesh(plusGeometry, plusMaterial);
-    plusIcon.position.z = 0.001;
+    const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
+    buttonLabel.position.set(0, 0.04, 0.002);
+    panel.add(buttonLabel);
     
-    fabButton.add(plusIcon);
-    fabButton.userData = { type: 'button', action: 'newScreen' };
+    // Move Screen button
+    const moveButtonMaterial = buttonMaterial.clone();
+    const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
+    moveScreenButton.position.set(0, -0.04, 0.001);
+    moveScreenButton.userData = { type: 'button', action: 'moveScreen' };
+    panel.add(moveScreenButton);
     
-    // Add a subtle shadow/glow effect to make the FAB stand out
-    const glowGeometry = new THREE.CircleGeometry(0.06, 32);
-    const glowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x000000, 
-        transparent: true, 
-        opacity: 0.2,
+    // Move Screen button label
+    const moveButtonCanvas = document.createElement('canvas');
+    moveButtonCanvas.width = 256;
+    moveButtonCanvas.height = 64;
+    const moveBtnCtx = moveButtonCanvas.getContext('2d');
+    moveBtnCtx.fillStyle = '#ffffff';
+    moveBtnCtx.font = '24px Arial';
+    moveBtnCtx.textAlign = 'center';
+    moveBtnCtx.textBaseline = 'middle';
+    moveBtnCtx.fillText('Move Selected Screen', 128, 32);
+    
+    const moveButtonTexture = new THREE.CanvasTexture(moveButtonCanvas);
+    const moveButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
+        map: moveButtonTexture,
+        transparent: true,
         side: THREE.DoubleSide
     });
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.position.z = -0.001;
-    fabButton.add(glow);
+    const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
+    moveButtonLabel.position.set(0, -0.04, 0.002);
+    panel.add(moveButtonLabel);
     
-    // Position the FAB in the lower right corner of the user's view
-    fabButton.position.set(0.2, -0.2, -0.5);
-    floatingUI.add(fabButton);
-    
-    // Create a tooltip for the FAB
-    const tooltipCanvas = document.createElement('canvas');
-    tooltipCanvas.width = 256;
-    tooltipCanvas.height = 64;
-    const tooltipCtx = tooltipCanvas.getContext('2d');
-    tooltipCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    tooltipCtx.roundRect(0, 0, 256, 64, 10);
-    tooltipCtx.fill();
-    tooltipCtx.fillStyle = '#ffffff';
-    tooltipCtx.font = '20px Arial';
-    tooltipCtx.textAlign = 'center';
-    tooltipCtx.textBaseline = 'middle';
-    tooltipCtx.fillText('Add New Screen', 128, 32);
-    
-    const tooltipTexture = new THREE.CanvasTexture(tooltipCanvas);
-    const tooltipGeometry = new THREE.PlaneGeometry(0.2, 0.05);
-    const tooltipMaterial = new THREE.MeshBasicMaterial({ 
-        map: tooltipTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        opacity: 0.9
-    });
-    const tooltip = new THREE.Mesh(tooltipGeometry, tooltipMaterial);
-    tooltip.position.set(0.2, -0.12, -0.5); // Position above the FAB
-    tooltip.visible = false; // Hide initially
-    fabButton.userData.tooltip = tooltip;
-    floatingUI.add(tooltip);
-    
-    // Add the floating UI to the scene
-    scene.add(floatingUI);
+    // Position the control panel on user's left
+    panel.position.set(-0.5, 0, -0.8);
+    panel.rotation.y = Math.PI / 6; // Angle slightly toward user
+    panel.userData = { type: 'controlPanel' };
+    scene.add(panel);
 }
 
-function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
+function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -0.8)) {
     const browserWindow = new THREE.Group();
     
     // Browser background with border
@@ -293,176 +223,17 @@ function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
     contentPanel.position.z = 0.001;
     browserWindow.add(contentPanel);
     
-    // Add close button
-    const closeButtonGeometry = new THREE.CircleGeometry(0.02, 32);
-    const closeButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff5252, // Red color
-        side: THREE.DoubleSide
-    });
-    const closeButton = new THREE.Mesh(closeButtonGeometry, closeButtonMaterial);
-    closeButton.position.set(0.37, 0.28, 0.002);
-    closeButton.userData = { type: 'button', action: 'closeScreen' };
-    browserWindow.add(closeButton);
-    
-    // Add X icon to close button
-    const xCanvas = document.createElement('canvas');
-    xCanvas.width = 64;
-    xCanvas.height = 64;
-    const xCtx = xCanvas.getContext('2d');
-    xCtx.strokeStyle = '#ffffff';
-    xCtx.lineWidth = 6;
-    xCtx.beginPath();
-    xCtx.moveTo(16, 16);
-    xCtx.lineTo(48, 48);
-    xCtx.moveTo(48, 16);
-    xCtx.lineTo(16, 48);
-    xCtx.stroke();
-    
-    const xTexture = new THREE.CanvasTexture(xCanvas);
-    const xGeometry = new THREE.CircleGeometry(0.015, 32);
-    const xMaterial = new THREE.MeshBasicMaterial({ 
-        map: xTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const xIcon = new THREE.Mesh(xGeometry, xMaterial);
-    xIcon.position.set(0.37, 0.28, 0.003);
-    browserWindow.add(xIcon);
-    
-    // Add resize handle
-    const resizeHandleGeometry = new THREE.PlaneGeometry(0.04, 0.04);
-    const resizeHandleMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x9e9e9e,
-        transparent: true,
-        opacity: 0.7,
-        side: THREE.DoubleSide
-    });
-    const resizeHandle = new THREE.Mesh(resizeHandleGeometry, resizeHandleMaterial);
-    resizeHandle.position.set(0.38, -0.28, 0.002);
-    resizeHandle.userData = { type: 'button', action: 'resizeScreen' };
-    browserWindow.add(resizeHandle);
-    
-    // Add resize icon
-    const resizeCanvas = document.createElement('canvas');
-    resizeCanvas.width = 64;
-    resizeCanvas.height = 64;
-    const resizeCtx = resizeCanvas.getContext('2d');
-    resizeCtx.strokeStyle = '#ffffff';
-    resizeCtx.lineWidth = 4;
-    resizeCtx.beginPath();
-    // Draw diagonal lines in the corner
-    resizeCtx.moveTo(32, 48);
-    resizeCtx.lineTo(48, 32);
-    resizeCtx.moveTo(24, 48);
-    resizeCtx.lineTo(48, 24);
-    resizeCtx.moveTo(16, 48);
-    resizeCtx.lineTo(48, 16);
-    resizeCtx.stroke();
-    
-    const resizeTexture = new THREE.CanvasTexture(resizeCanvas);
-    const resizeIconGeometry = new THREE.PlaneGeometry(0.03, 0.03);
-    const resizeIconMaterial = new THREE.MeshBasicMaterial({ 
-        map: resizeTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const resizeIcon = new THREE.Mesh(resizeIconGeometry, resizeIconMaterial);
-    resizeIcon.position.set(0.38, -0.28, 0.003);
-    browserWindow.add(resizeIcon);
-    
-    // Add rotation handle
-    const rotationHandleGeometry = new THREE.CircleGeometry(0.02, 32);
-    const rotationHandleMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x2196F3, // Blue color
-        side: THREE.DoubleSide
-    });
-    rotationHandle = new THREE.Mesh(rotationHandleGeometry, rotationHandleMaterial);
-    rotationHandle.position.set(-0.38, 0.28, 0.002);
-    rotationHandle.userData = { type: 'button', action: 'rotateScreen' };
-    browserWindow.add(rotationHandle);
-    
-    // Add rotation icon
-    const rotationCanvas = document.createElement('canvas');
-    rotationCanvas.width = 64;
-    rotationCanvas.height = 64;
-    const rotationCtx = rotationCanvas.getContext('2d');
-    rotationCtx.strokeStyle = '#ffffff';
-    rotationCtx.lineWidth = 4;
-    rotationCtx.beginPath();
-    rotationCtx.arc(32, 32, 20, 0, 1.5 * Math.PI);
-    rotationCtx.moveTo(32, 12);
-    rotationCtx.lineTo(25, 18);
-    rotationCtx.moveTo(32, 12);
-    rotationCtx.lineTo(39, 18);
-    rotationCtx.stroke();
-    
-    const rotationTexture = new THREE.CanvasTexture(rotationCanvas);
-    const rotationIconGeometry = new THREE.CircleGeometry(0.015, 32);
-    const rotationIconMaterial = new THREE.MeshBasicMaterial({ 
-        map: rotationTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const rotationIcon = new THREE.Mesh(rotationIconGeometry, rotationIconMaterial);
-    rotationIcon.position.set(-0.38, 0.28, 0.003);
-    browserWindow.add(rotationIcon);
-    
-    // Add tilt handle
-    const tiltHandleGeometry = new THREE.CircleGeometry(0.02, 32);
-    const tiltHandleMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xFF9800, // Orange color
-        side: THREE.DoubleSide
-    });
-    tiltHandle = new THREE.Mesh(tiltHandleGeometry, tiltHandleMaterial);
-    tiltHandle.position.set(-0.38, -0.28, 0.002);
-    tiltHandle.userData = { type: 'button', action: 'tiltScreen' };
-    browserWindow.add(tiltHandle);
-    
-    // Add tilt icon
-    const tiltCanvas = document.createElement('canvas');
-    tiltCanvas.width = 64;
-    tiltCanvas.height = 64;
-    const tiltCtx = tiltCanvas.getContext('2d');
-    tiltCtx.strokeStyle = '#ffffff';
-    tiltCtx.lineWidth = 4;
-    tiltCtx.beginPath();
-    tiltCtx.moveTo(22, 22);
-    tiltCtx.lineTo(42, 42);
-    tiltCtx.moveTo(22, 22);
-    tiltCtx.lineTo(12, 32);
-    tiltCtx.moveTo(42, 42);
-    tiltCtx.lineTo(52, 32);
-    tiltCtx.stroke();
-    
-    const tiltTexture = new THREE.CanvasTexture(tiltCanvas);
-    const tiltIconGeometry = new THREE.CircleGeometry(0.015, 32);
-    const tiltIconMaterial = new THREE.MeshBasicMaterial({ 
-        map: tiltTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const tiltIcon = new THREE.Mesh(tiltIconGeometry, tiltIconMaterial);
-    tiltIcon.position.set(-0.38, -0.28, 0.003);
-    browserWindow.add(tiltIcon);
-    
     // Position the window
     browserWindow.position.copy(position);
     browserWindow.userData = { 
         type: 'screen', 
         id: screens.length, 
         isSelected: false,
-        content: `Screen ${screens.length + 1} Content`,
-        originalScale: new THREE.Vector3(1, 1, 1), // Store original scale for resizing
-        initialRotation: new THREE.Euler() // Store initial rotation for rotation
+        content: `Screen ${screens.length + 1} Content`
     };
     
     scene.add(browserWindow);
     screens.push(browserWindow);
-    
-    // Add video if available
-    if (videoTexture) {
-        addVideoToScreen(browserWindow);
-    }
     
     // Set this as the selected screen
     selectScreen(browserWindow);
@@ -511,258 +282,6 @@ function createBrowserContentTexture(screenNumber) {
     texture.needsUpdate = true;
     
     return texture;
-}
-
-// Enhanced touch handling for direct screen manipulation
-function onTouchStart(event) {
-    if (!touchEnabled || !event.touches[0]) return;
-    
-    event.preventDefault();
-    
-    // Store initial touch position
-    initialTouchPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-    initialTouchPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-    
-    // Cast ray from touch position
-    raycaster.setFromCamera(initialTouchPosition, camera);
-    
-    // Check for FAB button interaction
-    const fabIntersects = raycaster.intersectObject(fabButton);
-    if (fabIntersects.length > 0) {
-        // Create a new screen in front of the camera
-        const position = new THREE.Vector3(0, 0, -1.2);
-        position.applyMatrix4(camera.matrixWorld);
-        
-        newScreen = createNewBrowserScreen(position);
-        
-        // Visual feedback for button press
-        const originalColor = fabButton.material.color.clone();
-        fabButton.material.color.set(0x8BC34A); // Lighter green for feedback
-        setTimeout(() => {
-            fabButton.material.color.copy(originalColor);
-        }, 200);
-        return;
-    }
-    
-    // Check for screen interaction
-    let screenIntersects = [];
-    screens.forEach(screen => {
-        // Check all interactive elements of the screen
-        const screenParts = screen.children.filter(child => 
-            child.userData && (child.userData.type === 'button' || !child.userData.type));
-        
-        const intersects = raycaster.intersectObjects(screenParts);
-        if (intersects.length > 0) {
-            // Store the screen and the specific intersected part
-            intersects.forEach(intersect => {
-                intersect.object.parent = screen; // Ensure the parent reference is set
-                screenIntersects.push(intersect);
-            });
-        }
-    });
-    
-    // Sort by distance
-    screenIntersects.sort((a, b) => a.distance - b.distance);
-    
-    if (screenIntersects.length > 0) {
-        const intersect = screenIntersects[0];
-        const screen = intersect.object.parent;
-        const part = intersect.object;
-        
-        // Select the screen first
-        selectScreen(screen);
-        
-        // Check if we clicked a special button
-        if (part.userData && part.userData.type === 'button') {
-            if (part.userData.action === 'closeScreen') {
-                // Remove the screen
-                scene.remove(screen);
-                screens = screens.filter(s => s !== screen);
-                if (selectedScreen === screen) {
-                    selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
-                    if (selectedScreen) {
-                        selectScreen(selectedScreen);
-                    }
-                }
-                return;
-            }
-            
-            if (part.userData.action === 'resizeScreen') {
-                // Start resizing the screen
-                isResizingScreen = true;
-                return;
-            }
-            
-            if (part.userData.action === 'rotateScreen') {
-                // Start rotating the screen
-                isRotatingScreen = true;
-                // Store initial rotation
-                initialRotation.copy(selectedScreen.rotation);
-                return;
-            }
-            
-            if (part.userData.action === 'tiltScreen') {
-                // Start tilting the screen
-                isTiltingScreen = true;
-                // Store initial tilt
-                initialTilt.copy(selectedScreen.rotation);
-                return;
-            }
-        }
-        
-        // Otherwise start dragging the screen
-        isDraggingScreen = true;
-        
-        // Calculate the offset from the touch point to the screen center
-        // This ensures we drag from the point we touched, not from the center
-        const intersectionPoint = intersect.point.clone();
-        screenOffset.copy(screen.position).sub(intersectionPoint);
-        
-        return;
-    }
-}
-
-function onTouchMove(event) {
-    if (!touchEnabled || !event.touches[0]) return;
-    
-    event.preventDefault();
-    
-    // Get current touch position
-    const currentTouchPosition = new THREE.Vector2(
-        (event.touches[0].clientX / window.innerWidth) * 2 - 1,
-        -(event.touches[0].clientY / window.innerHeight) * 2 + 1
-    );
-    
-    // Update raycaster with new touch position
-    raycaster.setFromCamera(currentTouchPosition, camera);
-    
-    if (isDraggingScreen && selectedScreen) {
-        // Get the ray's intersection with the z-plane of the screen
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
-        
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Move the screen to the new position, accounting for the initial offset
-        selectedScreen.position.copy(intersectionPoint.add(screenOffset));
-        
-        // Update keyboard position if visible
-        if (virtualKeyboard && virtualKeyboard.visible) {
-            updateKeyboardPosition();
-        }
-        
-        return;
-    }
-    
-    if (isResizingScreen && selectedScreen) {
-        // Get ray intersection with screen plane
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(selectedScreen.quaternion);
-        
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Calculate distance from screen center to touch point
-        const distanceX = Math.abs(intersectionPoint.x - selectedScreen.position.x);
-        const distanceY = Math.abs(intersectionPoint.y - selectedScreen.position.y);
-        
-        // Calculate new scale (with some constraints)
-        const newScaleX = Math.max(0.5, Math.min(2.0, distanceX * 2.5));
-        const newScaleY = Math.max(0.5, Math.min(2.0, distanceY * 2.5));
-        
-        // Apply new scale
-        selectedScreen.scale.set(newScaleX, newScaleY, 1);
-        
-        return;
-    }
-    
-    if (isRotatingScreen && selectedScreen) {
-        // Get ray intersection with screen plane
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
-        
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Calculate angle between initial and current positions
-        const screenCenter = selectedScreen.position.clone();
-        const initialVector = new THREE.Vector2(0, 1); // Up vector as reference
-        const currentVector = new THREE.Vector2(
-            intersectionPoint.x - screenCenter.x,
-            intersectionPoint.y - screenCenter.y
-        ).normalize();
-        
-        // Calculate angle between vectors
-        let angle = Math.atan2(currentVector.y, currentVector.x) - Math.atan2(initialVector.y, initialVector.x);
-        
-        // Apply rotation around z-axis (can add more axes for more complex rotation)
-        selectedScreen.rotation.z = angle;
-        
-        return;
-    }
-    
-    if (isTiltingScreen && selectedScreen) {
-        // Get ray intersection with screen plane
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
-        
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Calculate tilt based on vertical distance from center
-        const screenCenter = selectedScreen.position.clone();
-        const verticalDelta = intersectionPoint.y - screenCenter.y;
-        
-        // Apply tilt around x-axis
-        const tiltAmount = verticalDelta * 2; // Scale factor for more pronounced tilt
-        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, tiltAmount));
-        
-        return;
-    }
-}
-
-function onTouchEnd(event) {
-    isDraggingScreen = false;
-    isResizingScreen = false;
-    isRotatingScreen = false;
-    isTiltingScreen = false;
-    isTouchMoving = false;
-    isMovingScreen = false;
-}
-
-function updateKeyboardPosition() {
-    if (!selectedScreen || !virtualKeyboard) return;
-    
-    const screenPos = selectedScreen.position.clone();
-    const screenScale = selectedScreen.scale.clone();
-    
-    // Position keyboard under selected screen, accounting for screen scale
-    virtualKeyboard.position.set(
-        screenPos.x, 
-        screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
-        screenPos.z + 0.02
-    );
-    
-    // Scale keyboard proportionally to screen
-    const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
-    virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
-    
-    // Make keyboard face the user
-    virtualKeyboard.lookAt(camera.position);
-    virtualKeyboard.rotation.x = -Math.PI / 8;
 }
 
 function createVirtualKeyboard() {
@@ -909,12 +428,36 @@ function selectScreen(screen) {
         
         // Position keyboard under selected screen if needed
         if (virtualKeyboard) {
-            updateKeyboardPosition();
+            const screenPos = selectedScreen.position.clone();
+            virtualKeyboard.position.set(screenPos.x, screenPos.y - 0.45, screenPos.z + 0.02);
+            virtualKeyboard.lookAt(camera.position);
+            virtualKeyboard.rotation.x = -Math.PI / 8;
         }
     }
 }
 
-// Enhanced controller interaction
+function onSelectStart(event) {
+    if (isPlacingScreen || isMovingScreen) {
+        // We're in placement mode, so select start begins the commitment
+        return;
+    }
+}
+
+function onSelectEnd(event) {
+    if (isPlacingScreen && newScreen) {
+        // Finalize the placement of the new screen
+        isPlacingScreen = false;
+        newScreen = null;
+        return;
+    }
+    
+    if (isMovingScreen && selectedScreen) {
+        // Finalize the movement of the selected screen
+        isMovingScreen = false;
+        return;
+    }
+}
+
 function onSelect(event) {
     // Raycast to detect interactive elements
     const tempMatrix = new THREE.Matrix4();
@@ -922,103 +465,26 @@ function onSelect(event) {
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
-    // Check for FAB button interaction
-    const fabIntersects = raycaster.intersectObject(fabButton);
-    if (fabIntersects.length > 0) {
-        // Create a new screen at controller position + direction
-        isPlacingScreen = true;
-        
-        const position = new THREE.Vector3();
-        position.setFromMatrixPosition(controller.matrixWorld);
-        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
-        position.addScaledVector(direction, 0.8);
-        
-        newScreen = createNewBrowserScreen(position);
-        
-        // Visual feedback for button press
-        const originalColor = fabButton.material.color.clone();
-        fabButton.material.color.set(0x8BC34A); // Lighter green for feedback
-        setTimeout(() => {
-            fabButton.material.color.copy(originalColor);
-        }, 200);
-        
+    if (isPlacingScreen) {
+        // Finalize placement of new screen
+        isPlacingScreen = false;
+        newScreen = null;
         return;
     }
     
-    // Check for screen interaction - checking all parts of all screens
-    let screenIntersects = [];
-    screens.forEach(screen => {
-        // Check all interactive elements of the screen
-        const screenParts = screen.children.filter(child => 
-            child.userData && (child.userData.type === 'button' || !child.userData.type));
-        
-        const intersects = raycaster.intersectObjects(screenParts);
-        if (intersects.length > 0) {
-            // Store the screen and the specific intersected part
-            intersects.forEach(intersect => {
-                intersect.object.parent = screen; // Ensure the parent reference is set
-                screenIntersects.push(intersect);
-            });
-        }
-    });
+    if (isMovingScreen) {
+        // Finalize movement of selected screen
+        isMovingScreen = false;
+        return;
+    }
     
-    // Sort by distance
-    screenIntersects.sort((a, b) => a.distance - b.distance);
+    // Check for screen selection
+    const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0])); // Intersect with main panel
     
     if (screenIntersects.length > 0) {
-        const intersect = screenIntersects[0];
-        const screen = intersect.object.parent;
-        const part = intersect.object;
-        
-        // Select the screen first
+        const selectedObject = screenIntersects[0].object;
+        const screen = selectedObject.parent;
         selectScreen(screen);
-        
-        // Check if we clicked a special button
-        if (part.userData && part.userData.type === 'button') {
-            if (part.userData.action === 'closeScreen') {
-                // Remove the screen
-                scene.remove(screen);
-                screens = screens.filter(s => s !== screen);
-                if (selectedScreen === screen) {
-                    selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
-                    if (selectedScreen) {
-                        selectScreen(selectedScreen);
-                    }
-                }
-                return;
-            }
-            
-            if (part.userData.action === 'resizeScreen') {
-                // Start resizing the screen
-                isResizingScreen = true;
-                return;
-            }
-            
-            if (part.userData.action === 'rotateScreen') {
-                // Start rotating the screen
-                isRotatingScreen = true;
-                // Store initial rotation
-                initialRotation.copy(selectedScreen.rotation);
-                return;
-            }
-            
-            if (part.userData.action === 'tiltScreen') {
-                // Start tilting the screen
-                isTiltingScreen = true;
-                // Store initial tilt
-                initialTilt.copy(selectedScreen.rotation);
-                return;
-            }
-        }
-        
-        // Otherwise start dragging the screen
-        isDraggingScreen = true;
-        
-        // Calculate the offset from the touch point to the screen center
-        // This ensures we drag from the point we touched, not from the center
-        const intersectionPoint = intersect.point.clone();
-        screenOffset.copy(screen.position).sub(intersectionPoint);
-        
         return;
     }
     
@@ -1044,36 +510,57 @@ function onSelect(event) {
             return;
         }
     }
-}
-
-function onSelectStart(event) {
-    // This would handle the start of a controller selection
-    // For advanced cases like showing tooltip on hover before selection
     
-    // Show tooltip for FAB on hover
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    // Check for control panel button interactions
+    const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
+    let controlIntersects = [];
     
-    const fabIntersects = raycaster.intersectObject(fabButton);
-    if (fabIntersects.length > 0 && fabButton.userData.tooltip) {
-        fabButton.userData.tooltip.visible = true;
-    }
-}
-
-function onSelectEnd(event) {
-    // Reset states when controller selection ends
-    isDraggingScreen = false;
-    isResizingScreen = false;
-    isRotatingScreen = false;
-    isTiltingScreen = false;
-    isPlacingScreen = false;
-    isMovingScreen = false;
+    controlPanels.forEach(panel => {
+        // Get all button children
+        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
+        const buttonIntersects = raycaster.intersectObjects(buttons);
+        controlIntersects = controlIntersects.concat(buttonIntersects);
+    });
     
-    // Hide tooltip
-    if (fabButton && fabButton.userData.tooltip) {
-        fabButton.userData.tooltip.visible = false;
+    if (controlIntersects.length > 0) {
+        const button = controlIntersects[0].object;
+        
+        // Handle button actions
+        if (button.userData.action === 'newScreen') {
+            // Start placing a new screen
+            isPlacingScreen = true;
+            
+            // Create a new screen at controller position + direction
+            const position = new THREE.Vector3();
+            position.setFromMatrixPosition(controller.matrixWorld);
+            const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+            position.addScaledVector(direction, 0.8);
+            
+            newScreen = createNewBrowserScreen(position);
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+            
+            return;
+        }
+        
+        if (button.userData.action === 'moveScreen' && selectedScreen) {
+            // Start moving the selected screen
+            isMovingScreen = true;
+            
+            // Visual feedback for button press
+            const originalColor = button.material.color.clone();
+            button.material.color.set(0x4CAF50);
+            setTimeout(() => {
+                button.material.color.copy(originalColor);
+            }, 200);
+            
+            return;
+        }
     }
 }
 
@@ -1088,121 +575,26 @@ function animate() {
 }
 
 function render() {
-    // Update floating UI to always face the user and stay in view
-    if (floatingUI) {
-        // Position the floating UI to follow the camera
-        const cameraWorldPosition = new THREE.Vector3();
-        camera.getWorldPosition(cameraWorldPosition);
+    // Handle screen placement or movement
+    if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
+        const target = isPlacingScreen ? newScreen : selectedScreen;
         
-        // Calculate position relative to camera view
-        const cameraDirection = new THREE.Vector3(0, 0, -1);
-        cameraDirection.applyQuaternion(camera.quaternion);
-        
-        floatingUI.position.copy(cameraWorldPosition);
-        floatingUI.position.addScaledVector(cameraDirection, -0.5); // Position it 0.5 units in front
-        
-        // Shift to bottom right corner
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyQuaternion(camera.quaternion);
-        const up = new THREE.Vector3(0, 1, 0);
-        up.applyQuaternion(camera.quaternion);
-        
-        floatingUI.position.addScaledVector(right, 0.2);
-        floatingUI.position.addScaledVector(up, -0.2);
-        
-        // Make it face the user
-        floatingUI.lookAt(cameraWorldPosition);
-    }
-    
-    // Handle screen dragging with controller
-    if (isDraggingScreen && selectedScreen) {
-        // Get controller position
-        const controllerPosition = new THREE.Vector3();
-        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
-        
-        // Get controller direction
+        // Get controller position and direction
         const tempMatrix = new THREE.Matrix4();
         tempMatrix.identity().extractRotation(controller.matrixWorld);
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(controller.matrixWorld);
         const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
         
-        // Cast ray from controller
-        raycaster.ray.origin.copy(controllerPosition);
-        raycaster.ray.direction.copy(direction);
+        // Set position in front of controller
+        const targetPosition = position.clone().addScaledVector(direction, 0.8);
+        target.position.copy(targetPosition);
         
-        // Create a plane perpendicular to the camera view
-        const planeNormal = new THREE.Vector3(0, 0, 1);
-        planeNormal.applyQuaternion(camera.quaternion);
-        
-        const plane = new THREE.Plane();
-        plane.setFromNormalAndCoplanarPoint(planeNormal, selectedScreen.position);
-        
-        // Get intersection point with plane
-        const intersectionPoint = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersectionPoint);
-        
-        // Move the screen to the new position, considering the initial offset
-        selectedScreen.position.copy(intersectionPoint.add(screenOffset));
-        
-        // Update keyboard position if visible
-        if (virtualKeyboard && virtualKeyboard.visible) {
-            updateKeyboardPosition();
-        }
+        // Make screen face the user
+        target.lookAt(camera.position);
     }
     
-    // Handle screen resizing with controller
-    if (isResizingScreen && selectedScreen) {
-        // Get controller position
-        const controllerPosition = new THREE.Vector3();
-        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
-        
-        // Calculate distance from screen center to controller
-        const distanceX = Math.abs(controllerPosition.x - selectedScreen.position.x);
-        const distanceY = Math.abs(controllerPosition.y - selectedScreen.position.y);
-        
-        // Calculate new scale (with constraints)
-        const newScaleX = Math.max(0.5, Math.min(2.0, distanceX * 2.5));
-        const newScaleY = Math.max(0.5, Math.min(2.0, distanceY * 2.5));
-        
-        // Apply new scale
-        selectedScreen.scale.set(newScaleX, newScaleY, 1);
-    }
-    
-    // Handle screen rotation with controller
-    if (isRotatingScreen && selectedScreen) {
-        // Get controller position
-        const controllerPosition = new THREE.Vector3();
-        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
-        
-        // Calculate angle between screen center and controller
-        const screenCenter = selectedScreen.position.clone();
-        const direction = new THREE.Vector2(
-            controllerPosition.x - screenCenter.x,
-            controllerPosition.y - screenCenter.y
-        ).normalize();
-        
-        // Calculate rotation angle
-        const angle = Math.atan2(direction.y, direction.x) - Math.PI/2;
-        
-        // Apply rotation around z-axis
-        selectedScreen.rotation.z = angle;
-    }
-    
-    // Handle screen tilting with controller
-    if (isTiltingScreen && selectedScreen) {
-        // Get controller position
-        const controllerPosition = new THREE.Vector3();
-        controllerPosition.setFromMatrixPosition(controller.matrixWorld);
-        
-        // Calculate tilt based on vertical distance from center
-        const screenCenter = selectedScreen.position.clone();
-        const verticalDelta = controllerPosition.y - screenCenter.y;
-        
-        // Apply tilt around x-axis
-        const tiltAmount = verticalDelta * 2; // Scale factor for more pronounced tilt
-        selectedScreen.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, tiltAmount));
-    }
-    
-    // Handle keyboard key hover effects
+    // Highlight keys when hovered
     if (controller && virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
         // Reset previously selected key if any
         if (selectedKey) {
