@@ -73,6 +73,13 @@ function getButtonFromIntersect(object) {
         return object.parent;
     }
     
+    // If we hit a grandchild of a button
+    if (object.parent && object.parent.parent && 
+        object.parent.parent.userData && 
+        object.parent.parent.userData.type === 'button') {
+        return object.parent.parent;
+    }
+    
     return null;
 }
 
@@ -167,8 +174,8 @@ function handleButtonAction(button) {
         toggleVideoPlayback();
     } else if (action === 'volumeButton') {
         toggleVideoMute();
-    } else if (action === 'fullscreenButton') {
-        toggleFullscreen(button.userData.screen);
+    } else if (action === 'resizeButton') {
+        toggleResize(button.userData.screen);
     }
 }
 
@@ -260,7 +267,46 @@ function toggleRotateMode(button) {
     console.log("Rotate mode:", isRotateModeActive ? "activated" : "deactivated");
 }
 
-// Toggle fullscreen for a screen
+// Toggle resize for a screen
+function toggleResize(screen) {
+    if (!screen) return;
+    
+    // Check current scale
+    const currentScale = screen.scale.x;
+    
+    // Store original scale if not already stored
+    if (!screen.userData.hasOwnProperty('originalScale')) {
+        screen.userData.originalScale = screen.scale.clone();
+    }
+    
+    // Toggle between sizes
+    if (Math.abs(currentScale - 1.0) < 0.1) {
+        // Scale up to 1.5x
+        screen.scale.set(1.5, 1.5, 1);
+        
+        // Create visual feedback for resize
+        createModeChangeIndicator('Screen Enlarged');
+    } else if (Math.abs(currentScale - 1.5) < 0.1) {
+        // Scale up to 2.0x
+        screen.scale.set(2.0, 2.0, 1);
+        
+        // Create visual feedback for resize
+        createModeChangeIndicator('Screen Maximized');
+    } else {
+        // Return to original scale
+        screen.scale.set(1.0, 1.0, 1);
+        
+        // Create visual feedback for resize
+        createModeChangeIndicator('Screen Reset');
+    }
+    
+    // Provide haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
+    }
+}
+
+// Toggle fullscreen for a screen (kept for backward compatibility)
 function toggleFullscreen(screen) {
     if (!screen) return;
     
@@ -273,6 +319,9 @@ function toggleFullscreen(screen) {
         // Move forward slightly
         screen.userData.originalPosition = screen.position.clone();
         screen.position.z += 0.2;
+        
+        // Create visual feedback
+        createModeChangeIndicator('Fullscreen Mode');
     } else {
         // Return to original scale
         if (screen.userData.originalScale) {
@@ -285,6 +334,14 @@ function toggleFullscreen(screen) {
         if (screen.userData.originalPosition) {
             screen.position.copy(screen.userData.originalPosition);
         }
+        
+        // Create visual feedback
+        createModeChangeIndicator('Normal Mode');
+    }
+    
+    // Provide haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
     }
 }
 
@@ -296,7 +353,7 @@ function findButtonByAction(action) {
         button.userData.action === action);
 }
 
-// Find all buttons in the scene
+// Find all buttons in the scene with improved detection
 function findAllButtons() {
     let buttons = [];
     
@@ -317,6 +374,9 @@ function findAllButtons() {
         screen.children.forEach(child => {
             if (child.userData && child.userData.type === 'button') {
                 buttons.push(child);
+                
+                // Ensure button is always interactive by setting renderOrder
+                child.renderOrder = 10; // Higher renderOrder ensures it renders on top
             }
         });
     });
@@ -413,17 +473,15 @@ function onTouchStart(event) {
             // Store intersection point for drag calculations
             screenOffset.copy(screenObj.position).sub(screenIntersects[0].point);
             
-            // Double tap to toggle fullscreen
+            // Double tap to toggle resize (instead of fullscreen)
             if (doubleTapDetected) {
-                toggleFullscreen(screenObj);
+                toggleResize(screenObj);
                 
                 // Provide haptic feedback if available
                 if (navigator.vibrate) {
                     navigator.vibrate([30, 20, 30]);
                 }
                 
-                // Visual fullscreen feedback
-                createModeChangeIndicator('Fullscreen Toggled');
                 return;
             }
             

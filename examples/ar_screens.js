@@ -28,6 +28,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     });
     const shadowPanel = new THREE.Mesh(shadowGeometry, shadowMaterial);
     shadowPanel.position.z = -0.01;
+    shadowPanel.renderOrder = 0; // Lowest render order (back)
     browserWindow.add(shadowPanel);
     
     // Modern border with rounded corners effect
@@ -40,6 +41,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.005;
+    borderPanel.renderOrder = 1;
     browserWindow.add(borderPanel);
     
     // Browser background - main content area
@@ -49,7 +51,25 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         side: THREE.DoubleSide
     });
     const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
+    browserPanel.renderOrder = 2;
     browserWindow.add(browserPanel);
+    
+    // Content area with video - moved back to avoid blocking interactions
+    const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
+    
+    // Check if video texture is available, otherwise use static content
+    const contentMaterial = videoTexture ? 
+        new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide }) :
+        new THREE.MeshBasicMaterial({ 
+            map: createFallbackTexture(screens.length + 1),
+            side: THREE.DoubleSide
+        });
+        
+    const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
+    contentPanel.position.y = screenHeight * 0.05; // Centered in window
+    contentPanel.position.z = 0.001; // MOVED BACK so it doesn't block interactions
+    contentPanel.renderOrder = 3; // Video content
+    browserWindow.add(contentPanel);
     
     // Modern header bar
     const headerGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight * 0.12);
@@ -59,7 +79,8 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     });
     const headerBar = new THREE.Mesh(headerGeometry, headerMaterial);
     headerBar.position.y = screenHeight * 0.44;
-    headerBar.position.z = 0.001;
+    headerBar.position.z = 0.002;
+    headerBar.renderOrder = 4; // Above video
     browserWindow.add(headerBar);
     
     // Create title for the screen with modern font style
@@ -81,24 +102,9 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         side: THREE.DoubleSide
     });
     const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
-    titleMesh.position.set(-screenWidth * 0.05, screenHeight * 0.44, 0.002);
+    titleMesh.position.set(-screenWidth * 0.05, screenHeight * 0.44, 0.003);
+    titleMesh.renderOrder = 5; // Above header
     browserWindow.add(titleMesh);
-    
-    // Content area with video - moved forward slightly to avoid clipping
-    const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
-    
-    // Check if video texture is available, otherwise use static content
-    const contentMaterial = videoTexture ? 
-        new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide }) :
-        new THREE.MeshBasicMaterial({ 
-            map: createFallbackTexture(screens.length + 1),
-            side: THREE.DoubleSide
-        });
-        
-    const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
-    contentPanel.position.y = screenHeight * 0.05; // Centered in window
-    contentPanel.position.z = 0.005; // Moved forward to avoid clipping
-    browserWindow.add(contentPanel);
     
     // Modern control bar
     const controlBarGeometry = new THREE.PlaneGeometry(contentWidth, screenHeight * 0.1);
@@ -110,7 +116,8 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     });
     const controlBar = new THREE.Mesh(controlBarGeometry, controlBarMaterial);
     controlBar.position.y = -screenHeight * 0.38; // Position at bottom of content
-    controlBar.position.z = 0.006; // In front of video
+    controlBar.position.z = 0.002; // Ensure it's in front of video
+    controlBar.renderOrder = 6; // Above video content
     browserWindow.add(controlBar);
     
     // Add progress bar with modern design
@@ -121,7 +128,8 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     });
     const progressBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
     progressBg.position.y = -screenHeight * 0.33; // Top of control bar
-    progressBg.position.z = 0.007;
+    progressBg.position.z = 0.003; // Ensure it's in front
+    progressBg.renderOrder = 7; // Above control bar
     browserWindow.add(progressBg);
     
     // Add progress indicator (YouTube red)
@@ -133,7 +141,8 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const progress = new THREE.Mesh(progressGeometry, progressMaterial);
     progress.position.x = -contentWidth * 0.39; // Start from left
     progress.position.y = -screenHeight * 0.33;
-    progress.position.z = 0.008;
+    progress.position.z = 0.004; // Ensure it's in front
+    progress.renderOrder = 8; // Above progress background
     browserWindow.add(progress);
     
     // Create modern control buttons with larger size for better touch
@@ -141,7 +150,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const buttonPositions = [
         { x: -contentWidth * 0.42, y: -screenHeight * 0.42, type: 'play' },
         { x: -contentWidth * 0.32, y: -screenHeight * 0.42, type: 'volume' },
-        { x: contentWidth * 0.42, y: -screenHeight * 0.42, type: 'fullscreen' }
+        { x: contentWidth * 0.42, y: -screenHeight * 0.42, type: 'resize' } // Changed from fullscreen to resize
     ];
     
     buttonPositions.forEach(btn => {
@@ -180,10 +189,12 @@ function addControlButton(screen, type, x, y, size) {
         color: 0x555555,
         transparent: true,
         opacity: 0.8,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        depthTest: false // Disable depth testing for buttons
     });
     const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    button.position.set(x, y, 0.003);
+    button.position.set(x, y, 0.010); // Increased z-position to be in front of everything
+    button.renderOrder = 20; // Very high render order to ensure it's drawn on top
     button.userData = {
         type: 'button',
         action: type + 'Button',
@@ -197,10 +208,12 @@ function addControlButton(screen, type, x, y, size) {
     const iconMaterial = new THREE.MeshBasicMaterial({
         map: iconTexture,
         transparent: true,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        depthTest: false // Disable depth testing for icons
     });
     const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-    iconMesh.position.z = 0.001;
+    iconMesh.position.z = 0.001; // Slightly in front of button
+    iconMesh.renderOrder = 21; // Even higher than the button
     button.add(iconMesh);
     
     screen.add(button);
@@ -250,6 +263,27 @@ function createControlIcon(type) {
             ctx.beginPath();
             ctx.moveTo(44, 18);
             ctx.bezierCurveTo(52, 28, 52, 36, 44, 46);
+            ctx.stroke();
+            break;
+            
+        case 'resize':
+            // Draw resize icon with inward/outward arrows
+            // Outward arrow (top-left)
+            ctx.beginPath();
+            ctx.moveTo(16, 16);
+            ctx.lineTo(28, 16);
+            ctx.lineTo(28, 28);
+            ctx.moveTo(16, 16);
+            ctx.lineTo(28, 28);
+            ctx.stroke();
+            
+            // Inward arrow (bottom-right)
+            ctx.beginPath();
+            ctx.moveTo(48, 48);
+            ctx.lineTo(36, 48);
+            ctx.lineTo(36, 36);
+            ctx.moveTo(48, 48);
+            ctx.lineTo(36, 36);
             ctx.stroke();
             break;
             
