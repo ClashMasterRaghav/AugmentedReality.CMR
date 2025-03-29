@@ -40,6 +40,10 @@
 				cursor: pointer;
 				z-index: 100;
 			}
+			/* Hidden video element for texture */
+			#videoElement {
+				display: none;
+			}
 		</style>
 	</head>
 	<body>
@@ -48,6 +52,11 @@
 			AR Multi-Screen Experience<br />
 			Touch screens to select and move them
 		</div>
+
+		<!-- Hidden video element that will be used as texture -->
+		<video id="videoElement" loop muted crossorigin="anonymous">
+			<source src="textures/ar_videoplayback.mp4" type="video/mp4">
+		</video>
 
 		<script type="importmap">
 			{

@@ -19,6 +19,8 @@ let isMovingScreen = false; // Flag to indicate if user is currently moving a sc
 let touchEnabled = true; // Flag to enable touch controls
 let initialTouchPosition = new THREE.Vector2(); // Store initial touch position
 let isTouchMoving = false; // Flag to track if touch movement is in progress
+let videoTexture; // Texture for video playback
+let videoElement; // HTML video element
 
 init();
 animate();
@@ -42,8 +44,23 @@ function init() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
+    // Setup video texture
+    videoElement = document.getElementById('videoElement');
+    videoTexture = new THREE.VideoTexture(videoElement);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    videoTexture.format = THREE.RGBFormat;
+    
+    // Start video (will be muted)
+    videoElement.play();
+
     // AR Button
-    document.body.appendChild(ARButton.createButton(renderer));
+    document.body.appendChild(
+        ARButton.createButton(renderer, {
+            optionalFeatures: ['dom-overlay'],
+            domOverlay: { root: document.body }
+        })
+    );
 
     // Load font for text
     const fontLoader = new FontLoader();
@@ -68,8 +85,8 @@ function init() {
     scene.add(controllerGrip);
 
     // Pointer for interaction - SMALLER SIZE
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced from 0.01 to 0.005
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Changed color to cyan for better visibility
+    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
     const pointer = new THREE.Mesh(geometry, material);
     pointer.position.z = -0.1;
     controller.add(pointer);
@@ -618,6 +635,11 @@ function animate() {
 }
 
 function render() {
+    // Update video texture if video is playing
+    if (videoElement && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+        videoTexture.needsUpdate = true;
+    }
+
     // Handle screen placement or movement with controller
     if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen && !isTouchMoving)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
