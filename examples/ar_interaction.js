@@ -138,28 +138,55 @@ function onSelect(event) {
 
 // Get screen object from potentially nested mesh
 function getScreenFromIntersect(object) {
+    if (!object) {
+        console.log("getScreenFromIntersect: No object provided");
+        return null;
+    }
+    
+    console.log("getScreenFromIntersect: Checking object", object.uuid);
+    console.log("Object userData:", object.userData ? JSON.stringify(object.userData) : "none");
+    
     // First check if we hit the interaction plane
     if (object.userData && object.userData.type === 'interactionPlane' && object.userData.screen) {
+        console.log("Found interaction plane with screen reference");
         return object.userData.screen;
     }
     
     // If we hit the screen directly
     if (object.userData && object.userData.type === 'screen') {
+        console.log("Found screen directly");
         return object;
     }
     
     // Find parent screen by walking up the hierarchy
     let parent = object.parent;
-    while (parent) {
+    let depth = 0;
+    
+    while (parent && depth < 5) { // Limit depth to avoid infinite loops
+        depth++;
+        console.log("Checking parent at depth", depth, parent.uuid);
+        console.log("Parent userData:", parent.userData ? JSON.stringify(parent.userData) : "none");
+        
         if (parent.userData && parent.userData.type === 'screen') {
+            console.log("Found screen at parent level", depth);
             return parent;
         }
         if (parent.userData && parent.userData.type === 'interactionPlane' && parent.userData.screen) {
+            console.log("Found interaction plane at parent level", depth);
             return parent.userData.screen;
         }
         parent = parent.parent;
     }
     
+    // Last resort - check if this is one of the screen objects in our array
+    for (let i = 0; i < screens.length; i++) {
+        if (screens[i].uuid === object.uuid) {
+            console.log("Found screen by matching UUID in screens array");
+            return screens[i];
+        }
+    }
+    
+    console.log("No screen found from intersection");
     return null;
 }
 
@@ -396,8 +423,15 @@ function findAllButtons() {
 function onTouchStart(event) {
     event.preventDefault();
     
+    console.log("Touch start detected");
+    
+    // EMERGENCY FIX: Always make a touch immediately interactive
+    isTouchMovingScreen = true;
+    console.log("Force enabled touch movement mode");
+    
     // Check for multi-touch (pinch gesture)
     if (event.touches.length === 2 && selectedScreen) {
+        console.log("Two-finger touch detected, starting pinch");
         // Start pinch-to-zoom
         isPinching = true;
         
@@ -405,13 +439,10 @@ function onTouchStart(event) {
         const touch1 = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
         const touch2 = new THREE.Vector2(event.touches[1].clientX, event.touches[1].clientY);
         initialPinchDistance = touch1.distanceTo(touch2);
+        console.log("Initial pinch distance:", initialPinchDistance);
         
         // Store initial scale
         initialScale.copy(selectedScreen.scale);
-        
-        // Disable other touch interactions during pinch
-        isTouchMovingScreen = false;
-        isRotatingScreen = false;
         
         // Provide haptic feedback if available
         if (navigator.vibrate) {
@@ -424,10 +455,19 @@ function onTouchStart(event) {
     // Single touch handling
     const touch = event.touches[0];
     
+    if (!touch) {
+        console.log("No valid touch point");
+        return;
+    }
+    
+    console.log("Processing single touch");
+    
     // Convert touch to normalized device coordinates
     initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     initialTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     currentTouchPosition.copy(initialTouchPosition);
+    
+    console.log("Touch position:", initialTouchPosition.x.toFixed(3), initialTouchPosition.y.toFixed(3));
     
     // Update raycaster
     raycaster.setFromCamera(initialTouchPosition, camera);
@@ -437,13 +477,24 @@ function onTouchStart(event) {
     const doubleTapDetected = (now - lastTapTime) < 300;
     lastTapTime = now;
     
+    // EMERGENCY FIX: Check all screens regardless of intersection
+    if (screens.length > 0 && !selectedScreen) {
+        console.log("No screen selected, selecting first screen as fallback");
+        selectScreen(screens[0]);
+        selectedScreen = screens[0];
+        createModeChangeIndicator('Screen Selected');
+    }
+    
     // Check for button intersections first
     const buttons = findAllButtons();
+    console.log("Checking", buttons.length, "buttons for intersection");
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
         const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
         if (buttonObj) {
+            console.log("Button touched:", buttonObj.userData.action);
+            
             // Visual feedback
             const originalColor = buttonObj.material.color.clone();
             buttonObj.material.color.set(0x4FC3F7);
@@ -469,19 +520,37 @@ function onTouchStart(event) {
     }
     
     // Check for screen intersections - IMPROVED DETECTION
+    console.log("Checking screens for intersection");
+    
+    // EMERGENCY FIX: Add all objects in scene to detection
+    const allObjects = [];
+    scene.traverse(obj => {
+        if (obj.isMesh || obj.isGroup) {
+            allObjects.push(obj);
+        }
+    });
+    console.log("Total scene objects to check:", allObjects.length);
+    const allIntersects = raycaster.intersectObjects(allObjects, true);
+    console.log("Found", allIntersects.length, "total intersections");
+    
+    // Regular approach with explicit screen objects
     const screenObjects = [];
-    screens.forEach(screen => {
+    screens.forEach((screen, index) => {
+        console.log("Adding screen", index, "to detection list");
         screenObjects.push(screen);
         screen.children.forEach(child => {
-            if (child.userData && (child.userData.type === 'interactionPlane' || child.geometry)) {
+            if (child.isMesh) {
                 screenObjects.push(child);
             }
         });
     });
     
+    console.log("Total screen objects to check for intersection:", screenObjects.length);
     const screenIntersects = raycaster.intersectObjects(screenObjects, true);
+    console.log("Found", screenIntersects.length, "screen intersections");
     
     if (screenIntersects.length > 0) {
+        console.log("Hit object:", screenIntersects[0].object.uuid);
         const screenObj = getScreenFromIntersect(screenIntersects[0].object);
         if (screenObj) {
             console.log("Screen touched:", screenObj.userData.id);
@@ -495,6 +564,7 @@ function onTouchStart(event) {
             
             // Double tap to toggle resize
             if (doubleTapDetected) {
+                console.log("Double tap detected, toggling resize");
                 toggleResize(screenObj);
                 
                 // Provide haptic feedback
@@ -506,8 +576,9 @@ function onTouchStart(event) {
                 return;
             }
             
-            // ALWAYS enable screen movement on touch - regardless of mode
+            // IMPORTANT: ALWAYS enable screen movement on touch - regardless of mode
             isTouchMovingScreen = true;
+            console.log("Screen movement enabled:", isTouchMovingScreen);
             
             // Provide haptic feedback
             if (navigator.vibrate) {
@@ -522,10 +593,15 @@ function onTouchStart(event) {
                 isRotatingScreen = true;
                 initialRotation.copy(screenObj.rotation);
                 initialMousePosition.copy(initialTouchPosition);
+                console.log("Rotation mode also enabled");
             }
             
             createModeChangeIndicator('Screen Selected');
+        } else {
+            console.log("No screen found from intersection");
         }
+    } else {
+        console.log("No screen intersections found");
     }
 }
 
@@ -599,13 +675,16 @@ function onTouchMove(event) {
     // Always prevent default to avoid browser gestures
     event.preventDefault();
     
+    // Detailed debug logs
+    console.log("Touch move detected, touches:", event.touches.length);
+    console.log("Selected screen?", selectedScreen ? selectedScreen.userData.id : "none");
+    console.log("isTouchMovingScreen:", isTouchMovingScreen);
+    
     // Bail early if nothing is selected
     if (!selectedScreen) {
+        console.log("No screen selected, ignoring touch move");
         return;
     }
-    
-    // Log touch movement to debug
-    console.log("Touch move detected");
     
     // Handle pinch zoom with two fingers
     if (event.touches.length === 2 && isPinching) {
@@ -615,6 +694,7 @@ function onTouchMove(event) {
         
         // Calculate scale factor based on pinch
         const scaleFactor = currentPinchDistance / initialPinchDistance;
+        console.log("Pinch scaling, factor:", scaleFactor);
         
         // Apply new scale (with limits to prevent too small or too large)
         const newScale = initialScale.clone().multiplyScalar(scaleFactor);
@@ -632,28 +712,72 @@ function onTouchMove(event) {
         return;
     }
     
-    // Single touch handling
+    // Single touch handling for moving screens
     const touch = event.touches[0];
+    
+    // Make sure we have a valid touch point
+    if (!touch) {
+        console.log("No valid touch point");
+        return;
+    }
     
     // Convert touch to normalized device coordinates
     const previousTouchPosition = currentTouchPosition.clone();
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Log movement values for debugging
-    if (isTouchMovingScreen) {
-        console.log("Moving screen, delta:", 
-            currentTouchPosition.x - previousTouchPosition.x,
-            currentTouchPosition.y - previousTouchPosition.y);
-    }
+    // Log touch position for debugging
+    console.log("Current touch position:", 
+        currentTouchPosition.x.toFixed(3), 
+        currentTouchPosition.y.toFixed(3));
+        
+    // Calculate movement delta
+    const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+    const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+    console.log("Delta:", deltaX.toFixed(3), deltaY.toFixed(3));
     
-    // Move the screen if in move mode (which should be default when touching a screen)
-    if (isTouchMovingScreen) {
-        moveScreenWithTouch();
+    // FORCE ENABLE SCREEN MOVEMENT REGARDLESS OF MODE
+    // This is a key fix - we'll move the screen even if isTouchMovingScreen isn't set
+    if (true) {  // Always allow movement when a screen is selected
+        console.log("Moving screen");
+        
+        // Create more direct movement with less complexity
+        // Use a simplified approach that always works
+        
+        // Get the camera's forward and right vectors
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        
+        // Scale the movement (adjust multiplier as needed)
+        const movementSpeed = 3.0; // Increased for more responsiveness
+        
+        // Create movement vector in world space
+        const movement = new THREE.Vector3()
+            .addScaledVector(right, deltaX * movementSpeed)
+            .addScaledVector(new THREE.Vector3(0, 1, 0), deltaY * movementSpeed);
+        
+        console.log("Movement vector:", 
+            movement.x.toFixed(3), 
+            movement.y.toFixed(3), 
+            movement.z.toFixed(3));
+        
+        // Apply movement directly
+        selectedScreen.position.add(movement);
+        console.log("New screen position:", 
+            selectedScreen.position.x.toFixed(3), 
+            selectedScreen.position.y.toFixed(3), 
+            selectedScreen.position.z.toFixed(3));
+        
+        // Ensure screen always faces the camera
+        selectedScreen.lookAt(camera.position);
+        
+        // Create visual feedback
+        createMoveIndicator(selectedScreen.position.clone(), 0.03);
     }
     
     // Rotate if in rotate mode
     if (isRotatingScreen) {
+        console.log("Rotating screen");
         rotateScreenWithTouch();
     }
 }

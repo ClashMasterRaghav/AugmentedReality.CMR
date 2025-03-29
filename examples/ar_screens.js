@@ -20,7 +20,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     
     // Add transparent interaction plane to capture touch events
     // This covers the entire screen and is in front of everything
-    const interactionGeometry = new THREE.PlaneGeometry(screenWidth + 0.1, screenHeight + 0.1);
+    const interactionGeometry = new THREE.PlaneGeometry(screenWidth + 0.2, screenHeight + 0.2);
     const interactionMaterial = new THREE.MeshBasicMaterial({
         transparent: true,
         opacity: 0.0, // Completely invisible
@@ -28,13 +28,24 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         depthTest: false, // No depth testing to ensure it's always interactive
     });
     const interactionPlane = new THREE.Mesh(interactionGeometry, interactionMaterial);
-    interactionPlane.position.z = 0.015; // In front of all other elements
-    interactionPlane.renderOrder = 100; // Highest render order
+    interactionPlane.position.z = 0.020; // In front of ALL other elements
+    interactionPlane.renderOrder = 9999; // Highest render order possible
     interactionPlane.userData = {
         type: 'interactionPlane',
-        screen: browserWindow
+        screen: browserWindow,
+        isInteractive: true
     };
     browserWindow.add(interactionPlane);
+    
+    // Make the window itself have screen identifier
+    browserWindow.userData = { 
+        type: 'screen', 
+        id: screens.length, 
+        isSelected: false,
+        isInteractive: true,
+        content: `Video Screen ${screens.length + 1}`,
+        originalScale: new THREE.Vector3(1, 1, 1)
+    };
     
     // Shadow for depth effect
     const shadowGeometry = new THREE.PlaneGeometry(screenWidth + 0.05, screenHeight + 0.05);
@@ -177,22 +188,15 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     
     // Position the window
     browserWindow.position.copy(position);
-    browserWindow.userData = { 
-        type: 'screen', 
-        id: screens.length, 
-        isSelected: false,
-        content: `Video Screen ${screens.length + 1}`,
-        originalScale: new THREE.Vector3(1, 1, 1),
-        controls: {
-            isPlaying: true,
-            isMuted: true,
-            progress: 0,
-            volume: 0
-        }
-    };
     
+    // Add to scene and screens array
     scene.add(browserWindow);
     screens.push(browserWindow);
+    
+    // Log for debugging
+    console.log("Created new screen with ID:", browserWindow.userData.id);
+    console.log("Total screens:", screens.length);
+    console.log("Screen UUID:", browserWindow.uuid);
     
     // Set this as the selected screen
     selectScreen(browserWindow);
