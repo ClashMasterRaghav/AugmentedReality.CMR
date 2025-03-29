@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { 
     camera, scene, controller, renderer, raycaster, 
-    isPlacingScreen, newScreen, isMovingScreen, isMoveModeActive,
+    isPlacingScreen, newScreen, isMoveModeActive,
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition } from './ar_screens.js';
