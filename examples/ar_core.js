@@ -250,7 +250,24 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    // Position the screen directly in front of the camera at a good viewing distance
+    const startPosition = new THREE.Vector3(0, 0, -1.0);
+    
+    // Create the screen with a more visible size
+    const startScreen = createNewBrowserScreen(startPosition);
+    
+    // Ensure the screen is facing the user
+    startScreen.lookAt(camera.position);
+    
+    // Provide visual/haptic feedback
+    if (navigator.vibrate) {
+        navigator.vibrate(20);
+    }
+    
+    console.log("Start screen created at position:", startPosition);
+    
+    // Show notification to help user locate the screen
+    createNotification('Find the screen in front of you', 'info');
 }
 
 // Create a fixed add screen button in the top-right corner
