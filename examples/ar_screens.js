@@ -145,7 +145,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     // Add video controls at the bottom of the screen if video texture exists
     if (typeof videoTexture !== 'undefined' && videoTexture) {
         // Progress bar background
-        const progressBgGeometry = new THREE.PlaneGeometry(0.74, 0.02);
+        const progressBgGeometry = new THREE.PlaneGeometry(0.5, 0.02);
         const progressBgMaterial = new THREE.MeshBasicMaterial({
             color: 0x333333,
             side: THREE.DoubleSide,
@@ -157,14 +157,14 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         browserWindow.add(progressBg);
         
         // Progress bar (initially empty)
-        const progressGeometry = new THREE.PlaneGeometry(0.74, 0.02);
+        const progressGeometry = new THREE.PlaneGeometry(0.5, 0.02);
         const progressMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000, // Red progress bar
             side: THREE.DoubleSide,
             depthTest: false
         });
         const progressBar = new THREE.Mesh(progressGeometry, progressMaterial);
-        progressBar.position.set(-0.37, -0.21, 0.006); // Start at left edge
+        progressBar.position.set(-0.25, -0.21, 0.006); // Start at left edge
         progressBar.scale.set(0, 1, 1); // Initially 0 width
         progressBar.renderOrder = 91;
         browserWindow.add(progressBar);

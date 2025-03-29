@@ -516,59 +516,60 @@ function onTouchStart(event) {
     const doubleTapDetected = (now - lastTapTime) < 300;
     lastTapTime = now;
     
-    // Improved detection of drag handles - in AR we need a more generous hit zone
+    // Identify all screens close to our touch ray
+    const screenIntersections = [];
+    
+    // Cast ray against all screens to find potential candidates
+    screens.forEach(screen => {
+        // Use a more generous ray for each screen
+        const intersects = raycaster.intersectObject(screen, true);
+        if (intersects.length > 0) {
+            // Store information about the hit including distance
+            screenIntersections.push({
+                screen: screen,
+                distance: intersects[0].distance,
+                object: intersects[0].object
+            });
+        }
+    });
+    
+    // Sort by distance so we prioritize closer screens
+    screenIntersections.sort((a, b) => a.distance - b.distance);
+    
+    // PRIORITY 1: Check for direct hits on drag handles
+    let dragHandleHit = false;
     let intersectedDragHandle = null;
     let intersectedScreen = null;
     
-    // PRIORITY 1: Check ALL drag handles with a larger area for easier selection in AR
-    const expandedRay = new THREE.Raycaster(raycaster.ray.origin, raycaster.ray.direction);
-    expandedRay.params.Line.threshold = 0.05; // Increased threshold for easier selection
-    expandedRay.params.Points.threshold = 0.05;
-    
-    // First check all screens and their drag handles directly
-    for (let i = 0; i < screens.length; i++) {
-        const screen = screens[i];
+    // Check for drag handle hits on the closest screens first
+    for (const hit of screenIntersections) {
+        const screen = hit.screen;
         
-        // Ensure we check the top bar and any children (e.g., grip pattern)
         if (screen.userData && screen.userData.dragHandle) {
             const dragHandle = screen.userData.dragHandle;
             
-            // Check direct hit with drag handle
-            const handleIntersects = expandedRay.intersectObject(dragHandle, true);
+            // Check if ray intersects with drag handle directly
+            const handleIntersects = raycaster.intersectObject(dragHandle, true);
             if (handleIntersects.length > 0) {
-                console.log("Direct hit on drag handle:", dragHandle.uuid);
                 intersectedDragHandle = dragHandle;
                 intersectedScreen = screen;
+                dragHandleHit = true;
                 break;
             }
             
-            // If not direct hit, see if we're close to the top of the screen as fallback
-            // This creates a more generous hit area above the screen
-            const screenPos = screen.position.clone();
-            const topY = screenPos.y + 0.375; // Approximating top of screen
-            
-            // Compute ray intersection with a plane at the top of the screen
-            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1));
-            plane.translate(new THREE.Vector3(0, topY, screenPos.z));
-            
-            const intersection = new THREE.Vector3();
-            const ray = raycaster.ray;
-            
-            if (ray.intersectPlane(plane, intersection)) {
-                // Check if intersection is within the width bounds of the screen
-                const distToCenter = Math.abs(intersection.x - screenPos.x);
-                if (distToCenter < 0.5) { // Half the screen width
-                    console.log("Near-hit on top of screen:", screen.userData.id);
-                    intersectedDragHandle = dragHandle;
-                    intersectedScreen = screen;
-                    break;
-                }
+            // Check for hits near the top bar for easier dragging
+            if (hit.object === screen || hit.object === dragHandle) {
+                // If we directly hit the screen or drag handle 
+                intersectedDragHandle = dragHandle;
+                intersectedScreen = screen;
+                dragHandleHit = true;
+                break;
             }
         }
     }
     
     // If we found a drag handle, set up for dragging
-    if (intersectedDragHandle && intersectedScreen) {
+    if (dragHandleHit && intersectedDragHandle && intersectedScreen) {
         console.log("Starting drag on screen:", intersectedScreen.userData.id);
         
         // Set up drag state
@@ -602,7 +603,7 @@ function onTouchStart(event) {
         return;
     }
     
-    // Check for button intersections if not dragging
+    // PRIORITY 2: Check for button intersections if not dragging
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
@@ -636,48 +637,34 @@ function onTouchStart(event) {
         }
     }
     
-    // Rest of code for regular screen interaction...
-    // Check for screen intersections
-    const screenObjects = [];
-    screens.forEach((screen, index) => {
-        console.log("Adding screen", index, "to detection list");
-        screenObjects.push(screen);
-        screen.children.forEach(child => {
-            if (child.isMesh) {
-                screenObjects.push(child);
-            }
-        });
-    });
-    
-    const screenIntersects = raycaster.intersectObjects(screenObjects, true);
-    
-    if (screenIntersects.length > 0) {
-        const screenObj = getScreenFromIntersect(screenIntersects[0].object);
-        if (screenObj) {
-            console.log("Screen touched:", screenObj.userData.id);
+    // PRIORITY 3: Regular screen selection - use the closest screen from our sorted list
+    if (screenIntersections.length > 0) {
+        const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
+        
+        console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
+        
+        // Select the screen
+        selectScreen(screen);
+        selectedScreen = screen;
+        
+        // Double tap to toggle resize
+        if (doubleTapDetected) {
+            console.log("Double tap detected, toggling resize");
+            toggleResize(screen);
             
-            // Select the screen
-            selectScreen(screenObj);
-            selectedScreen = screenObj;
-            
-            // Double tap to toggle resize
-            if (doubleTapDetected) {
-                console.log("Double tap detected, toggling resize");
-                toggleResize(screenObj);
-                
-                // Provide haptic feedback
-                if (navigator.vibrate) {
-                    navigator.vibrate([30, 20, 30]);
-                }
-                
-                createModeChangeIndicator('Size Changed');
-                return;
+            // Provide haptic feedback
+            if (navigator.vibrate) {
+                navigator.vibrate([30, 20, 30]);
             }
             
-            // Flash highlight around selected screen
-            flashScreenHighlight(screenObj);
-            createModeChangeIndicator('Screen Selected');
+            createModeChangeIndicator('Size Changed');
+            return;
         }
+        
+        // Flash highlight around selected screen
+        flashScreenHighlight(screen);
+        createModeChangeIndicator('Screen Selected');
     }
 }
 
@@ -764,7 +751,7 @@ function onTouchMove(event) {
     
     // Handle dragging via the drag handle - even more direct approach
     if (isDraggingHandle && draggedScreen) {
-        console.log("Moving screen via drag handle");
+        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
         
         try {
             // Preserve original scale
@@ -806,11 +793,8 @@ function onTouchMove(event) {
         return;
     }
     
-    // Handle other touch interactions as before...
-    if (isRotatingScreen) {
-        console.log("Rotating screen");
-        rotateScreenWithTouch();
-    }
+    // We're not handling other forms of movement to simplify the interaction model
+    // This keeps the drag handle as the primary way to move screens, which improves reliability
 }
 
 // Move screen based on touch movement
@@ -1009,9 +993,9 @@ function handleProgressBarTouch(screen, point) {
         const hitX = intersection.x - screenPos.x;
         const hitY = intersection.y - progressBarY;
         
-        if (Math.abs(hitX) < 0.37 && Math.abs(hitY) < 0.02) {
+        if (Math.abs(hitX) < 0.25 && Math.abs(hitY) < 0.02) {
             // Calculate progress (normalized between 0-1)
-            const progress = (hitX + 0.37) / 0.74;
+            const progress = (hitX + 0.25) / 0.5;
             updateVideoTime(progress);
             return true;
         }

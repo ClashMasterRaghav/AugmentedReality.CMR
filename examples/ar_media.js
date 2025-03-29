@@ -102,7 +102,7 @@ function updateVideoProgress() {
             // Update progress bar width and position
             progressBar.scale.x = progress;
             // Adjust position to keep left-aligned
-            progressBar.position.x = -0.37 + (progress * 0.37);
+            progressBar.position.x = -0.25 + (progress * 0.25);
             
             // Update progress in userData
             if (screen.userData && screen.userData.controls) {

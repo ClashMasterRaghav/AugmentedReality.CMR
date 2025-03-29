@@ -110,9 +110,6 @@ function initAREnvironment() {
     pointer.position.z = -0.1;
     controller.add(pointer);
 
-    // Create a default browser window
-    createNewBrowserScreen(new THREE.Vector3(0, 0, -1.2)); // Position further back
-
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
