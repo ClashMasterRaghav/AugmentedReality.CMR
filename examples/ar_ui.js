@@ -46,8 +46,8 @@ export function createNotification(message, type = 'info') {
 export function createControlPanel() {
     const panel = new THREE.Group();
     
-    // Panel background with rounded corners effect
-    const panelGeometry = new THREE.PlaneGeometry(0.3, 0.25); // Increased height for more buttons
+    // Panel background with rounded corners effect - SMALLER SIZE
+    const panelGeometry = new THREE.PlaneGeometry(0.15, 0.15); // Reduced size significantly
     const panelMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x333333,
         side: THREE.DoubleSide,
@@ -58,7 +58,7 @@ export function createControlPanel() {
     panel.add(panelMesh);
     
     // Add panel border glow
-    const glowGeometry = new THREE.PlaneGeometry(0.31, 0.26); // Adjusted for new panel size
+    const glowGeometry = new THREE.PlaneGeometry(0.155, 0.155); // Adjusted for new panel size
     const glowMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x4488ff,
         side: THREE.DoubleSide,
@@ -69,50 +69,51 @@ export function createControlPanel() {
     glowMesh.position.z = -0.002;
     panel.add(glowMesh);
     
-    // New Screen button with improved design
-    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
-    const buttonMaterial = new THREE.MeshBasicMaterial({ 
+    // Create buttons using icons instead of text
+    const buttonSize = 0.04;
+    const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
+    
+    // New Screen button 
+    const newScreenButtonMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x4488ff,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
-    const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    newScreenButton.position.set(0, 0.09, 0.001);
+    const newScreenButton = new THREE.Mesh(buttonGeometry, newScreenButtonMaterial);
+    newScreenButton.position.set(0, 0.05, 0.001);
     newScreenButton.userData = { type: 'button', action: 'newScreen' };
     panel.add(newScreenButton);
     
-    // New Screen button label with improved text
-    const buttonCanvas = document.createElement('canvas');
-    buttonCanvas.width = 256;
-    buttonCanvas.height = 64;
-    const btnCtx = buttonCanvas.getContext('2d');
-    btnCtx.fillStyle = '#ffffff';
-    btnCtx.font = 'bold 24px Arial';
-    btnCtx.textAlign = 'center';
-    btnCtx.textBaseline = 'middle';
-    btnCtx.fillText('+ New Screen', 128, 32);
+    // Add + icon to new screen button
+    const plusCanvas = document.createElement('canvas');
+    plusCanvas.width = 64;
+    plusCanvas.height = 64;
+    const plusCtx = plusCanvas.getContext('2d');
+    plusCtx.fillStyle = '#ffffff';
+    plusCtx.fillRect(26, 14, 12, 36); // Vertical line
+    plusCtx.fillRect(14, 26, 36, 12); // Horizontal line
     
-    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
-    const buttonLabelGeometry = new THREE.PlaneGeometry(0.24, 0.04);
-    const buttonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: buttonTexture,
+    const plusTexture = new THREE.CanvasTexture(plusCanvas);
+    const iconGeometry = new THREE.CircleGeometry(buttonSize / 2 * 0.8, 32);
+    const plusMaterial = new THREE.MeshBasicMaterial({ 
+        map: plusTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
-    buttonLabel.position.set(0, 0.09, 0.002);
-    panel.add(buttonLabel);
+    const plusIcon = new THREE.Mesh(iconGeometry, plusMaterial);
+    plusIcon.position.set(0, 0.05, 0.002);
+    panel.add(plusIcon);
     
     // Move Screen button with toggle functionality
     const moveButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x44cc88,
+        color: 0x777777, // Grey when inactive
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
     const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
-    moveScreenButton.position.set(0, 0.03, 0.001);
+    moveScreenButton.position.set(0, 0, 0.001);
     moveScreenButton.userData = { 
         type: 'button',
         action: 'moveScreen',
@@ -121,36 +122,57 @@ export function createControlPanel() {
     };
     panel.add(moveScreenButton);
     
-    // Move Screen button label
-    const moveButtonCanvas = document.createElement('canvas');
-    moveButtonCanvas.width = 256;
-    moveButtonCanvas.height = 64;
-    const moveBtnCtx = moveButtonCanvas.getContext('2d');
-    moveBtnCtx.fillStyle = '#ffffff';
-    moveBtnCtx.font = 'bold 24px Arial';
-    moveBtnCtx.textAlign = 'center';
-    moveBtnCtx.textBaseline = 'middle';
-    moveBtnCtx.fillText('Move Screen', 128, 32);
+    // Add move icon
+    const moveCanvas = document.createElement('canvas');
+    moveCanvas.width = 64;
+    moveCanvas.height = 64;
+    const moveCtx = moveCanvas.getContext('2d');
+    moveCtx.fillStyle = '#ffffff';
     
-    const moveButtonTexture = new THREE.CanvasTexture(moveButtonCanvas);
-    const moveButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: moveButtonTexture,
+    // Draw arrows indicating movement
+    moveCtx.beginPath();
+    moveCtx.moveTo(32, 12); // Top arrow
+    moveCtx.lineTo(22, 22);
+    moveCtx.lineTo(42, 22);
+    moveCtx.fill();
+    
+    moveCtx.beginPath();
+    moveCtx.moveTo(32, 52); // Bottom arrow
+    moveCtx.lineTo(22, 42);
+    moveCtx.lineTo(42, 42);
+    moveCtx.fill();
+    
+    moveCtx.beginPath();
+    moveCtx.moveTo(12, 32); // Left arrow
+    moveCtx.lineTo(22, 22);
+    moveCtx.lineTo(22, 42);
+    moveCtx.fill();
+    
+    moveCtx.beginPath();
+    moveCtx.moveTo(52, 32); // Right arrow
+    moveCtx.lineTo(42, 22);
+    moveCtx.lineTo(42, 42);
+    moveCtx.fill();
+    
+    const moveTexture = new THREE.CanvasTexture(moveCanvas);
+    const moveMaterial = new THREE.MeshBasicMaterial({ 
+        map: moveTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
-    moveButtonLabel.position.set(0, 0.03, 0.002);
-    panel.add(moveButtonLabel);
+    const moveIcon = new THREE.Mesh(iconGeometry, moveMaterial);
+    moveIcon.position.set(0, 0, 0.002);
+    panel.add(moveIcon);
     
     // Rotate Screen button
     const rotateButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xf39c12, // Orange color
+        color: 0x777777, // Grey when inactive
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
     const rotateScreenButton = new THREE.Mesh(buttonGeometry, rotateButtonMaterial);
-    rotateScreenButton.position.set(0, -0.03, 0.001);
+    rotateScreenButton.position.set(0, -0.05, 0.001);
     rotateScreenButton.userData = { 
         type: 'button',
         action: 'rotateScreen',
@@ -159,63 +181,39 @@ export function createControlPanel() {
     };
     panel.add(rotateScreenButton);
     
-    // Rotate Screen button label
-    const rotateButtonCanvas = document.createElement('canvas');
-    rotateButtonCanvas.width = 256;
-    rotateButtonCanvas.height = 64;
-    const rotateBtnCtx = rotateButtonCanvas.getContext('2d');
-    rotateBtnCtx.fillStyle = '#ffffff';
-    rotateBtnCtx.font = 'bold 24px Arial';
-    rotateBtnCtx.textAlign = 'center';
-    rotateBtnCtx.textBaseline = 'middle';
-    rotateBtnCtx.fillText('Rotate Screen', 128, 32);
+    // Add rotate icon
+    const rotateCanvas = document.createElement('canvas');
+    rotateCanvas.width = 64;
+    rotateCanvas.height = 64;
+    const rotateCtx = rotateCanvas.getContext('2d');
     
-    const rotateButtonTexture = new THREE.CanvasTexture(rotateButtonCanvas);
-    const rotateButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: rotateButtonTexture,
+    // Draw rotation icon
+    rotateCtx.strokeStyle = '#ffffff';
+    rotateCtx.lineWidth = 4;
+    rotateCtx.beginPath();
+    rotateCtx.arc(32, 32, 18, 0, 1.5 * Math.PI);
+    rotateCtx.stroke();
+    
+    // Draw arrow head
+    rotateCtx.fillStyle = '#ffffff';
+    rotateCtx.beginPath();
+    rotateCtx.moveTo(32, 14);
+    rotateCtx.lineTo(26, 22);
+    rotateCtx.lineTo(38, 22);
+    rotateCtx.fill();
+    
+    const rotateTexture = new THREE.CanvasTexture(rotateCanvas);
+    const rotateMaterial = new THREE.MeshBasicMaterial({ 
+        map: rotateTexture,
         transparent: true,
         side: THREE.DoubleSide
     });
-    const rotateButtonLabel = new THREE.Mesh(buttonLabelGeometry, rotateButtonLabelMaterial);
-    rotateButtonLabel.position.set(0, -0.03, 0.002);
-    panel.add(rotateButtonLabel);
+    const rotateIcon = new THREE.Mesh(iconGeometry, rotateMaterial);
+    rotateIcon.position.set(0, -0.05, 0.002);
+    panel.add(rotateIcon);
     
-    // End AR button
-    const endARButtonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xe74c3c, // Red color
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.9
-    });
-    const endARButton = new THREE.Mesh(buttonGeometry, endARButtonMaterial);
-    endARButton.position.set(0, -0.09, 0.001);
-    endARButton.userData = { type: 'button', action: 'endAR' };
-    panel.add(endARButton);
-    
-    // End AR button label
-    const endARButtonCanvas = document.createElement('canvas');
-    endARButtonCanvas.width = 256;
-    endARButtonCanvas.height = 64;
-    const endARBtnCtx = endARButtonCanvas.getContext('2d');
-    endARBtnCtx.fillStyle = '#ffffff';
-    endARBtnCtx.font = 'bold 24px Arial';
-    endARBtnCtx.textAlign = 'center';
-    endARBtnCtx.textBaseline = 'middle';
-    endARBtnCtx.fillText('End AR', 128, 32);
-    
-    const endARButtonTexture = new THREE.CanvasTexture(endARButtonCanvas);
-    const endARButtonLabelMaterial = new THREE.MeshBasicMaterial({ 
-        map: endARButtonTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const endARButtonLabel = new THREE.Mesh(buttonLabelGeometry, endARButtonLabelMaterial);
-    endARButtonLabel.position.set(0, -0.09, 0.002);
-    panel.add(endARButtonLabel);
-    
-    // Position the control panel in front of the user
-    panel.position.set(0, -0.2, -0.6); // Moved forward and slightly down
-    panel.rotation.x = -Math.PI / 8; // Tilt slightly up
+    // Position the control panel in front of the user (moved forward for better visibility)
+    panel.position.set(0.2, -0.1, -0.4); // Right side position
     panel.userData = { type: 'controlPanel' };
     scene.add(panel);
     

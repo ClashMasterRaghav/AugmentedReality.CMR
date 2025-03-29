@@ -81,6 +81,16 @@ export function initAR() {
 
     // Controller setup
     controller = renderer.xr.getController(0);
+    
+    // Add controller event listeners
+    controller.addEventListener('selectstart', function() {
+        controller.userData.isSelecting = true;
+    });
+    
+    controller.addEventListener('selectend', function() {
+        controller.userData.isSelecting = false;
+    });
+    
     scene.add(controller);
 
     // Controller model
@@ -138,16 +148,63 @@ export function render() {
     
     // Handle screen rotation with controller
     if (isRotateModeActive && selectedScreen) {
-        // Get controller movement
+        // Get controller movement and rotation
         const tempMatrix = new THREE.Matrix4();
         tempMatrix.identity().extractRotation(controller.matrixWorld);
         
         // Extract controller orientation
         const controllerDirection = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
         
-        // Apply rotation based on controller movement
-        selectedScreen.rotation.y += controllerDirection.x * 0.05;
-        selectedScreen.rotation.x += controllerDirection.y * 0.05;
+        // Get controller quaternion
+        const controllerQuaternion = new THREE.Quaternion().setFromRotationMatrix(tempMatrix);
+        
+        // Get controller Euler angles
+        const controllerEuler = new THREE.Euler().setFromQuaternion(controllerQuaternion);
+        
+        // Extract rotation values with sensitivity adjustment
+        const xRotation = controllerEuler.x * 0.5; // Pitch
+        const yRotation = controllerEuler.y * 0.5; // Yaw
+        
+        // Apply smooth rotation
+        selectedScreen.rotation.x = THREE.MathUtils.lerp(
+            selectedScreen.rotation.x,
+            xRotation, 
+            0.1
+        );
+        
+        selectedScreen.rotation.y = THREE.MathUtils.lerp(
+            selectedScreen.rotation.y,
+            yRotation, 
+            0.1
+        );
+        
+        // Optional: add subtle rotation based on controller movement for fine-tuning
+        selectedScreen.rotation.y += controllerDirection.x * 0.01;
+        selectedScreen.rotation.x += controllerDirection.y * 0.01;
+        
+        // Limit rotation angles to avoid extreme angles
+        selectedScreen.rotation.x = THREE.MathUtils.clamp(
+            selectedScreen.rotation.x,
+            -Math.PI / 2,  // Limit to 90 degrees up
+            Math.PI / 2    // Limit to 90 degrees down
+        );
+    }
+    
+    // Handle screen movement if move mode is active
+    if (isMoveModeActive && selectedScreen) {
+        // Check if controller trigger/button is pressed
+        if (controller.userData && controller.userData.isSelecting) {
+            // Get controller position and direction
+            const tempMatrix = new THREE.Matrix4();
+            tempMatrix.identity().extractRotation(controller.matrixWorld);
+            const position = new THREE.Vector3();
+            position.setFromMatrixPosition(controller.matrixWorld);
+            const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+            
+            // Set position with slight lag for smoother movement
+            const targetPosition = position.clone().addScaledVector(direction, 0.8);
+            selectedScreen.position.lerp(targetPosition, 0.5);
+        }
     }
     
     // Update screen visual effects

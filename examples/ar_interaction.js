@@ -218,54 +218,56 @@ function handleButtonAction(button) {
         return;
     }
     
-    if (button.userData.action === 'moveScreen' && selectedScreen) {
-        // Toggle move mode
-        if (button.userData.isToggle) {
-            isMoveModeActive = !isMoveModeActive;
-            button.material.color.set(isMoveModeActive ? 0x4CAF50 : 0x44cc88);
+    if (button.userData.action === 'moveScreen') {
+        // Always toggle move mode regardless of selected screen
+        isMoveModeActive = !isMoveModeActive;
+        button.userData.isActive = isMoveModeActive;
+        
+        // Update button color based on state
+        if (isMoveModeActive) {
+            button.material.color.set(0x44cc88); // Green when active
             
-            // Update notification
-            showNotification(isMoveModeActive ? "Move mode activated" : "Move mode deactivated");
+            // Deactivate rotate mode
+            isRotateModeActive = false;
             
-            // Deactivate other modes
-            if (isMoveModeActive) {
-                isRotateModeActive = false;
-                // Reset other toggle buttons
-                resetToggleButtons('moveScreen');
-            }
-            return;
+            // Find rotate button and update its color
+            const rotateButtons = findButtonsByAction('rotateScreen');
+            rotateButtons.forEach(rotateButton => {
+                rotateButton.material.color.set(0x777777); // Grey when inactive
+                rotateButton.userData.isActive = false;
+            });
+            
+            showNotification("Move mode activated");
+        } else {
+            button.material.color.set(0x777777); // Grey when inactive
+            showNotification("Move mode deactivated");
         }
-        
-        // If not a toggle, just start moving the selected screen
-        isMovingScreen = true;
-        
-        // Visual feedback for button press
-        const originalColor = button.material.color.clone();
-        button.material.color.set(0x4CAF50);
-        setTimeout(() => {
-            button.material.color.copy(originalColor);
-        }, 200);
-        
-        showNotification("Moving screen...");
         return;
     }
     
-    if (button.userData.action === 'rotateScreen' && selectedScreen) {
-        // Toggle rotate mode
-        if (button.userData.isToggle) {
-            isRotateModeActive = !isRotateModeActive;
-            button.material.color.set(isRotateModeActive ? 0x4CAF50 : 0xf39c12);
+    if (button.userData.action === 'rotateScreen') {
+        // Always toggle rotate mode regardless of selected screen
+        isRotateModeActive = !isRotateModeActive;
+        button.userData.isActive = isRotateModeActive;
+        
+        // Update button color based on state
+        if (isRotateModeActive) {
+            button.material.color.set(0xf39c12); // Orange when active
             
-            // Update notification
-            showNotification(isRotateModeActive ? "Rotate mode activated" : "Rotate mode deactivated");
+            // Deactivate move mode
+            isMoveModeActive = false;
             
-            // Deactivate other modes
-            if (isRotateModeActive) {
-                isMoveModeActive = false;
-                // Reset other toggle buttons
-                resetToggleButtons('rotateScreen');
-            }
-            return;
+            // Find move button and update its color
+            const moveButtons = findButtonsByAction('moveScreen');
+            moveButtons.forEach(moveButton => {
+                moveButton.material.color.set(0x777777); // Grey when inactive
+                moveButton.userData.isActive = false;
+            });
+            
+            showNotification("Rotate mode activated");
+        } else {
+            button.material.color.set(0x777777); // Grey when inactive
+            showNotification("Rotate mode deactivated");
         }
         return;
     }
@@ -375,6 +377,12 @@ function findButtonsInScene() {
     buttons = buttons.concat(fabButtons);
     
     return buttons;
+}
+
+// Find buttons by action
+function findButtonsByAction(action) {
+    const buttons = findButtonsInScene();
+    return buttons.filter(button => button.userData && button.userData.action === action);
 }
 
 // Touch start handler
