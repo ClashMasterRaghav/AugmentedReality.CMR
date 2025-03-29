@@ -8,178 +8,172 @@ import { videoTexture } from './ar_media.js';
 export let screens = [];
 
 // Create a new browser screen
-export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
-    const browserWindow = new THREE.Group();
+export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Create a group for the entire screen
+    const screenGroup = new THREE.Group();
+    screenGroup.position.copy(position);
+    screenGroup.userData.type = 'screen';
     
-    // Larger screen dimensions
-    const screenWidth = 1.0;  // Increased from 0.8
-    const screenHeight = 0.75; // Increased from 0.6
-    const aspectRatio = 16/9; // Maintain proper video aspect ratio
-    const contentWidth = screenWidth * 0.95;
-    const contentHeight = contentWidth / aspectRatio;
+    // Set width and height with 16:9 aspect ratio
+    const width = 1.0;
+    const height = width * 0.75; // 4:3 aspect ratio for overall screen
+    const contentAspectRatio = 16/9; // Content area has 16:9 ratio
     
-    // Shadow for depth effect
-    const shadowGeometry = new THREE.PlaneGeometry(screenWidth + 0.05, screenHeight + 0.05);
+    // Create shadow for depth effect
+    const shadowGeometry = new THREE.PlaneGeometry(width + 0.1, height + 0.1);
     const shadowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x000000,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.6
+        color: 0x000000, 
+        transparent: true, 
+        opacity: 0.4,
+        side: THREE.DoubleSide
     });
-    const shadowPanel = new THREE.Mesh(shadowGeometry, shadowMaterial);
-    shadowPanel.position.z = -0.01;
-    shadowPanel.renderOrder = 0; // Lowest render order (back)
-    browserWindow.add(shadowPanel);
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadow.position.z = -0.01;
+    shadow.userData.parentScreen = screenGroup;
+    screenGroup.add(shadow);
     
-    // Modern border with rounded corners effect
-    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    // Create a border for the screen
+    const borderGeometry = new THREE.PlaneGeometry(width + 0.05, height + 0.05);
     const borderMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x2c2c2c, // Dark grey border
-        side: THREE.DoubleSide,
-        transparent: false,
-        opacity: 1.0
+        color: 0x333333, 
+        side: THREE.DoubleSide
     });
-    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
-    borderPanel.position.z = -0.005;
-    borderPanel.renderOrder = 1;
-    browserWindow.add(borderPanel);
+    const border = new THREE.Mesh(borderGeometry, borderMaterial);
+    border.position.z = -0.005;
+    border.userData.parentScreen = screenGroup;
+    screenGroup.add(border);
     
-    // Browser background - main content area
-    const browserGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    // Create the main background panel
+    const browserGeometry = new THREE.PlaneGeometry(width, height);
     const browserMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x121212, // Dark background like modern YouTube
+        color: 0x1F1F1F, // Dark theme
         side: THREE.DoubleSide
     });
     const browserPanel = new THREE.Mesh(browserGeometry, browserMaterial);
-    browserPanel.renderOrder = 2;
-    browserWindow.add(browserPanel);
+    browserPanel.userData.parentScreen = screenGroup;
+    screenGroup.add(browserPanel);
     
-    // Content area with video - moved back to avoid blocking interactions
-    const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
-    
-    // Check if video texture is available, otherwise use static content
-    const contentMaterial = videoTexture ? 
-        new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide }) :
-        new THREE.MeshBasicMaterial({ 
-            map: createFallbackTexture(screens.length + 1),
-            side: THREE.DoubleSide
-        });
-        
-    const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
-    contentPanel.position.y = screenHeight * 0.05; // Centered in window
-    contentPanel.position.z = 0.001; // MOVED BACK so it doesn't block interactions
-    contentPanel.renderOrder = 3; // Video content
-    browserWindow.add(contentPanel);
-    
-    // Modern header bar
-    const headerGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight * 0.12);
+    // Create modern header
+    const headerHeight = height * 0.1;
+    const headerGeometry = new THREE.PlaneGeometry(width, headerHeight);
     const headerMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x181818, // Modern dark header
+        color: 0x2D2D2D, // Slightly lighter than background
         side: THREE.DoubleSide
     });
-    const headerBar = new THREE.Mesh(headerGeometry, headerMaterial);
-    headerBar.position.y = screenHeight * 0.44;
-    headerBar.position.z = 0.002;
-    headerBar.renderOrder = 4; // Above video
-    browserWindow.add(headerBar);
+    const header = new THREE.Mesh(headerGeometry, headerMaterial);
+    header.position.y = height/2 - headerHeight/2;
+    header.position.z = 0.001;
+    header.userData.parentScreen = screenGroup;
+    screenGroup.add(header);
     
-    // Create title for the screen with modern font style
-    const titleCanvas = document.createElement('canvas');
-    titleCanvas.width = 1024;
-    titleCanvas.height = 128;
-    const titleCtx = titleCanvas.getContext('2d');
-    titleCtx.fillStyle = '#ffffff';
-    titleCtx.font = 'bold 40px Roboto, Arial';
-    titleCtx.textAlign = 'left'; // Left-aligned like modern interfaces
-    titleCtx.textBaseline = 'middle';
-    titleCtx.fillText(`AR Video Player ${screens.length + 1}`, 30, 64);
+    // Create title with nice font
+    const title = createText("AR Video Viewer", 0.05, 0x4FC3F7);
+    title.position.y = height/2 - headerHeight/2;
+    title.position.z = 0.002;
+    title.userData.parentScreen = screenGroup;
+    screenGroup.add(title);
     
-    const titleTexture = new THREE.CanvasTexture(titleCanvas);
-    const titleGeometry = new THREE.PlaneGeometry(screenWidth * 0.9, screenHeight * 0.1);
-    const titleMaterial = new THREE.MeshBasicMaterial({ 
-        map: titleTexture,
+    // Create content panel for video with 16:9 aspect ratio
+    const contentHeight = height * 0.6;
+    const contentWidth = contentHeight * contentAspectRatio;
+    const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
+    const contentMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x000000,
+        side: THREE.DoubleSide
+    });
+    
+    // Create the content panel (will hold video)
+    const contentPanel = new THREE.Mesh(contentGeometry, contentMaterial);
+    contentPanel.position.y = 0;
+    contentPanel.position.z = 0.004; // Ensure it's in front of browser panel
+    contentPanel.userData.parentScreen = screenGroup;
+    screenGroup.add(contentPanel);
+    
+    // Create video texture 
+    const videoElement = createVideoElement();
+    const videoTexture = new THREE.VideoTexture(videoElement);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    contentPanel.material = new THREE.MeshBasicMaterial({ 
+        map: videoTexture,
+        side: THREE.DoubleSide
+    });
+    
+    // Store video element reference
+    contentPanel.userData.videoElement = videoElement;
+    contentPanel.userData.videoTexture = videoTexture;
+    screenGroup.userData.videoElement = videoElement;
+    screenGroup.userData.contentPanel = contentPanel;
+    
+    // Create control bar below video
+    const controlBarHeight = height * 0.12;
+    const controlGeometry = new THREE.PlaneGeometry(contentWidth, controlBarHeight);
+    const controlMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x212121, // Dark control bar
+        side: THREE.DoubleSide,
         transparent: true,
-        side: THREE.DoubleSide
+        opacity: 0.95
     });
-    const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
-    titleMesh.position.set(-screenWidth * 0.05, screenHeight * 0.44, 0.003);
-    titleMesh.renderOrder = 5; // Above header
-    browserWindow.add(titleMesh);
+    const controlBar = new THREE.Mesh(controlGeometry, controlMaterial);
+    controlBar.position.y = -contentHeight/2 - controlBarHeight/2;
+    controlBar.position.z = 0.006; // Ensure it's in front of content
+    controlBar.userData.parentScreen = screenGroup;
+    screenGroup.add(controlBar);
     
-    // Modern control bar
-    const controlBarGeometry = new THREE.PlaneGeometry(contentWidth, screenHeight * 0.1);
-    const controlBarMaterial = new THREE.MeshBasicMaterial({
-        color: 0x181818, // Modern dark controls
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide
-    });
-    const controlBar = new THREE.Mesh(controlBarGeometry, controlBarMaterial);
-    controlBar.position.y = -screenHeight * 0.38; // Position at bottom of content
-    controlBar.position.z = 0.002; // Ensure it's in front of video
-    controlBar.renderOrder = 6; // Above video content
-    browserWindow.add(controlBar);
-    
-    // Add progress bar with modern design
-    const progressBgGeometry = new THREE.PlaneGeometry(contentWidth * 0.98, screenHeight * 0.02);
-    const progressBgMaterial = new THREE.MeshBasicMaterial({
-        color: 0x444444, // Progress bar background
-        side: THREE.DoubleSide
-    });
-    const progressBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
-    progressBg.position.y = -screenHeight * 0.33; // Top of control bar
-    progressBg.position.z = 0.003; // Ensure it's in front
-    progressBg.renderOrder = 7; // Above control bar
-    browserWindow.add(progressBg);
-    
-    // Add progress indicator (YouTube red)
-    const progressGeometry = new THREE.PlaneGeometry(contentWidth * 0.2, screenHeight * 0.02); // Starting progress
-    const progressMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff0000, // YouTube red
-        side: THREE.DoubleSide
-    });
-    const progress = new THREE.Mesh(progressGeometry, progressMaterial);
-    progress.position.x = -contentWidth * 0.39; // Start from left
-    progress.position.y = -screenHeight * 0.33;
-    progress.position.z = 0.004; // Ensure it's in front
-    progress.renderOrder = 8; // Above progress background
-    browserWindow.add(progress);
-    
-    // Create modern control buttons with larger size for better touch
-    const buttonSize = screenHeight * 0.07;
-    const buttonPositions = [
-        { x: -contentWidth * 0.42, y: -screenHeight * 0.42, type: 'play' },
-        { x: -contentWidth * 0.32, y: -screenHeight * 0.42, type: 'volume' },
-        { x: contentWidth * 0.42, y: -screenHeight * 0.42, type: 'resize' } // Changed from fullscreen to resize
-    ];
-    
-    buttonPositions.forEach(btn => {
-        addControlButton(browserWindow, btn.type, btn.x, btn.y, buttonSize);
-    });
-    
-    // Position the window
-    browserWindow.position.copy(position);
-    browserWindow.userData = { 
-        type: 'screen', 
-        id: screens.length, 
-        isSelected: false,
-        content: `Video Screen ${screens.length + 1}`,
-        originalScale: new THREE.Vector3(1, 1, 1),
-        controls: {
-            isPlaying: true,
-            isMuted: true,
-            progress: 0,
-            volume: 0
-        }
+    // Store original dimensions in userData for resize operations
+    screenGroup.userData.originalDimensions = {
+        width: width,
+        height: height,
+        contentWidth: contentWidth,
+        contentHeight: contentHeight
     };
     
-    scene.add(browserWindow);
-    screens.push(browserWindow);
+    // Add to screens array and return
+    if (!screens) screens = [];
+    screens.push(screenGroup);
     
-    // Set this as the selected screen
-    selectScreen(browserWindow);
+    return screenGroup;
+}
+
+// Function to create a text label
+function createText(text, size = 0.04, color = 0xffffff) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const scale = 400;
+    canvas.width = text.length * scale * 0.6;
+    canvas.height = scale;
     
-    return browserWindow;
+    // Set text styling
+    context.fillStyle = '#000000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.font = `bold ${scale * 0.8}px Arial, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Convert hex color to RGB string
+    const hexToRgb = (hex) => {
+        const r = (hex >> 16) & 255;
+        const g = (hex >> 8) & 255;
+        const b = hex & 255;
+        return `rgb(${r},${g},${b})`;
+    };
+    
+    context.fillStyle = hexToRgb(color);
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture and mesh
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const aspectRatio = canvas.width / canvas.height;
+    const geometry = new THREE.PlaneGeometry(size * aspectRatio, size);
+    
+    // Return mesh with text
+    return new THREE.Mesh(geometry, material);
 }
 
 // Add a control button to the screen
@@ -198,7 +192,8 @@ function addControlButton(screen, type, x, y, size) {
     button.userData = {
         type: 'button',
         action: type + 'Button',
-        screen: screen
+        screen: screen,
+        parentScreen: screen // Reference to parent screen for easy lookup
     };
     
     // Create icon for the button
@@ -214,6 +209,7 @@ function addControlButton(screen, type, x, y, size) {
     const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
     iconMesh.position.z = 0.001; // Slightly in front of button
     iconMesh.renderOrder = 21; // Even higher than the button
+    iconMesh.userData = { parentScreen: screen }; // Add parent reference
     button.add(iconMesh);
     
     screen.add(button);

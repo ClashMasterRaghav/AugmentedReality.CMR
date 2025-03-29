@@ -68,16 +68,13 @@ function getButtonFromIntersect(object) {
         return object;
     }
     
-    // If we hit a child of a button (like the icon)
-    if (object.parent && object.parent.userData && object.parent.userData.type === 'button') {
-        return object.parent;
-    }
-    
-    // If we hit a grandchild of a button
-    if (object.parent && object.parent.parent && 
-        object.parent.parent.userData && 
-        object.parent.parent.userData.type === 'button') {
-        return object.parent.parent;
+    // Try to find parent button by walking up the hierarchy
+    let parent = object.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'button') {
+            return parent;
+        }
+        parent = parent.parent;
     }
     
     return null;
@@ -143,12 +140,23 @@ function getScreenFromIntersect(object) {
         return object;
     }
     
+    // If the object has a direct reference to its parent screen
+    if (object.userData && object.userData.parentScreen) {
+        return object.userData.parentScreen;
+    }
+    
     // Find parent screen by walking up the hierarchy
     let parent = object.parent;
     while (parent) {
         if (parent.userData && parent.userData.type === 'screen') {
             return parent;
         }
+        
+        // Try to use a direct reference if available
+        if (parent.userData && parent.userData.parentScreen) {
+            return parent.userData.parentScreen;
+        }
+        
         parent = parent.parent;
     }
     
@@ -353,40 +361,39 @@ function findButtonByAction(action) {
         button.userData.action === action);
 }
 
-// Find all buttons in the scene with improved detection
+// Find all buttons in the scene
 function findAllButtons() {
-    let buttons = [];
+    // Gather all buttons from screens and control panel
+    const allButtons = [];
     
-    // Get control panel buttons
-    const controlPanels = scene.children.filter(obj => 
-        obj.userData && obj.userData.type === 'controlPanel');
-    
-    controlPanels.forEach(panel => {
-        panel.children.forEach(child => {
-            if (child.userData && child.userData.type === 'button') {
-                buttons.push(child);
-            }
-        });
-    });
-    
-    // Get screen buttons
-    screens.forEach(screen => {
+    // Get buttons from screens
+    const allScreens = findAllScreens();
+    allScreens.forEach(screen => {
         screen.children.forEach(child => {
             if (child.userData && child.userData.type === 'button') {
-                buttons.push(child);
-                
-                // Ensure button is always interactive by setting renderOrder
-                child.renderOrder = 10; // Higher renderOrder ensures it renders on top
+                allButtons.push(child);
             }
         });
     });
     
-    return buttons;
+    // Get buttons from control panel if it exists
+    if (controlPanel) {
+        controlPanel.children.forEach(child => {
+            if (child.userData && child.userData.type === 'button') {
+                allButtons.push(child);
+            }
+        });
+    }
+    
+    return allButtons;
 }
 
 // Touch start handler
 function onTouchStart(event) {
     event.preventDefault();
+    
+    // Log touch event
+    console.log(`Touch start detected with ${event.touches.length} fingers`);
     
     // Check for multi-touch (pinch gesture)
     if (event.touches.length === 2 && selectedScreen) {
@@ -429,11 +436,86 @@ function onTouchStart(event) {
     const doubleTapDetected = (now - lastTapTime) < 300;
     lastTapTime = now;
     
-    // Check for button intersections first
+    // *** PRIORITIZE SCREEN DETECTION ***
+    // Use recursive true for deep intersection testing of all screen objects
+    const allScreens = findAllScreens();
+    console.log(`Testing intersections with ${allScreens.length} screens`);
+    
+    // Test with entire screen objects
+    const screenIntersects = raycaster.intersectObjects(allScreens, true);
+    console.log(`Found ${screenIntersects.length} screen intersections`);
+    
+    if (screenIntersects.length > 0) {
+        // Log intersection details
+        console.log("Screen intersection:", screenIntersects[0].object.uuid);
+        
+        const screenObj = getScreenFromIntersect(screenIntersects[0].object);
+        if (screenObj) {
+            console.log("Found parent screen:", screenObj.uuid);
+            
+            // Select the screen
+            selectScreen(screenObj);
+            selectedScreen = screenObj;
+            
+            // Show touch indicator at intersection point for visual feedback
+            createTouchIndicator(screenIntersects[0].point);
+            
+            // Store intersection point for drag calculations
+            screenOffset.copy(screenObj.position).sub(screenIntersects[0].point);
+            
+            // Double tap to toggle resize 
+            if (doubleTapDetected) {
+                toggleResize(screenObj);
+                
+                // Provide haptic feedback if available
+                if (navigator.vibrate) {
+                    navigator.vibrate([30, 20, 30]);
+                }
+                
+                return;
+            }
+            
+            // ALWAYS enable screen movement on touch by default 
+            isTouchMovingScreen = true;
+            console.log("Screen touch detected - moving enabled");
+            
+            // Make screen "jump" slightly to indicate it's selected
+            const originalPos = screenObj.position.clone();
+            screenObj.position.z += 0.05; // Move slightly toward user
+            
+            setTimeout(() => {
+                screenObj.position.copy(originalPos);
+            }, 200);
+            
+            // Create visual feedback to show touch was detected
+            createModeChangeIndicator("Screen Selected");
+            
+            // Provide haptic feedback for screen selection
+            if (navigator.vibrate) {
+                navigator.vibrate(20);
+            }
+            
+            // Flash highlight around selected screen
+            flashScreenHighlight(screenObj);
+            
+            // If in rotate mode, also enable rotation
+            if (isRotateModeActive) {
+                isRotatingScreen = true;
+                initialRotation.copy(screenObj.rotation);
+                initialMousePosition.copy(initialTouchPosition);
+            }
+            
+            return; // Exit early to prioritize screen movement over buttons
+        }
+    }
+    
+    // If no screen detected, check for buttons
+    console.log("No screen detected, checking for buttons");
     const buttons = findAllButtons();
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
+        console.log("Button detected:", buttonIntersects[0].object.uuid);
         const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
         if (buttonObj) {
             // Visual feedback
@@ -449,6 +531,9 @@ function onTouchStart(event) {
                 buttonObj.scale.copy(originalScale);
             }, 200);
             
+            // Create touch indicator at intersection point
+            createTouchIndicator(buttonIntersects[0].point);
+            
             // Provide haptic feedback if available
             if (navigator.vibrate) {
                 navigator.vibrate(40);
@@ -460,115 +545,46 @@ function onTouchStart(event) {
         }
     }
     
-    // Check for screen intersections
-    const screenIntersects = raycaster.intersectObjects(screens, true);
-    
-    if (screenIntersects.length > 0) {
-        const screenObj = getScreenFromIntersect(screenIntersects[0].object);
-        if (screenObj) {
-            // Select the screen
-            selectScreen(screenObj);
-            selectedScreen = screenObj;
-            
-            // Store intersection point for drag calculations
-            screenOffset.copy(screenObj.position).sub(screenIntersects[0].point);
-            
-            // Double tap to toggle resize (instead of fullscreen)
-            if (doubleTapDetected) {
-                toggleResize(screenObj);
-                
-                // Provide haptic feedback if available
-                if (navigator.vibrate) {
-                    navigator.vibrate([30, 20, 30]);
-                }
-                
-                return;
-            }
-            
-            // Always enable screen movement on touch - simplifies interaction
-            isTouchMovingScreen = true;
-            
-            // Provide light haptic feedback for screen selection
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-            
-            // Flash highlight around selected screen
-            flashScreenHighlight(screenObj);
-            
-            // If in rotate mode, also enable rotation
-            if (isRotateModeActive) {
-                isRotatingScreen = true;
-                initialRotation.copy(screenObj.rotation);
-                initialMousePosition.copy(initialTouchPosition);
-            }
-        }
-    }
+    console.log("No interactive elements detected");
 }
 
-// Flash a highlight effect around a selected screen
-function flashScreenHighlight(screen) {
-    // Find the border or create one if it doesn't exist
-    let highlightMesh = screen.children.find(child => 
-        child.userData && child.userData.isHighlight);
+// Create a visual indicator for touch point
+function createTouchIndicator(position) {
+    // Create a small sphere at the touch point
+    const geometry = new THREE.SphereGeometry(0.02, 16, 16);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x4FC3F7,
+        transparent: true,
+        opacity: 0.8
+    });
+    const indicator = new THREE.Mesh(geometry, material);
+    indicator.position.copy(position);
+    scene.add(indicator);
     
-    if (!highlightMesh) {
-        // Get screen dimensions (use the first plane geometry as reference)
-        const screenMesh = screen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry');
+    // Animate and remove
+    const startTime = performance.now();
+    const duration = 500; // ms
+    
+    function animate() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
         
-        let width = 1.05;
-        let height = 0.8;
-        
-        if (screenMesh && screenMesh.geometry) {
-            // Extract dimensions from existing geometry
-            const size = new THREE.Vector3();
-            screenMesh.geometry.computeBoundingBox();
-            screenMesh.geometry.boundingBox.getSize(size);
-            
-            // Scale slightly larger than the original screen
-            width = size.x * 1.05;
-            height = size.y * 1.05;
+        if (progress >= 1) {
+            scene.remove(indicator);
+            indicator.geometry.dispose();
+            indicator.material.dispose();
+            return;
         }
         
-        // Create highlight mesh
-        const glowGeometry = new THREE.PlaneGeometry(width, height);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4fc3f7,
-            transparent: true,
-            opacity: 0,
-            side: THREE.DoubleSide
-        });
+        // Scale up and fade out
+        const scale = 1 + progress * 2;
+        indicator.scale.set(scale, scale, scale);
+        indicator.material.opacity = 0.8 * (1 - progress);
         
-        highlightMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        highlightMesh.position.z = -0.01;
-        highlightMesh.userData = { isHighlight: true };
-        screen.add(highlightMesh);
+        requestAnimationFrame(animate);
     }
     
-    // Animate the highlight
-    let opacity = 0;
-    const fadeIn = () => {
-        opacity += 0.1;
-        highlightMesh.material.opacity = opacity;
-        
-        if (opacity < 0.6) {
-            requestAnimationFrame(fadeIn);
-        } else {
-            // Fade out
-            const fadeOut = () => {
-                opacity -= 0.1;
-                highlightMesh.material.opacity = opacity;
-                
-                if (opacity > 0) {
-                    requestAnimationFrame(fadeOut);
-                }
-            };
-            requestAnimationFrame(fadeOut);
-        }
-    };
-    
-    requestAnimationFrame(fadeIn);
+    animate();
 }
 
 // Touch move handler
@@ -622,7 +638,10 @@ function onTouchMove(event) {
 
 // Move screen based on touch movement
 function moveScreenWithTouch() {
-    if (!selectedScreen) return;
+    if (!selectedScreen) {
+        console.log("No selected screen to move");
+        return;
+    }
     
     // Update raycaster with current touch position
     raycaster.setFromCamera(currentTouchPosition, camera);
@@ -643,8 +662,11 @@ function moveScreenWithTouch() {
         // Add screenOffset to maintain relative touch position
         const targetPosition = intersectionPoint.clone().add(screenOffset);
         
-        // Apply more responsive smoothing
-        selectedScreen.position.lerp(targetPosition, 0.7);
+        // Calculate movement distance for feedback
+        const moveDistance = selectedScreen.position.distanceTo(targetPosition);
+        
+        // Apply direct movement with no smoothing for immediate response
+        selectedScreen.position.copy(targetPosition);
         
         // Ensure the screen stays at a reasonable distance
         const distance = camera.position.distanceTo(selectedScreen.position);
@@ -661,49 +683,58 @@ function moveScreenWithTouch() {
             controlPanel.userData.update();
         }
         
-        // Add visual feedback for movement
-        createMoveIndicator(selectedScreen.position.clone(), 0.05);
+        // Add visual feedback for significant movements
+        if (moveDistance > 0.01) {
+            createMoveIndicator(selectedScreen.position.clone(), 0.02);
+            
+            // Log movement for debugging
+            console.log("Moving screen", moveDistance.toFixed(3), "units");
+        }
     }
 }
 
 // Create a visual indicator for movement feedback
-function createMoveIndicator(position, size) {
-    // Create a small dot that fades quickly
-    const geometry = new THREE.SphereGeometry(size, 8, 8);
+function createMoveIndicator(position, size = 0.05) {
+    // Create a ring to show where the screen is being moved
+    const geometry = new THREE.RingGeometry(size, size + 0.01, 32);
     const material = new THREE.MeshBasicMaterial({
-        color: 0x4fc3f7,
+        color: 0x4FC3F7,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.6,
+        side: THREE.DoubleSide
     });
-    
     const indicator = new THREE.Mesh(geometry, material);
     indicator.position.copy(position);
     
-    // Add to scene
+    // Orient to face camera
+    indicator.lookAt(camera.position);
+    
     scene.add(indicator);
     
-    // Animate fading out
+    // Animate and remove
     const startTime = performance.now();
-    const duration = 200; // 200ms
+    const duration = 300; // ms
     
-    function fadeOut() {
+    function animate() {
         const elapsed = performance.now() - startTime;
         const progress = elapsed / duration;
         
-        if (progress < 1) {
-            material.opacity = 0.3 * (1 - progress);
-            indicator.scale.x = 1 - (progress * 0.5);
-            indicator.scale.y = 1 - (progress * 0.5);
-            indicator.scale.z = 1 - (progress * 0.5);
-            requestAnimationFrame(fadeOut);
-        } else {
+        if (progress >= 1) {
             scene.remove(indicator);
-            geometry.dispose();
-            material.dispose();
+            indicator.geometry.dispose();
+            indicator.material.dispose();
+            return;
         }
+        
+        // Scale up and fade out
+        const scale = 1 + progress * 3;
+        indicator.scale.set(scale, scale, scale);
+        indicator.material.opacity = 0.6 * (1 - progress);
+        
+        requestAnimationFrame(animate);
     }
     
-    requestAnimationFrame(fadeOut);
+    animate();
 }
 
 // Rotate screen based on touch movement
@@ -810,72 +841,97 @@ function updateVideoTime(progress) {
 
 // Create a floating text indicator for mode changes
 function createModeChangeIndicator(message) {
-    // Create a canvas for the text
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
+    // Create a text indicator using HTML
+    const indicator = document.createElement('div');
+    indicator.textContent = message;
+    indicator.style.position = 'fixed';
+    indicator.style.bottom = '20px';
+    indicator.style.left = '50%';
+    indicator.style.transform = 'translateX(-50%)';
+    indicator.style.background = 'rgba(33, 150, 243, 0.8)';
+    indicator.style.color = 'white';
+    indicator.style.padding = '10px 20px';
+    indicator.style.borderRadius = '20px';
+    indicator.style.fontFamily = 'Arial, sans-serif';
+    indicator.style.fontSize = '16px';
+    indicator.style.fontWeight = 'bold';
+    indicator.style.pointerEvents = 'none';
+    indicator.style.zIndex = '1000';
+    indicator.style.opacity = '0';
+    indicator.style.transition = 'opacity 0.3s ease-in-out';
     
-    // Draw the text
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = 'rgba(50, 150, 255, 0.8)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    document.body.appendChild(indicator);
     
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    // Fade in
+    setTimeout(() => {
+        indicator.style.opacity = '1';
+    }, 10);
     
-    // Create texture
-    const texture = new THREE.CanvasTexture(canvas);
-    const geometry = new THREE.PlaneGeometry(0.3, 0.075);
+    // Remove after delay
+    setTimeout(() => {
+        indicator.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(indicator);
+        }, 300);
+    }, 1500);
+}
+
+// Flash a highlight effect around a selected screen
+function flashScreenHighlight(screen) {
+    // Create a highlight effect around the selected screen
+    const width = screen.userData.originalDimensions?.width || 1.0;
+    const height = screen.userData.originalDimensions?.height || 0.75;
+    
+    const geometry = new THREE.PlaneGeometry(width + 0.15, height + 0.15);
     const material = new THREE.MeshBasicMaterial({
-        map: texture,
+        color: 0x4FC3F7,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.3,
         side: THREE.DoubleSide
     });
+    const highlight = new THREE.Mesh(geometry, material);
+    highlight.position.copy(screen.position);
+    highlight.position.z -= 0.015; // Behind screen
     
-    const indicator = new THREE.Mesh(geometry, material);
+    // Match screen rotation
+    highlight.rotation.copy(screen.rotation);
     
-    // Position above the control panel
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
-    cameraDirection.applyQuaternion(camera.quaternion);
+    scene.add(highlight);
     
-    indicator.position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
-    indicator.position.y += 0.15; // Position above control panel
-    indicator.quaternion.copy(camera.quaternion);
-    
-    scene.add(indicator);
-    
-    // Fade out and remove
+    // Animate and remove
     const startTime = performance.now();
-    const duration = 1500; // 1.5 seconds
+    const duration = 500; // ms
     
-    function fadeOut() {
+    function animate() {
         const elapsed = performance.now() - startTime;
         const progress = elapsed / duration;
         
-        if (progress < 1) {
-            if (progress > 0.7) {
-                // Start fading out in the last 30% of time
-                material.opacity = 0.9 * (1 - ((progress - 0.7) / 0.3));
-            }
-            
-            // Float upward slightly
-            indicator.position.y += 0.0002;
-            
-            requestAnimationFrame(fadeOut);
-        } else {
-            scene.remove(indicator);
-            material.dispose();
-            geometry.dispose();
-            texture.dispose();
+        if (progress >= 1) {
+            scene.remove(highlight);
+            highlight.geometry.dispose();
+            highlight.material.dispose();
+            return;
         }
+        
+        // Pulse effect
+        const pulse = Math.sin(progress * Math.PI * 3);
+        const scale = 1 + pulse * 0.1;
+        highlight.scale.set(scale, scale, scale);
+        highlight.material.opacity = 0.3 * (1 - progress);
+        
+        requestAnimationFrame(animate);
     }
     
-    requestAnimationFrame(fadeOut);
+    animate();
+}
+
+// Find all screens in the scene
+function findAllScreens() {
+    // First try to use the screens array
+    if (screens && screens.length > 0) {
+        return screens;
+    }
+    
+    // Fallback: search directly in the scene
+    return scene.children.filter(obj => obj.userData && obj.userData.type === 'screen');
 } 
