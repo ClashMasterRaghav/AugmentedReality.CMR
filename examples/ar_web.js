@@ -26,6 +26,8 @@ let isRotateModeActive = false; // Flag to track if rotate mode is active
 let rotationSpeed = 0.05; // Speed of rotation
 let initialRotation = new THREE.Vector2(); // Store initial rotation
 let isRotating = false; // Flag to track if rotation is in progress
+let isMovingControlPanel = false;
+let controlPanel = null;
 
 init();
 animate();
@@ -124,44 +126,138 @@ function init() {
 // Update the createControlPanel function
 function createControlPanel() {
     const panel = new THREE.Group();
+    controlPanel = panel; // Store reference to control panel
     
     // Panel background with modern design - smaller size
     const panelGeometry = new THREE.PlaneGeometry(0.25, 0.20); // Reduced size
     const panelMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x222222, // Darker background for modern look
+        color: 0x1a1a2e, // Darker, more modern background
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.85 // Slightly more transparent
+        opacity: 0.9 // More solid appearance
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    panelMesh.userData = { type: 'panelBackground' }; // For hit detection
     panel.add(panelMesh);
     
-    // Add subtle panel border
-    const glowGeometry = new THREE.PlaneGeometry(0.26, 0.21); // Adjusted for new panel size
-    const glowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x4488ff,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.3 // More subtle glow
-    });
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.z = -0.002;
-    panel.add(glowMesh);
-    
-    // Smaller button size for modern look
-    const buttonGeometry = new THREE.PlaneGeometry(0.20, 0.04);
-    const buttonMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x4488ff,
+    // Add subtle rounded corners effect with multiple overlays
+    const cornerRadius = 0.01;
+    const cornerGeometry = new THREE.PlaneGeometry(0.25 - cornerRadius*2, 0.20 - cornerRadius*2);
+    const cornerMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x1a1a2e,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.9
     });
+    const cornerMesh = new THREE.Mesh(cornerGeometry, cornerMaterial);
+    cornerMesh.position.z = 0.0005;
+    panel.add(cornerMesh);
+    
+    // Add modern gradient effect
+    const gradientGeometry = new THREE.PlaneGeometry(0.25, 0.20);
+    const gradientCanvas = document.createElement('canvas');
+    gradientCanvas.width = 256;
+    gradientCanvas.height = 200;
+    const gradCtx = gradientCanvas.getContext('2d');
+    const gradient = gradCtx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, 'rgba(26, 26, 46, 0.9)');
+    gradient.addColorStop(1, 'rgba(40, 40, 80, 0.9)');
+    gradCtx.fillStyle = gradient;
+    gradCtx.fillRect(0, 0, 256, 200);
+    
+    const gradientTexture = new THREE.CanvasTexture(gradientCanvas);
+    const gradientMaterial = new THREE.MeshBasicMaterial({
+        map: gradientTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const gradientMesh = new THREE.Mesh(gradientGeometry, gradientMaterial);
+    gradientMesh.position.z = 0.001;
+    panel.add(gradientMesh);
+    
+    // Add panel title
+    const titleCanvas = document.createElement('canvas');
+    titleCanvas.width = 256;
+    titleCanvas.height = 40;
+    const titleCtx = titleCanvas.getContext('2d');
+    titleCtx.fillStyle = '#ffffff';
+    titleCtx.font = 'bold 18px Arial';
+    titleCtx.textAlign = 'center';
+    titleCtx.textBaseline = 'middle';
+    titleCtx.fillText('AR CONTROLS', 128, 20);
+    
+    const titleTexture = new THREE.CanvasTexture(titleCanvas);
+    const titleGeometry = new THREE.PlaneGeometry(0.20, 0.03);
+    const titleMaterial = new THREE.MeshBasicMaterial({
+        map: titleTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
+    titleMesh.position.set(0, 0.085, 0.002);
+    panel.add(titleMesh);
+    
+    // Add move panel handle with icon
+    const handleGeometry = new THREE.PlaneGeometry(0.24, 0.025);
+    const handleMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x3a3a5e,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    });
+    const handleMesh = new THREE.Mesh(handleGeometry, handleMaterial);
+    handleMesh.position.set(0, 0.085, 0.0015);
+    handleMesh.userData = { type: 'panelHandle' }; // For hit detection
+    panel.add(handleMesh);
+    
+    // Add handle icon (drag dots)
+    const handleIconCanvas = document.createElement('canvas');
+    handleIconCanvas.width = 256;
+    handleIconCanvas.height = 30;
+    const handleCtx = handleIconCanvas.getContext('2d');
+    handleCtx.fillStyle = '#aaaaaa';
+    // Draw 6 dots in the center
+    for (let i = 0; i < 6; i++) {
+        handleCtx.beginPath();
+        handleCtx.arc(108 + i * 8, 15, 2, 0, Math.PI * 2);
+        handleCtx.fill();
+    }
+    
+    const handleIconTexture = new THREE.CanvasTexture(handleIconCanvas);
+    const handleIconGeometry = new THREE.PlaneGeometry(0.05, 0.015);
+    const handleIconMaterial = new THREE.MeshBasicMaterial({
+        map: handleIconTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const handleIconMesh = new THREE.Mesh(handleIconGeometry, handleIconMaterial);
+    handleIconMesh.position.set(0, 0.085, 0.002);
+    panel.add(handleIconMesh);
+    
+    // Smaller button size for modern look with better hitbox
+    const buttonGeometry = new THREE.PlaneGeometry(0.20, 0.04);
+    // Create invisible larger hitbox geometry for buttons
+    const hitboxGeometry = new THREE.PlaneGeometry(0.22, 0.045);
     
     // New Screen button
-    const newScreenButton = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    newScreenButton.position.set(0, 0.07, 0.001);
+    const newScreenButton = new THREE.Mesh(buttonGeometry, new THREE.MeshBasicMaterial({ 
+        color: 0x4488ff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    }));
+    newScreenButton.position.set(0, 0.045, 0.001);
     newScreenButton.userData = { type: 'button', action: 'newScreen' };
     panel.add(newScreenButton);
+    
+    // New Screen button hitbox (invisible but larger for better interaction)
+    const newScreenHitbox = new THREE.Mesh(hitboxGeometry, new THREE.MeshBasicMaterial({ 
+        transparent: true,
+        opacity: 0.0
+    }));
+    newScreenHitbox.position.set(0, 0.045, 0.0005);
+    newScreenHitbox.userData = { type: 'hitbox', action: 'newScreen' };
+    panel.add(newScreenHitbox);
     
     // New Screen button label
     const buttonCanvas = document.createElement('canvas');
@@ -182,7 +278,7 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const buttonLabel = new THREE.Mesh(buttonLabelGeometry, buttonLabelMaterial);
-    buttonLabel.position.set(0, 0.07, 0.002);
+    buttonLabel.position.set(0, 0.045, 0.002);
     panel.add(buttonLabel);
     
     // Move Screen button with toggle functionality - grey when inactive
@@ -193,7 +289,7 @@ function createControlPanel() {
         opacity: 0.9
     });
     const moveScreenButton = new THREE.Mesh(buttonGeometry, moveButtonMaterial);
-    moveScreenButton.position.set(0, 0.02, 0.001);
+    moveScreenButton.position.set(0, 0.0, 0.001);
     moveScreenButton.userData = { 
         type: 'button',
         action: 'moveScreen',
@@ -201,6 +297,15 @@ function createControlPanel() {
         isActive: false
     };
     panel.add(moveScreenButton);
+    
+    // Move Screen button hitbox
+    const moveScreenHitbox = new THREE.Mesh(hitboxGeometry, new THREE.MeshBasicMaterial({ 
+        transparent: true,
+        opacity: 0.0
+    }));
+    moveScreenHitbox.position.set(0, 0.0, 0.0005);
+    moveScreenHitbox.userData = { type: 'hitbox', action: 'moveScreen' };
+    panel.add(moveScreenHitbox);
     
     // Move Screen button label
     const moveButtonCanvas = document.createElement('canvas');
@@ -220,7 +325,7 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const moveButtonLabel = new THREE.Mesh(buttonLabelGeometry, moveButtonLabelMaterial);
-    moveButtonLabel.position.set(0, 0.02, 0.002);
+    moveButtonLabel.position.set(0, 0.0, 0.002);
     panel.add(moveButtonLabel);
     
     // Rotate Screen button - grey when inactive
@@ -231,7 +336,7 @@ function createControlPanel() {
         opacity: 0.9
     });
     const rotateScreenButton = new THREE.Mesh(buttonGeometry, rotateButtonMaterial);
-    rotateScreenButton.position.set(0, -0.03, 0.001);
+    rotateScreenButton.position.set(0, -0.045, 0.001);
     rotateScreenButton.userData = { 
         type: 'button',
         action: 'rotateScreen',
@@ -239,6 +344,15 @@ function createControlPanel() {
         isActive: false
     };
     panel.add(rotateScreenButton);
+    
+    // Rotate Screen button hitbox
+    const rotateScreenHitbox = new THREE.Mesh(hitboxGeometry, new THREE.MeshBasicMaterial({ 
+        transparent: true,
+        opacity: 0.0
+    }));
+    rotateScreenHitbox.position.set(0, -0.045, 0.0005);
+    rotateScreenHitbox.userData = { type: 'hitbox', action: 'rotateScreen' };
+    panel.add(rotateScreenHitbox);
     
     // Rotate Screen button label
     const rotateButtonCanvas = document.createElement('canvas');
@@ -258,7 +372,7 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const rotateButtonLabel = new THREE.Mesh(buttonLabelGeometry, rotateButtonLabelMaterial);
-    rotateButtonLabel.position.set(0, -0.03, 0.002);
+    rotateButtonLabel.position.set(0, -0.045, 0.002);
     panel.add(rotateButtonLabel);
     
     // Toggle Audio button
@@ -269,7 +383,7 @@ function createControlPanel() {
         opacity: 0.9
     });
     const audioButton = new THREE.Mesh(buttonGeometry, audioButtonMaterial);
-    audioButton.position.set(0, -0.08, 0.001);
+    audioButton.position.set(0, -0.09, 0.001);
     audioButton.userData = { 
         type: 'button',
         action: 'toggleAudio',
@@ -277,6 +391,15 @@ function createControlPanel() {
         isActive: false
     };
     panel.add(audioButton);
+    
+    // Audio button hitbox
+    const audioButtonHitbox = new THREE.Mesh(hitboxGeometry, new THREE.MeshBasicMaterial({ 
+        transparent: true,
+        opacity: 0.0
+    }));
+    audioButtonHitbox.position.set(0, -0.09, 0.0005);
+    audioButtonHitbox.userData = { type: 'hitbox', action: 'toggleAudio' };
+    panel.add(audioButtonHitbox);
     
     // Audio button label
     const audioButtonCanvas = document.createElement('canvas');
@@ -296,7 +419,7 @@ function createControlPanel() {
         side: THREE.DoubleSide
     });
     const audioButtonLabel = new THREE.Mesh(buttonLabelGeometry, audioButtonLabelMaterial);
-    audioButtonLabel.position.set(0, -0.08, 0.002);
+    audioButtonLabel.position.set(0, -0.09, 0.002);
     panel.add(audioButtonLabel);
     
     // Position the control panel in front of the user
@@ -304,7 +427,8 @@ function createControlPanel() {
     panel.rotation.x = -Math.PI / 8; // Tilt slightly up
     panel.userData = { 
         type: 'controlPanel',
-        audioLabel: audioButtonLabel // Store reference to audio label for updating
+        audioLabel: audioButtonLabel, // Store reference to audio label for updating
+        isMovable: true // Flag to indicate this panel can be moved
     };
     scene.add(panel);
 }
@@ -642,6 +766,12 @@ function onSelect(event) {
         return;
     }
     
+    if (isMovingControlPanel) {
+        // Finalize movement of control panel
+        isMovingControlPanel = false;
+        return;
+    }
+    
     // Check for screen selection
     const screenIntersects = raycaster.intersectObjects(screens.map(screen => screen.children[0])); // Intersect with main panel
     
@@ -652,45 +782,56 @@ function onSelect(event) {
         return;
     }
     
-    // Check for keyboard key intersections
-    if (virtualKeyboard && virtualKeyboard.visible && virtualKeyboard.userData.keys) {
-        const keyIntersects = raycaster.intersectObjects(virtualKeyboard.userData.keys);
-        
-        if (keyIntersects.length > 0) {
-            const key = keyIntersects[0].object;
-            console.log(`Key pressed: ${key.userData.key}`);
-            
-            // Visual feedback on key press
-            const flashColor = new THREE.Color(0x00ff00);
-            const originalColor = key.userData.originalMaterial.color.clone();
-            
-            key.material.color.copy(flashColor);
-            
-            // Reset color after brief flash
-            setTimeout(() => {
-                key.material.color.copy(originalColor);
-            }, 200);
-            
-            return;
-        }
-    }
-    
-    // Check for control panel button interactions
+    // Check for control panel interactions
     const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
-    let controlIntersects = [];
     
+    // First check for panel handle (for moving the panel)
+    const panelHandles = [];
     controlPanels.forEach(panel => {
-        // Get all button children
-        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        controlIntersects = controlIntersects.concat(buttonIntersects);
+        const handles = panel.children.filter(obj => obj.userData && obj.userData.type === 'panelHandle');
+        panelHandles.push(...handles);
     });
     
-    if (controlIntersects.length > 0) {
-        const button = controlIntersects[0].object;
+    const handleIntersects = raycaster.intersectObjects(panelHandles);
+    if (handleIntersects.length > 0) {
+        const handle = handleIntersects[0].object;
+        const panel = handle.parent;
+        
+        if (panel.userData.isMovable) {
+            isMovingControlPanel = true;
+            // Visual feedback
+            handle.material.color.set(0x5a5a8e); // Highlight color
+            setTimeout(() => {
+                handle.material.color.set(0x3a3a5e); // Reset color
+            }, 200);
+        }
+        return;
+    }
+    
+    // Check for hitbox interactions (larger invisible areas for better interaction)
+    const hitboxes = [];
+    controlPanels.forEach(panel => {
+        const boxes = panel.children.filter(obj => obj.userData && obj.userData.type === 'hitbox');
+        hitboxes.push(...boxes);
+    });
+    
+    const hitboxIntersects = raycaster.intersectObjects(hitboxes);
+    if (hitboxIntersects.length > 0) {
+        const hitbox = hitboxIntersects[0].object;
+        const action = hitbox.userData.action;
+        const panel = hitbox.parent;
+        
+        // Find the actual button that corresponds to this hitbox
+        const button = panel.children.find(obj => 
+            obj.userData && 
+            obj.userData.type === 'button' && 
+            obj.userData.action === action
+        );
+        
+        if (!button) return;
         
         // Handle button actions
-        if (button.userData.action === 'newScreen') {
+        if (action === 'newScreen') {
             // Start placing a new screen
             isPlacingScreen = true;
             
@@ -712,16 +853,38 @@ function onSelect(event) {
             return;
         }
         
-        if (button.userData.action === 'moveScreen' && selectedScreen) {
-            // Start moving the selected screen
-            isMovingScreen = true;
-            
-            // Visual feedback for button press
-            const originalColor = button.material.color.clone();
-            button.material.color.set(0x4CAF50);
-            setTimeout(() => {
-                button.material.color.copy(originalColor);
-            }, 200);
+        if (action === 'moveScreen') {
+            // Toggle move mode
+            if (button.userData.isToggle) {
+                button.userData.isActive = !button.userData.isActive;
+                isMoveModeActive = button.userData.isActive;
+                
+                // Update button color based on state
+                if (button.userData.isActive) {
+                    button.material.color.set(0x4CAF50); // Green when active
+                    
+                    // Deactivate rotate mode if it's active
+                    if (isRotateModeActive) {
+                        const rotateButtons = scene.children
+                            .filter(obj => obj.userData && obj.userData.type === 'controlPanel')
+                            .flatMap(panel => panel.children.filter(obj => obj.userData && obj.userData.action === 'rotateScreen'));
+                        
+                        if (rotateButtons.length > 0) {
+                            rotateButtons[0].userData.isActive = false;
+                            rotateButtons[0].material.color.set(0x777777); // Grey when inactive
+                            isRotateModeActive = false;
+                        }
+                    }
+                    
+                    // If a screen is selected, start moving it immediately
+                    if (selectedScreen) {
+                        isMovingScreen = true;
+                    }
+                } else {
+                    button.material.color.set(0x777777); // Grey when inactive
+                    isMovingScreen = false; // Stop any ongoing movement
+                }
+            }
             
             return;
         }
@@ -831,6 +994,25 @@ function render() {
         target.lookAt(camera.position);
     }
     
+    // Handle control panel movement
+    if (isMovingControlPanel && controlPanel) {
+        // Get controller position and direction
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(controller.matrixWorld);
+        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // Set position in front of controller, but closer
+        const targetPosition = position.clone().addScaledVector(direction, 0.5);
+        controlPanel.position.copy(targetPosition);
+        
+        // Make panel face the user
+        controlPanel.lookAt(camera.position);
+        // Adjust tilt
+        controlPanel.rotation.x -= Math.PI / 8;
+    }
+    
     // Handle screen rotation with controller
     if (isRotateModeActive && selectedScreen && !isRotating) {
         // Get controller movement
@@ -915,15 +1097,35 @@ function onTouchStart(event) {
         return;
     }
     
-    // Check for control panel button interactions
+    // Check for control panel handle (for moving the panel)
     const controlPanels = scene.children.filter(obj => obj.userData && obj.userData.type === 'controlPanel');
-    let controlIntersects = [];
-    
+    const panelHandles = [];
     controlPanels.forEach(panel => {
-        const buttons = panel.children.filter(obj => obj.userData && obj.userData.type === 'button');
-        const buttonIntersects = raycaster.intersectObjects(buttons);
-        controlIntersects = controlIntersects.concat(buttonIntersects);
+        const handles = panel.children.filter(obj => obj.userData && obj.userData.type === 'panelHandle');
+        panelHandles.push(...handles);
     });
+    
+    const handleIntersects = raycaster.intersectObjects(panelHandles);
+    if (handleIntersects.length > 0) {
+        const handle = handleIntersects[0].object;
+        const panel = handle.parent;
+        
+        if (panel.userData.isMovable) {
+            isMovingControlPanel = true;
+            // Visual feedback
+            handle.material.color.set(0x5a5a8e); // Highlight color
+        }
+        return;
+    }
+    
+    // Check for hitbox interactions
+    const hitboxes = [];
+    controlPanels.forEach(panel => {
+        const boxes = panel.children.filter(obj => obj.userData && obj.userData.type === 'hitbox');
+        hitboxes.push(...boxes);
+    });
+    
+    const hitboxIntersects = raycaster.intersectObjects(hitboxes);
     
     if (controlIntersects.length > 0) {
         const button = controlIntersects[0].object;
@@ -1049,6 +1251,14 @@ function onTouchMove(event) {
         selectedScreen.position.y += deltaY * movementScale;
     }
     
+    // Update control panel position if we're moving it
+    if (isMovingControlPanel && controlPanel) {
+        // Scale the movement to make it more natural
+        const movementScale = 1.5;
+        controlPanel.position.x += deltaX * movementScale;
+        controlPanel.position.y += deltaY * movementScale;
+    }
+    
     // Update screen rotation if we're rotating a screen with touch
     if (isRotating && selectedScreen) {
         // Scale the rotation to make it more natural
@@ -1064,4 +1274,13 @@ function onTouchMove(event) {
 function onTouchEnd(event) {
     isTouchMoving = false;
     isRotating = false;
+    isMovingControlPanel = false;
+    
+    // Reset panel handle color if we were moving a panel
+    if (controlPanel) {
+        const handle = controlPanel.children.find(obj => obj.userData && obj.userData.type === 'panelHandle');
+        if (handle) {
+            handle.material.color.set(0x3a3a5e);
+        }
+    }
 }
