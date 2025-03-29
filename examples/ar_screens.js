@@ -16,7 +16,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     
-    console.log("Creating screen with draggable top bar");
+    console.log("Creating screen with draggable top bar and video");
     
     // Basic identification data
     browserWindow.userData = { 
@@ -37,17 +37,34 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     borderPanel.position.z = -0.001;
     browserWindow.add(borderPanel);
     
-    // Background plane
+    // Background plane - will hold video texture
     const bgGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
-    const bgMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x121212, // Dark background
-        side: THREE.DoubleSide
-    });
+    
+    // Use video texture if available, otherwise use a dark background
+    let bgMaterial;
+    if (typeof videoTexture !== 'undefined' && videoTexture) {
+        console.log("Using video texture for screen content");
+        bgMaterial = new THREE.MeshBasicMaterial({ 
+            map: videoTexture,
+            side: THREE.DoubleSide
+        });
+    } else {
+        console.log("Video texture not available, using fallback");
+        bgMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x121212, // Dark background as fallback
+            side: THREE.DoubleSide
+        });
+        
+        // Create a fallback texture with loading indicator
+        const fallbackTexture = createFallbackTexture(browserWindow.userData.id);
+        bgMaterial.map = fallbackTexture;
+    }
+    
     const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
     browserWindow.add(bgPanel);
     
     // Add draggable top bar - spans the entire width of the screen
-    const topBarHeight = 0.08; // Height of the top bar
+    const topBarHeight = 0.10; // Increased height for easier grabbing in AR
     const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
     const topBarMaterial = new THREE.MeshBasicMaterial({
         color: 0x333333, // Darker than the background
@@ -62,34 +79,45 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     topBar.position.set(
         0, // Centered horizontally
         screenHeight/2 - topBarHeight/2, // Top edge
-        0.005 // Slightly in front
+        0.01 // Increased z-position for better touch detection
     );
     topBar.renderOrder = 100; // Ensure it renders on top
     
     // Add a grip pattern to indicate draggability
     const gripCanvas = document.createElement('canvas');
     gripCanvas.width = 512;
-    gripCanvas.height = 64;
+    gripCanvas.height = 96; // Increased height
     const ctx = gripCanvas.getContext('2d');
     
-    // Draw grip pattern (dots)
+    // Fill with gradient background for better visibility
+    const gradient = ctx.createLinearGradient(0, 0, 0, 96);
+    gradient.addColorStop(0, '#555555');
+    gradient.addColorStop(1, '#333333');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 512, 96);
+    
+    // Draw grip pattern (larger dots)
     ctx.fillStyle = '#ffffff';
     for (let i = 0; i < 9; i++) {
         const x = 30 + i * 56; // Evenly spaced dots
         ctx.beginPath();
-        ctx.arc(x, 32, 3, 0, Math.PI * 2);
+        ctx.arc(x, 48, 4, 0, Math.PI * 2); // Larger dots, centered vertically
         ctx.fill();
     }
     
-    // Add screen title text
+    // Add screen title text with shadow for better readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Arial';
+    ctx.font = 'bold 28px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`Screen ${browserWindow.userData.id + 1}`, 256, 32);
+    ctx.fillText(`Screen ${browserWindow.userData.id + 1}`, 256, 48);
     
     const gripTexture = new THREE.CanvasTexture(gripCanvas);
-    const gripGeometry = new THREE.PlaneGeometry(screenWidth * 0.95, topBarHeight * 0.8);
+    const gripGeometry = new THREE.PlaneGeometry(screenWidth * 0.95, topBarHeight * 0.9);
     const gripMaterial = new THREE.MeshBasicMaterial({
         map: gripTexture,
         transparent: true,
@@ -113,6 +141,50 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     
     // Store reference to the drag handle on the screen object
     browserWindow.userData.dragHandle = topBar;
+    
+    // Add video controls at the bottom of the screen if video texture exists
+    if (typeof videoTexture !== 'undefined' && videoTexture) {
+        // Progress bar background
+        const progressBgGeometry = new THREE.PlaneGeometry(0.74, 0.02);
+        const progressBgMaterial = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            side: THREE.DoubleSide,
+            depthTest: false
+        });
+        const progressBg = new THREE.Mesh(progressBgGeometry, progressBgMaterial);
+        progressBg.position.set(0, -0.21, 0.005);
+        progressBg.renderOrder = 90;
+        browserWindow.add(progressBg);
+        
+        // Progress bar (initially empty)
+        const progressGeometry = new THREE.PlaneGeometry(0.74, 0.02);
+        const progressMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000, // Red progress bar
+            side: THREE.DoubleSide,
+            depthTest: false
+        });
+        const progressBar = new THREE.Mesh(progressGeometry, progressMaterial);
+        progressBar.position.set(-0.37, -0.21, 0.006); // Start at left edge
+        progressBar.scale.set(0, 1, 1); // Initially 0 width
+        progressBar.renderOrder = 91;
+        browserWindow.add(progressBar);
+        
+        // Add play/pause button
+        const playButton = addControlButton(browserWindow, 'play', -0.3, -0.27, 0.03);
+        
+        // Add volume/mute button
+        const volumeButton = addControlButton(browserWindow, 'volume', -0.2, -0.27, 0.03);
+        
+        // Store controls in userData
+        browserWindow.userData.controls = {
+            progress: 0,
+            isPlaying: true,
+            isMuted: false,
+            progressBar: progressBar,
+            playButton: playButton,
+            volumeButton: volumeButton
+        };
+    }
     
     // Position the window
     browserWindow.position.copy(position);

@@ -5,6 +5,9 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
+import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
+import { initUI, createNotification } from './ar_ui.js';
+import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
@@ -19,6 +22,8 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let selectedScreen = null;
 export let selectedKey = null;
+export let container;
+export let isARMode = false;
 
 // Main initialization function called from ar_main.js
 export function initAR() {
@@ -110,6 +115,31 @@ function initAREnvironment() {
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
+
+    // Initialize UI elements
+    initUI();
+    
+    // Preload video texture right after scene setup
+    console.log("Initializing video functionality");
+    const videoTexture = loadVideoTexture();
+    
+    // Connect video controls to the interaction module
+    setupVideoControls({
+        toggleVideoPlayback,
+        toggleVideoMute
+    });
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Start animation loop
+    renderer.setAnimationLoop(animate);
+    
+    // Add a notification to let the user know the app is ready
+    createNotification('AR Experience Ready', 'success');
+    
+    // Create initial screen
+    createStartScreen();
 }
 
 // Handle window resize
@@ -122,6 +152,12 @@ function onWindowResize() {
 // Animation loop
 export function animate() {
     renderer.setAnimationLoop(render);
+    
+    // Update video textures in every frame
+    updateVideoTextures();
+    
+    // Check if in AR mode
+    isARMode = renderer.xr.isPresenting;
 }
 
 // Render function
@@ -211,4 +247,9 @@ export function render() {
     
     // Render the scene
     renderer.render(scene, camera);
+}
+
+// Create a welcome screen at the start
+function createStartScreen() {
+    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
 }
