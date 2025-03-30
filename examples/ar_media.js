@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { scene, camera } from './ar_core.js';
 import { screens, createNewBrowserScreen } from './ar_screens.js';
 import { createNotification } from './ar_ui.js';
-import { createModeChangeIndicator } from './ar_interaction.js';
 
 // Export video texture reference
 export let videoTexture;
@@ -11,6 +10,16 @@ export let videoElement;
 export let currentTime = 0;
 export let duration = 100; // Default duration if not available
 export let availableVideos = []; // Array to store available videos
+
+// Define a local version of createModeChangeIndicator
+function createModeChangeIndicator(message) {
+    // Create a simple notification instead
+    createNotification(message);
+    
+    // This can be expanded later if needed, but for now
+    // we're just forwarding to the notification system
+    console.log("Mode change:", message);
+}
 
 // Load video texture for AR content
 export function loadVideoTexture(videoPath = null) {
