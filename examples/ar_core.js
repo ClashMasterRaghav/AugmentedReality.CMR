@@ -5,7 +5,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
-import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
+import { setupEventListeners, setupVideoControls, updatePanelDragging } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
 
@@ -238,9 +238,12 @@ export function render() {
             
             // Set position with slight lag for smoother movement
             const targetPosition = position.clone().addScaledVector(direction, 0.8);
-            selectedScreen.position.lerp(targetPosition, 0.85);
+            selectedScreen.position.lerp(targetPosition, 0.95); // Increased lerp speed for more responsive movement
         }
     }
+    
+    // Update panel dragging if needed
+    updatePanelDragging();
     
     // Update screen visual effects
     updateScreenEffects();
