@@ -63,345 +63,330 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     return browserWindow;
 }
 
-// Create a rounded rectangle shape for UI elements
+// Helper function to create a rounded rectangle shape
 function createRoundedRectShape(width, height, radius) {
     const shape = new THREE.Shape();
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
     
-    // Improved smoothness with more points in corners
-    const segments = 8; // Number of segments in each corner curve
+    const x = -width / 2;
+    const y = -height / 2;
     
-    // Start from bottom left
-    shape.moveTo(-halfWidth + radius, -halfHeight);
+    shape.moveTo(x, y + radius);
+    shape.lineTo(x, y + height - radius);
+    shape.quadraticCurveTo(x, y + height, x + radius, y + height);
+    shape.lineTo(x + width - radius, y + height);
+    shape.quadraticCurveTo(x + width, y + height, x + width, y + height - radius);
+    shape.lineTo(x + width, y + radius);
+    shape.quadraticCurveTo(x + width, y, x + width - radius, y);
+    shape.lineTo(x + radius, y);
+    shape.quadraticCurveTo(x, y, x, y + radius);
     
-    // Bottom edge
-    shape.lineTo(halfWidth - radius, -halfHeight);
-    
-    // Bottom right corner
-    for (let i = 0; i <= segments; i++) {
-        const angle = Math.PI / 2 * i / segments;
-        const x = halfWidth - radius + Math.cos(angle + Math.PI / 2) * radius;
-        const y = -halfHeight + radius - Math.cos(angle) * radius;
-        shape.lineTo(x, y);
-    }
-    
-    // Right edge
-    shape.lineTo(halfWidth, halfHeight - radius);
-    
-    // Top right corner
-    for (let i = 0; i <= segments; i++) {
-        const angle = Math.PI / 2 * i / segments;
-        const x = halfWidth - radius + Math.cos(angle) * radius;
-        const y = halfHeight - radius + Math.sin(angle) * radius;
-        shape.lineTo(x, y);
-    }
-    
-    // Top edge
-    shape.lineTo(-halfWidth + radius, halfHeight);
-    
-    // Top left corner
-    for (let i = 0; i <= segments; i++) {
-        const angle = Math.PI / 2 * i / segments;
-        const x = -halfWidth + radius - Math.sin(angle) * radius;
-        const y = halfHeight - radius + Math.cos(angle) * radius;
-        shape.lineTo(x, y);
-    }
-    
-    // Left edge
-    shape.lineTo(-halfWidth, -halfHeight + radius);
-    
-    // Bottom left corner
-    for (let i = 0; i <= segments; i++) {
-        const angle = Math.PI / 2 * i / segments;
-        const x = -halfWidth + radius - Math.cos(angle) * radius;
-        const y = -halfHeight + radius - Math.sin(angle) * radius;
-        shape.lineTo(x, y);
-    }
-    
-    shape.closePath();
     return shape;
 }
 
-// Create a screen with enhanced visuals and gradient background
+// Enhanced screen creation function with modern UI
 function enhancedCreateScreen(position, size, title = 'Screen', content = null) {
-    const width = size.x || 1;
-    const height = size.y || 0.6;
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-    
-    // Create screen group
+    // Create the screen container
     const screen = new THREE.Group();
-    screen.position.copy(position);
     
-    // Create screen background with gradient
-    const backgroundGeometry = new THREE.PlaneGeometry(width, height);
+    // Define screen dimensions
+    const screenWidth = size.x;
+    const screenHeight = size.y;
+    const topBarHeight = 0.06; // Thinner top bar
+    const cornerRadius = 0.04; // Corner radius
     
-    // Create gradient background texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512 * (height / width);
-    const ctx = canvas.getContext('2d');
+    // Content background - create this first so it's behind the top bar
+    // Use rounded corners for the content background
+    const backgroundShape = createRoundedRectShape(screenWidth, screenHeight, cornerRadius);
+    const backgroundGeometry = new THREE.ShapeGeometry(backgroundShape);
+    let backgroundMaterial;
     
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#121212');    // Very dark gray at top
-    gradient.addColorStop(1, '#000000');    // Pure black at bottom
-    
-    // Fill with gradient
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Add subtle ambient patterns/highlights
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-    
-    // Add a subtle vignette effect
-    const grd = ctx.createRadialGradient(
-        canvas.width/2, canvas.height/2, 0,
-        canvas.width/2, canvas.height/2, canvas.width
-    );
-    grd.addColorStop(0, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(0,0,0,0.3)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Create texture from canvas
-    const backgroundTexture = new THREE.CanvasTexture(canvas);
-    const backgroundMaterial = new THREE.MeshBasicMaterial({
-        map: backgroundTexture,
-        side: THREE.DoubleSide
-    });
-    
-    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-    background.position.z = -0.01; // Slightly behind content
-    screen.add(background);
-    
-    // Create screen content
-    let contentTexture;
-    if (content === null) {
-        // Use video texture if available, otherwise fallback
-        import('./ar_media.js').then(mediaModule => {
-            if (mediaModule.videoTexture) {
-                contentTexture = mediaModule.videoTexture;
-                applyTexture(contentTexture);
-            } else {
-                contentTexture = createFallbackTexture(screens.length + 1);
-                applyTexture(contentTexture);
-            }
-        }).catch(err => {
-            console.error("Error importing video module:", err);
-            contentTexture = createFallbackTexture(screens.length + 1);
-            applyTexture(contentTexture);
+    if (content && content.isVideoTexture) {
+        // Use video texture if provided
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: content,
+            side: THREE.DoubleSide,
+            depthTest: false
         });
-    } else if (typeof content === 'string') {
-        // Create texture from URL
-        const textureLoader = new THREE.TextureLoader();
-        contentTexture = textureLoader.load(content, 
-            // onLoad callback
-            function(texture) {
-                applyTexture(texture);
-            },
-            // onProgress callback
-            undefined,
-            // onError callback
-            function(err) {
-                console.error('Error loading texture:', err);
-                contentTexture = createFallbackTexture(screens.length + 1);
-                applyTexture(contentTexture);
-            }
-        );
     } else {
-        // Assume content is already a texture
-        contentTexture = content;
-        applyTexture(contentTexture);
-    }
-    
-    function applyTexture(texture) {
-        // Content area (slightly smaller than background)
-        const contentWidth = width * 0.95;
-        const contentHeight = height * 0.95;
-        const contentGeometry = new THREE.PlaneGeometry(contentWidth, contentHeight);
-        const contentMaterial = new THREE.MeshBasicMaterial({
-            map: texture,
-            side: THREE.DoubleSide
+        // Create a gradient texture for the background
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 384;
+        const ctx = canvas.getContext('2d');
+        
+        // Create a subtle gradient (dark blue to dark purple)
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#121520');
+        gradient.addColorStop(1, '#1a1025');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add a slight noise texture for depth
+        ctx.globalAlpha = 0.05;
+        for (let i = 0; i < 1000; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
+            const size = Math.random() * 2;
+            ctx.fillRect(
+                Math.random() * canvas.width, 
+                Math.random() * canvas.height, 
+                size, size
+            );
+        }
+        ctx.globalAlpha = 1.0;
+        
+        // Create texture from canvas
+        const backgroundTexture = new THREE.CanvasTexture(canvas);
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: backgroundTexture,
+            side: THREE.DoubleSide,
+            depthTest: false
         });
         
-        const content = new THREE.Mesh(contentGeometry, contentMaterial);
-        content.position.z = 0; // On top of background
-        screen.add(content);
-        
-        // Update screen's userData
-        screen.userData.width = width;
-        screen.userData.height = height;
-        screen.userData.content = content;
-        
-        // Make video texture available to the screen
-        if (texture && content && screen.userData) {
-            screen.userData.videoTexture = texture;
+        // Create fallback texture with loading indicator if needed
+        if (!content) {
+            // The fallback texture will be added on top of the gradient
+            const fallbackTexture = createFallbackTexture(title.split(' ').pop() || '1');
+            const fallbackMaterial = new THREE.MeshBasicMaterial({
+                map: fallbackTexture,
+                side: THREE.DoubleSide,
+                transparent: true,
+                depthTest: false
+            });
+            
+            // Create a mesh for the fallback content
+            const fallbackGeometry = new THREE.PlaneGeometry(screenWidth * 0.8, screenHeight * 0.6);
+            const fallbackMesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+            fallbackMesh.position.z = 0.003; // Slightly in front of background
+            screen.add(fallbackMesh);
         }
     }
     
-    // Add top bar for dragging with rounded corners
-    const barHeight = height * 0.08;
+    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+    background.position.set(0, 0, 0.002);
+    background.renderOrder = 1;
+    screen.add(background);
     
-    // Create top bar with rounded corners
-    const topBarShape = createRoundedRectShape(width, barHeight, 0.01);
+    // Create a solid black top bar with rounded corners at the top
+    // For top bar, we use a custom shape with rounded corners only at the top
+    const topBarShape = new THREE.Shape();
+    const halfWidth = screenWidth / 2;
+    const halfHeight = screenHeight / 2;
+    const topY = halfHeight;
+    const bottomY = halfHeight - topBarHeight;
+    
+    // Start from bottom left
+    topBarShape.moveTo(-halfWidth, bottomY);
+    // Line to top left corner
+    topBarShape.lineTo(-halfWidth, topY - cornerRadius);
+    // Top left corner curve
+    topBarShape.quadraticCurveTo(-halfWidth, topY, -halfWidth + cornerRadius, topY);
+    // Line to top right corner
+    topBarShape.lineTo(halfWidth - cornerRadius, topY);
+    // Top right corner curve
+    topBarShape.quadraticCurveTo(halfWidth, topY, halfWidth, topY - cornerRadius);
+    // Line to bottom right
+    topBarShape.lineTo(halfWidth, bottomY);
+    // Line back to start (bottom left)
+    topBarShape.lineTo(-halfWidth, bottomY);
+    
     const topBarGeometry = new THREE.ShapeGeometry(topBarShape);
     const topBarMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.8,
+        color: 0x111111, // Solid black color
+        transparent: false, // No transparency
         side: THREE.DoubleSide,
-        depthTest: true
+        depthTest: true // Enable depth testing to prevent seeing through
     });
-    
     const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
-    topBar.position.set(0, halfHeight - barHeight/2, 0.005);
+    topBar.position.set(0, 0, 0.004);
+    topBar.renderOrder = 10;
     topBar.userData = {
         type: 'dragHandle',
-        screen: screen
+        isTopBar: true,
+        screen: screen,
+        originalColor: topBarMaterial.color.getHex()
     };
     screen.add(topBar);
     
-    // Store reference to drag handle
-    screen.userData.dragHandle = topBar;
-    
     // Create a more modern grip pattern to indicate draggability
-    const gripWidth = width * 0.2;
-    const gripGeometry = new THREE.PlaneGeometry(gripWidth, barHeight * 0.5);
-    const gripCanvas = document.createElement('canvas');
-    gripCanvas.width = 128;
-    gripCanvas.height = 32;
-    const gripCtx = gripCanvas.getContext('2d');
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 64; // Reduced height for thinner top bar
+    const ctx = canvas.getContext('2d');
     
-    // Draw grip dots
-    gripCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    const dotRadius = 2;
+    // Create a solid black background for the top bar
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw screen title with improved typography
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '26px Inter, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Add text shadow for better readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2);
+    ctx.shadowColor = 'transparent';
+    
+    // Add subtle grip indicator dots
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    const dotRadius = 1.5;
     const dotSpacing = 12;
-    const startX = (gripCanvas.width - (dotRadius * 2 * 3 + dotSpacing * 2)) / 2;
-    const centerY = gripCanvas.height / 2;
+    const dotsStartX = canvas.width - 100;
+    const dotsY = canvas.height / 2;
     
-    for (let i = 0; i < 3; i++) {
-        gripCtx.beginPath();
-        gripCtx.arc(startX + i * (dotRadius * 2 + dotSpacing), centerY, dotRadius, 0, Math.PI * 2);
-        gripCtx.fill();
+    for (let i = 0; i < 4; i++) {
+        const x = dotsStartX + (i * dotSpacing);
+        // First row (slightly above center)
+        ctx.beginPath();
+        ctx.arc(x, dotsY - 5, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+        // Second row (slightly below center)
+        ctx.beginPath();
+        ctx.arc(x, dotsY + 5, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
     }
     
-    const gripTexture = new THREE.CanvasTexture(gripCanvas);
-    const gripMaterial = new THREE.MeshBasicMaterial({
-        map: gripTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: true
-    });
+    // Apply the canvas as a texture to the top bar
+    const topBarTexture = new THREE.CanvasTexture(canvas);
+    topBarTexture.anisotropy = 4;
+    topBarMaterial.map = topBarTexture;
+    topBarMaterial.needsUpdate = true;
     
-    const grip = new THREE.Mesh(gripGeometry, gripMaterial);
-    grip.position.z = 0.001; // Slightly above top bar
-    topBar.add(grip);
+    // Add video control buttons with refined positioning
+    if (content && content.isVideoTexture) {
+        // Move play button to bottom left - increase button size
+        const playButton = addControlButton(screen, 'play', -screenWidth/2 + 0.08, -screenHeight/2 + 0.08, 0.04);
+        playButton.userData.videoControl = true;
+        playButton.userData.videoAction = 'togglePlayback';
+        
+        // Keep volume button on bottom right, but initialize with muted icon - increase button size
+        const volumeButton = addControlButton(screen, 'muted', screenWidth/2 - 0.08, -screenHeight/2 + 0.08, 0.04);
+        volumeButton.userData.videoControl = true;
+        volumeButton.userData.videoAction = 'toggleMute';
+        
+        // Add a simple timeline slider
+        const timelineWidth = screenWidth * 0.6;
+        const timelineHeight = 0.01;
+        
+        // Timeline background
+        const timelineGeometry = new THREE.PlaneGeometry(timelineWidth, timelineHeight);
+        const timelineMaterial = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+        const timeline = new THREE.Mesh(timelineGeometry, timelineMaterial);
+        timeline.position.set(0, -screenHeight/2 + 0.08, 0.008);
+        timeline.renderOrder = 15;
+        timeline.userData = {
+            type: 'timeline',
+            interactive: true
+        };
+        screen.add(timeline);
+        
+        // Progress indicator
+        const progressGeometry = new THREE.PlaneGeometry(timelineWidth, timelineHeight);
+        const progressMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4285f4, // Google blue
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+        const progress = new THREE.Mesh(progressGeometry, progressMaterial);
+        progress.scale.set(0, 1, 1); // Start with zero width
+        progress.position.set(-timelineWidth/2, 0, 0.001); // Left-aligned
+        timeline.add(progress);
+        
+        // Slider handle
+        const handleSize = 0.02;
+        const handleGeometry = new THREE.CircleGeometry(handleSize, 32);
+        const handleMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.set(-timelineWidth/2, 0, 0.002); // Start at left
+        timeline.add(handle);
+        
+        // Time display
+        const timeDisplay = createTimeDisplay();
+        timeDisplay.position.set(0, timelineHeight + 0.02, 0.001);
+        timeline.add(timeDisplay);
+        
+        // Store controls in userData
+        screen.userData.controls = {
+            isPlaying: true,
+            isMuted: true,
+            currentTime: 0,
+            duration: 100, // Default, will update when video loads
+            playButton: playButton,
+            volumeButton: volumeButton,
+            timeline: timeline,
+            progress: progress,
+            handle: handle,
+            timeDisplay: timeDisplay
+        };
+    }
     
-    // Add title text
-    const titleCanvas = document.createElement('canvas');
-    titleCanvas.width = 256;
-    titleCanvas.height = 32;
-    const titleCtx = titleCanvas.getContext('2d');
-    
-    titleCtx.fillStyle = 'rgba(0, 0, 0, 0)'; // Transparent background
-    titleCtx.fillRect(0, 0, titleCanvas.width, titleCanvas.height);
-    
-    titleCtx.font = '16px Arial';
-    titleCtx.textAlign = 'left';
-    titleCtx.textBaseline = 'middle';
-    titleCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    titleCtx.fillText(title, 10, titleCanvas.height/2);
-    
-    const titleTexture = new THREE.CanvasTexture(titleCanvas);
-    const titleGeometry = new THREE.PlaneGeometry(width * 0.6, barHeight * 0.7);
-    const titleMaterial = new THREE.MeshBasicMaterial({
-        map: titleTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: true
-    });
-    
-    const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
-    titleMesh.position.set(-width * 0.15, 0, 0.001); // Left-aligned, slightly above top bar
-    topBar.add(titleMesh);
-    
-    // Add screen to list immediately
-    screen.userData = {
-        type: 'screen',
-        id: 'screen_' + (screens.length + 1),
-        title: title,
-        width: width,
-        height: height,
-        controls: {},
-        // Store initial values
-        originalScale: new THREE.Vector3(1, 1, 1),
-        originalPosition: position.clone()
-    };
-    
-    screens.push(screen);
+    // Position the entire screen
+    screen.position.copy(position);
     
     return screen;
 }
 
-// Create a control button with rounded shape
+// Add a control button to the screen
 function addControlButton(screen, type, x, y, size) {
-    // Create a circular button for better touch target
-    const buttonSize = size || 0.05; // Increased size for better touchability
-    const buttonGeometry = new THREE.CircleGeometry(buttonSize, 32);
+    const buttonGeometry = new THREE.CircleGeometry(size, 32);
     const buttonMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
+        color: 0x444444, // Darker gray for more subtle appearance
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         side: THREE.DoubleSide,
-        depthTest: true
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
-    
     const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    button.position.set(x, y, 0.01);
+    button.position.set(x, y, 0.010); // Increased z-position to be in front of everything
+    button.renderOrder = 20; // Very high render order to ensure it's drawn on top
     button.userData = {
         type: 'button',
         action: type + 'Button',
-        size: buttonSize
+        screen: screen
     };
     
-    // Create button icon
-    const iconCanvas = document.createElement('canvas');
-    iconCanvas.width = 128;
-    iconCanvas.height = 128;
-    const ctx = iconCanvas.getContext('2d');
-    
-    // Draw icon based on type
+    // Create icon for the button with improved design
     const iconTexture = createControlIcon(type);
-    const iconGeometry = new THREE.PlaneGeometry(buttonSize * 1.4, buttonSize * 1.4);
+    const iconSize = size * 0.7; // Smaller icon for more whitespace
+    const iconGeometry = new THREE.PlaneGeometry(iconSize * 2, iconSize * 2);
     const iconMaterial = new THREE.MeshBasicMaterial({
         map: iconTexture,
         transparent: true,
         side: THREE.DoubleSide,
-        depthTest: true
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
+    const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+    iconMesh.position.z = 0.001; // Slightly in front of button
+    iconMesh.renderOrder = 21; // Even higher than the button
+    button.add(iconMesh);
     
-    const icon = new THREE.Mesh(iconGeometry, iconMaterial);
-    icon.position.z = 0.001;
-    button.add(icon);
-    
-    // Add subtle 3D effect with a glow
-    const glowSize = buttonSize * 1.2;
-    const glowGeometry = new THREE.CircleGeometry(glowSize, 32);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4fc3f7,
+    // Add subtle highlight/shadow for depth
+    const highlightGeometry = new THREE.CircleGeometry(size * 1.02, 32);
+    const highlightMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
         transparent: true,
         opacity: 0.2,
         side: THREE.DoubleSide,
-        depthTest: true
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
+    const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+    highlightMesh.position.z = -0.001; // Slightly behind the button
+    button.add(highlightMesh);
     
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.position.z = -0.001;
-    button.add(glow);
-    
-    // Add to screen
     screen.add(button);
     return button;
 }
@@ -504,72 +489,38 @@ function createControlIcon(type) {
     return texture;
 }
 
-// Create a fallback texture with rounded corners
+// Create a fallback texture when video is not available
 function createFallbackTexture(screenNumber) {
+    // Create a canvas to draw fallback content
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256;
+    canvas.width = 760;
+    canvas.height = 460;
+    
     const ctx = canvas.getContext('2d');
     
-    // Fill with gradient background
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#212121');
-    gradient.addColorStop(1, '#121212');
-    ctx.fillStyle = gradient;
+    // Fill background (YouTube-style dark background)
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw rounded rectangle background
-    const radius = 20;
+    // Draw YouTube-style loading icon (spinning circle)
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(radius, 0);
-    ctx.lineTo(canvas.width - radius, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-    ctx.lineTo(canvas.width, canvas.height - radius);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
-    ctx.lineTo(radius, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
-    ctx.lineTo(0, radius);
-    ctx.quadraticCurveTo(0, 0, radius, 0);
-    ctx.fill();
-    
-    // Add subtle grid pattern
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    const gridSize = 20;
-    
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    
-    for (let y = 0; y <= canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    
-    // Add screen number and loading text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 40px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`Screen ${screenNumber}`, canvas.width/2, canvas.height/2 - 40);
-    
-    ctx.font = '24px Arial';
-    ctx.fillText('Loading content...', canvas.width/2, canvas.height/2 + 20);
-    
-    // Add a subtle loading animation indicator
-    ctx.strokeStyle = '#4fc3f7';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(canvas.width/2, canvas.height/2 + 80, 20, 0, Math.PI * 1.5);
+    ctx.arc(canvas.width/2, canvas.height/2, 50, 0, 1.8 * Math.PI);
     ctx.stroke();
     
-    // Create texture
+    // Draw message
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px Roboto, Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading video content...', canvas.width/2, canvas.height/2 + 100);
+    ctx.font = '16px Roboto, Arial';
+    ctx.fillText('Tap to interact with the player', canvas.width/2, canvas.height/2 + 140);
+    
+    // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
+    
     return texture;
 }
 
@@ -710,205 +661,4 @@ export function updateScreenEffects() {
             }
         }
     });
-}
-
-// Create a resize handle for the corner of the screen
-function createResizeHandle(size) {
-    const group = new THREE.Group();
-    
-    // Create the handle background
-    const handleGeometry = new THREE.CircleGeometry(size, 32);
-    const handleMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide,
-        depthTest: true
-    });
-    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-    group.add(handle);
-    
-    // Create diagonal resize icon
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    
-    // Draw diagonal arrows
-    ctx.fillStyle = 'transparent';
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw diagonal line
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(18, 18);
-    ctx.lineTo(46, 46);
-    ctx.stroke();
-    
-    // Draw arrowheads
-    ctx.beginPath();
-    ctx.moveTo(46, 46);
-    ctx.lineTo(46, 38);
-    ctx.moveTo(46, 46);
-    ctx.lineTo(38, 46);
-    ctx.stroke();
-    
-    // Create texture from canvas
-    const iconTexture = new THREE.CanvasTexture(canvas);
-    const iconMaterial = new THREE.MeshBasicMaterial({
-        map: iconTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: true
-    });
-    
-    // Create icon mesh
-    const iconSize = size * 0.8;
-    const iconGeometry = new THREE.PlaneGeometry(iconSize * 2, iconSize * 2);
-    const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-    iconMesh.position.z = 0.001; // Slightly in front
-    group.add(iconMesh);
-    
-    // Add handle properties
-    group.userData = {
-        type: 'resizeHandle',
-        dragType: 'resize'
-    };
-    
-    return group;
-}
-
-// Toggle screen resizing visuals
-export function toggleResize(screen, isResizing) {
-    if (!screen) return;
-    
-    // Get current scale of the screen
-    const currentScale = screen.scale.clone();
-    
-    if (isResizing) {
-        // Store original scale if not already stored
-        if (!screen.userData.originalScale) {
-            screen.userData.originalScale = currentScale.clone();
-        }
-        
-        // Add resize visual cues - show a slight pulsing effect
-        const pulseAnimation = () => {
-            if (!screen || !screen.userData || screen.userData.isResizing !== true) return;
-            
-            // Create a subtle pulse effect
-            const time = Date.now() * 0.001; // Convert to seconds
-            const pulseScale = 1 + Math.sin(time * 5) * 0.02; // Small 2% pulse
-            
-            // Apply to the scale but maintain aspect ratio
-            screen.scale.copy(currentScale);
-            screen.scale.multiplyScalar(pulseScale);
-            
-            // Add a thin highlight border around the screen
-            if (!screen.userData.resizeBorder) {
-                const width = screen.userData.width || 1;
-                const height = screen.userData.height || 0.6;
-                
-                // Create a wireframe border
-                const borderGeom = new THREE.EdgesGeometry(
-                    new THREE.PlaneGeometry(width, height)
-                );
-                const borderMat = new THREE.LineBasicMaterial({
-                    color: 0x4FC3F7,
-                    linewidth: 2,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                const border = new THREE.LineSegments(borderGeom, borderMat);
-                border.position.z = 0.005; // Slightly in front
-                screen.add(border);
-                
-                // Store reference
-                screen.userData.resizeBorder = border;
-            }
-            
-            // Request next frame if still resizing
-            if (screen.userData.isResizing === true) {
-                requestAnimationFrame(pulseAnimation);
-            }
-        };
-        
-        // Start the pulse animation
-        screen.userData.isResizing = true;
-        requestAnimationFrame(pulseAnimation);
-        
-    } else {
-        // Stop resizing mode
-        screen.userData.isResizing = false;
-        
-        // Remove resize border if it exists
-        if (screen.userData.resizeBorder) {
-            screen.remove(screen.userData.resizeBorder);
-            screen.userData.resizeBorder.geometry.dispose();
-            screen.userData.resizeBorder.material.dispose();
-            delete screen.userData.resizeBorder;
-        }
-        
-        // Ensure the original scale is saved (might have been modified by pinch)
-        if (screen.userData.originalScale) {
-            // Make sure we don't reset to original, keep current scale
-            screen.userData.originalScale = screen.scale.clone();
-        }
-        
-        // Update screen content based on new size
-        updateScreenContent(screen);
-    }
-}
-
-// Update screen content after resize
-function updateScreenContent(screen) {
-    if (!screen) return;
-    
-    // If screen has content texture or material, update it
-    screen.children.forEach(child => {
-        if (child.material && child.material.map) {
-            child.material.needsUpdate = true;
-        }
-    });
-    
-    // Update layout of controls if any
-    if (screen.userData.controls) {
-        Object.values(screen.userData.controls).forEach(control => {
-            if (control && control.position) {
-                // This will force controls to update their positions
-                if (control.userData && control.userData.updateLayout) {
-                    control.userData.updateLayout();
-                }
-            }
-        });
-    }
-    
-    // If screen has a video texture, adjust video element size
-    if (screen.userData.videoTexture) {
-        const videoElement = screen.userData.videoElement;
-        
-        if (videoElement) {
-            // Update video resolution to match new screen size
-            const aspectRatio = screen.userData.width / screen.userData.height;
-            
-            // Set appropriate video quality based on screen size
-            let videoQuality = 360; // Default
-            
-            if (screen.scale.x > 1.5) {
-                videoQuality = 720;
-            } else if (screen.scale.x < 0.7) {
-                videoQuality = 240;
-            }
-            
-            // Apply changes if needed
-            if (videoElement.dataset.quality !== String(videoQuality)) {
-                videoElement.dataset.quality = String(videoQuality);
-                
-                // If there's a function to update quality, call it
-                if (typeof updateVideoQuality === 'function') {
-                    updateVideoQuality(videoElement, videoQuality);
-                }
-            }
-        }
-    }
 } 
