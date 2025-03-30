@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createVirtualKeyboard, initUI, createModeChangeIndicator } from './ar_ui.js';
+import { createControlPanel, createVirtualKeyboard, initUI, createNotification } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures, scanForVideos } from './ar_media.js';

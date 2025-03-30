@@ -25,6 +25,13 @@ export function createNotification(message, type = 'info') {
     }
 }
 
+// Add createModeChangeIndicator function to fix import issues
+export function createModeChangeIndicator(message) {
+    // Simply wrap the createNotification function
+    createNotification(message, 'info');
+    console.log("Mode change:", message);
+}
+
 // Alias for backward compatibility
 export const showNotification = createNotification;
 
