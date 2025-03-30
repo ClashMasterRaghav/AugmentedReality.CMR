@@ -286,7 +286,7 @@ export function createControlPanel() {
     
     // Define button parameters - SMALLER buttons positioned lower and more compact
     const buttonSize = 0.055; // Even smaller buttons
-    const buttonSpacing = 0.10; // Less space between buttons, moved closer together
+    const buttonSpacing = 0.15; // Less space between buttons, moved closer together
     
     // Create buttons - Add Screen and Delete Screen - MOVED MUCH LOWER for larger drag area
     const buttonPositions = [
@@ -411,7 +411,7 @@ export function createControlPanel() {
     });
     
     // Position control panel - start at a fixed position in front of the user
-    controlPanel.position.set(0, 0, -0.5);
+    controlPanel.position.set(0, 0, -1.5);
     
     // Add this property so we can detect panel in interaction code
     controlPanel.userData = {
