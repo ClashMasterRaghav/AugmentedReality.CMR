@@ -78,63 +78,98 @@ function onSelectStart(event) {
     }
 }
 
-// Get button object from potentially nested mesh
+// Get button from an intersected object
 function getButtonFromIntersect(object) {
-    console.log("Finding button from intersect object:", object.uuid.substring(0, 8));
-    
-    // If we hit the button directly
+    // If object is a button, return it directly
     if (object.userData && object.userData.type === 'button') {
-        console.log("→ Direct button hit:", object.userData.action);
+        console.log("Direct button hit:", object.userData.action);
         return object;
     }
     
-    // If we hit a child of a button (like the icon)
+    // Check if the parent is a button (common for icon meshes)
     if (object.parent && object.parent.userData && object.parent.userData.type === 'button') {
-        console.log("→ Button parent hit:", object.parent.userData.action);
+        console.log("Parent button hit:", object.parent.userData.action);
         return object.parent;
     }
     
-    // If we hit a grandchild of a button
+    // Check if the grandparent is a button (for nested structures)
     if (object.parent && object.parent.parent && 
-        object.parent.parent.userData && 
-        object.parent.parent.userData.type === 'button') {
-        console.log("→ Button grandparent hit:", object.parent.parent.userData.action);
+        object.parent.parent.userData && object.parent.parent.userData.type === 'button') {
+        console.log("Grandparent button hit:", object.parent.parent.userData.action);
         return object.parent.parent;
     }
     
-    // Deeper search up to 5 levels up
+    // Traverse up to find a button (up to 5 levels)
     let current = object;
-    let depth = 0;
-    const maxDepth = 5;
+    let level = 0;
     
-    while (current && depth < maxDepth) {
+    while (current.parent && level < 5) {
+        current = current.parent;
+        level++;
+        
         if (current.userData && current.userData.type === 'button') {
-            console.log(`→ Button found at depth ${depth}:`, current.userData.action);
+            console.log(`Found button at level ${level}:`, current.userData.action);
             return current;
         }
-        current = current.parent;
-        depth++;
     }
     
-    // Search by traversing children of control panel
-    const controlPanels = scene.children.filter(obj => 
-        obj.userData && obj.userData.type === 'controlPanel');
-    
-    if (controlPanels.length > 0) {
-        const panel = controlPanels[0];
-        const buttonChildren = panel.children.filter(child => 
-            child.userData && child.userData.type === 'button');
+    // Special handling for screen video control buttons
+    if (object.parent) {
+        // Check if we're inside a screen
+        let screen = null;
+        let target = object.parent;
         
-        // Check if any of these buttons contain our object
-        for (const btn of buttonChildren) {
-            if (btn === object || btn.children.some(child => child === object)) {
-                console.log("→ Button found via panel traversal:", btn.userData.action);
-                return btn;
+        // Traverse up to find the screen
+        for (let i = 0; i < 5; i++) {
+            if (!target) break;
+            
+            if (target.userData && target.userData.type === 'screen') {
+                screen = target;
+                break;
+            }
+            target = target.parent;
+        }
+        
+        if (screen) {
+            // If we found a screen, check its direct children for buttons
+            for (let i = 0; i < screen.children.length; i++) {
+                const child = screen.children[i];
+                if (child.userData && child.userData.type === 'button') {
+                    // Check if this button contains our hit object
+                    let foundObject = false;
+                    
+                    // Check if the hit object is this button or a descendant
+                    child.traverse((obj) => {
+                        if (obj === object) {
+                            foundObject = true;
+                        }
+                    });
+                    
+                    if (foundObject) {
+                        console.log("Found screen button via traversal:", child.userData.action);
+                        return child;
+                    }
+                    
+                    // Check distance from hit point to button (for near misses)
+                    if (object.worldToLocal && child.getWorldPosition) {
+                        const hitPoint = new THREE.Vector3();
+                        object.getWorldPosition(hitPoint);
+                        
+                        const buttonPoint = new THREE.Vector3();
+                        child.getWorldPosition(buttonPoint);
+                        
+                        const distance = hitPoint.distanceTo(buttonPoint);
+                        if (distance < 0.05) { // If within 5cm
+                            console.log("Found nearby button:", child.userData.action, "distance:", distance);
+                            return child;
+                        }
+                    }
+                }
             }
         }
     }
     
-    console.log("→ No button found from intersect");
+    console.log("No button found from intersect");
     return null;
 }
 
@@ -329,10 +364,27 @@ function handleButtonAction(button) {
             createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
             break;
             
+        // FIXED: Add explicit handling for playButton and volumeButton from screens
+        case 'playButton':
+            console.log("Play/pause button pressed");
+            // Toggle video playback
+            if (videoControlFunctions.togglePlayback) {
+                videoControlFunctions.togglePlayback();
+            }
+            break;
+            
+        case 'volumeButton':
+            console.log("Mute/unmute button pressed");
+            // Toggle video mute
+            if (videoControlFunctions.toggleMute) {
+                videoControlFunctions.toggleMute();
+            }
+            break;
+            
+        // Keep generic play/pause and mute/unmute handlers for compatibility
         case 'play':
         case 'pause':
             console.log("Play/pause button pressed");
-            // Toggle video playback
             if (videoControlFunctions.togglePlayback) {
                 videoControlFunctions.togglePlayback();
             }
@@ -341,7 +393,6 @@ function handleButtonAction(button) {
         case 'mute':
         case 'unmute':
             console.log("Mute/unmute button pressed");
-            // Toggle video mute
             if (videoControlFunctions.toggleMute) {
                 videoControlFunctions.toggleMute();
             }
@@ -617,12 +668,12 @@ function onTouchStart(event) {
         const panelIntersects = raycaster.intersectObject(controlPanel, true);
         
         if (panelIntersects.length > 0) {
-            // Check if we hit the top drag area (y > 0.04 in panel local space)
+            // IMPROVED: Make the entire top half of the panel draggable
             const hitPoint = panelIntersects[0].point.clone();
             const localPoint = controlPanel.worldToLocal(hitPoint.clone());
             
-            // Check if we're in the top portion of the panel (the drag handle area)
-            if (localPoint.y > 0.04) {
+            // Check if we're in the top half of the panel (more generous drag area)
+            if (localPoint.y > 0.0) {
                 console.log("Starting control panel drag");
                 
                 // Store initial panel position and rotation

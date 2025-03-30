@@ -259,22 +259,27 @@ export function createControlPanel() {
     glowMesh.position.z = -0.002;
     controlPanel.add(glowMesh);
     
-    // Create draggable indicator for better UX
-    const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width * 0.6, 0.02);
+    // Create larger and more visible draggable indicator for better UX
+    const dragAreaHeight = 0.05; // Increased height for easier grabbing
+    const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width, dragAreaHeight);
     const dragIndicatorMaterial = new THREE.MeshBasicMaterial({
         color: 0x90CAF9,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.3,
         side: THREE.DoubleSide
     });
     const dragIndicator = new THREE.Mesh(dragIndicatorGeometry, dragIndicatorMaterial);
-    dragIndicator.position.set(0, panelSize.height/2 - 0.03, 0.001);
+    dragIndicator.position.set(0, panelSize.height/2 - dragAreaHeight/2, 0.001);
+    dragIndicator.userData = {
+        type: 'dragHandle',
+        isDragArea: true
+    };
     controlPanel.add(dragIndicator);
     
     // Add interactive pulsing animation to drag area
     const pulseDragArea = () => {
         const time = Date.now() * 0.001;
-        dragIndicator.material.opacity = 0.3 + Math.sin(time * 2) * 0.2;
+        dragIndicator.material.opacity = 0.2 + Math.sin(time * 2) * 0.2;
         requestAnimationFrame(pulseDragArea);
     };
     requestAnimationFrame(pulseDragArea);
@@ -776,10 +781,10 @@ export function setupControlPanel() {
     cameraDirection.applyQuaternion(camera.quaternion);
     
     const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
+    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.4)); // Closer to user (0.4m instead of 0.5m)
     
-    // Position below the camera view
-    position.y -= 0.2;
+    // Position below the camera view at a comfortable height
+    position.y -= 0.15;
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
