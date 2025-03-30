@@ -59,17 +59,11 @@ export function loadVideoTexture() {
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // Update progress bars on all screens
-            screens.forEach(screen => {
-                if (screen.userData && screen.userData.controls && screen.userData.controls.progressBar) {
-                    const progress = currentTime / duration;
-                    updateVideoProgress(
-                        screen.userData.controls.progressBar,
-                        progress,
-                        screen
-                    );
-                }
-            });
+            // Store progress for use in update loops elsewhere
+            if (videoElement && isFinite(videoElement.duration) && videoElement.duration > 0) {
+                const progress = videoElement.currentTime / videoElement.duration;
+                // Let ar_core.js handle calling updateVideoProgress with this data
+            }
         });
         
         videoElement.addEventListener('error', (e) => {
