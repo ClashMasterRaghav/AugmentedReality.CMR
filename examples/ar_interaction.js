@@ -1075,7 +1075,7 @@ function updateVideoTime(progress) {
 }
 
 // Create a floating text indicator for mode changes
-function createModeChangeIndicator(message) {
+export function createModeChangeIndicator(message) {
     // Create a canvas for the text
     const canvas = document.createElement('canvas');
     canvas.width = 256;

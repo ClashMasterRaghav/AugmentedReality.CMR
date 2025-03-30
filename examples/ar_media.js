@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { scene, camera } from './ar_core.js';
 import { screens, createNewBrowserScreen } from './ar_screens.js';
-import { createModeChangeIndicator } from './ar_ui.js';
+import { createNotification } from './ar_ui.js';
+import { createModeChangeIndicator } from './ar_interaction.js';
 
 // Export video texture reference
 export let videoTexture;
