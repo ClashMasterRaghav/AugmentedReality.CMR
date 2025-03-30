@@ -60,6 +60,17 @@ function initAREnvironment() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
+    // Initialize performance stats if Stats is available
+    let stats;
+    try {
+        stats = new Stats();
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.top = '0px';
+        container.appendChild(stats.domElement);
+    } catch (e) {
+        console.log('Stats not available, continuing without performance monitoring');
+    }
+
     // AR Button with session end event handling
     const arButton = ARButton.createButton(renderer, {
         optionalFeatures: ['dom-overlay'],
@@ -148,23 +159,23 @@ function onWindowResize() {
 }
 
 // Core animation loop
-function animate() {
-    requestAnimationFrame(animate);
+export function animate() {
+    // Set up renderer's animation loop
+    renderer.setAnimationLoop(render);
     
-    // Update controller
-    updateXRController();
+    // Update video textures in every frame
+    updateVideoTextures();
     
-    // Update screen effects such as hover animations
-    updateScreenEffects();
-    
-    // Update video textures
-    if (typeof updateVideoTextures === 'function') {
-        updateVideoTextures();
+    // Check if in AR mode
+    isARMode = renderer.xr.isPresenting;
+}
+
+// Internal animation function for non-AR mode
+function updateXRController() {
+    // Only used when we have stats and XR controller updates
+    if (typeof stats !== 'undefined') {
+        stats.update();
     }
-    
-    // Render the scene
-    renderer.render(scene, camera);
-    stats.update();
 }
 
 // Render function
