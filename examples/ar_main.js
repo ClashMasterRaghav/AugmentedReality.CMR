@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { initAR, render, animate } from './ar_core.js';
+import { initAR, animate } from './ar_core.js';
 import { setupEventListeners } from './ar_interaction.js';
 import { loadVideoTexture } from './ar_media.js';
 
