@@ -1,6 +1,6 @@
 // Screen creation and management functionality
 import * as THREE from 'three';
-import { scene, camera, selectedScreen } from './ar_core.js';
+import { scene, camera, selectedScreen, setSelectedScreen } from './ar_core.js';
 import { virtualKeyboard } from './ar_ui.js';
 import { videoTexture } from './ar_media.js';
 
@@ -592,8 +592,16 @@ export function selectScreen(screen) {
         animateScreenScale(selectedScreen, 1.0, 150);
     }
     
+    // If screen is null, just clear selection
+    if (!screen) {
+        // Update both local and global references
+        setSelectedScreen(null);
+        return;
+    }
+    
     // Select new screen
-    selectedScreen = screen; // Update the global selectedScreen variable
+    // Update the global selectedScreen variable through the setter function
+    setSelectedScreen(screen);
     screen.userData.isSelected = true;
     
     // Log selection for debugging

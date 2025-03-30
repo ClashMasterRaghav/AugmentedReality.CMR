@@ -793,7 +793,7 @@ function onTouchMove(event) {
             const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
             
             // Scale for more noticeable movement in AR - INCREASED for faster movement
-            const moveScale = 0.35; // Significantly increased for better AR response
+            const moveScale = 0.75; // Significantly increased for better AR response
             
             // Create movement vector
             const movement = new THREE.Vector3()
@@ -838,7 +838,7 @@ function moveScreenWithTouch() {
     );
     
     // Scale the movement (adjust multiplier as needed)
-    const movementSpeed = 2.0;
+    const movementSpeed = 4.0;
     
     // Create movement vector in world space
     const movement = new THREE.Vector3()
@@ -1119,7 +1119,7 @@ export function setupVideoControls(mediaModule) {
 }
 
 // Function to delete the last interacted screen (most recently selected)
-function deleteLastScreen() {
+export function deleteLastScreen() {
     // If no screens, do nothing
     if (!screens || screens.length === 0) {
         console.log("No screens to delete");
@@ -1127,21 +1127,23 @@ function deleteLastScreen() {
         return false;
     }
     
+    // Get the current selected screen from the imported module variable
+    let screenToDelete = selectedScreen;
+    
     // Verify we have a selected screen to delete
-    if (!selectedScreen) {
+    if (!screenToDelete) {
         console.log("No screen selected for deletion, selecting most recent one");
         // If there's no selected screen, select the last created one (as fallback)
         if (screens.length > 0) {
-            selectedScreen = screens[screens.length - 1];
+            screenToDelete = screens[screens.length - 1];
             // Make sure it's visually marked as selected
-            selectScreen(selectedScreen);
+            selectScreen(screenToDelete);
         } else {
             return false;
         }
     }
     
     // Log which screen is being deleted
-    const screenToDelete = selectedScreen;
     console.log("Deleting selected screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
     
     // Create visual deletion effect
@@ -1164,7 +1166,7 @@ function deleteLastScreen() {
         // Don't need to set selectedScreen as selectScreen does this
     } else {
         // No screens left
-        selectedScreen = null;
+        selectScreen(null);
     }
     
     // Provide haptic feedback if available

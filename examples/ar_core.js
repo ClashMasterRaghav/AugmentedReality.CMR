@@ -25,6 +25,12 @@ export let selectedKey = null;
 export let container;
 export let isARMode = false;
 
+// Function to safely update the selected screen reference globally
+export function setSelectedScreen(screen) {
+    console.log("Setting global selectedScreen to:", screen ? (screen.userData && screen.userData.id ? screen.userData.id : "unknown") : "null");
+    selectedScreen = screen;
+}
+
 // Main initialization function called from ar_main.js
 export function initAR() {
     try {
@@ -232,7 +238,7 @@ export function render() {
             
             // Set position with slight lag for smoother movement
             const targetPosition = position.clone().addScaledVector(direction, 0.8);
-            selectedScreen.position.lerp(targetPosition, 0.5);
+            selectedScreen.position.lerp(targetPosition, 0.85);
         }
     }
     
