@@ -7,7 +7,7 @@ import {
 } from './ar_core.js';
 import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
-import { videoElement, duration } from './ar_media.js';
+import { videoElement, duration, toggleVideoPlayback, toggleVideoMute, updateVideoTime } from './ar_media.js';
 
 // Touch interaction variables
 let touchEnabled = true;
@@ -1052,12 +1052,6 @@ function handleProgressBarTouch(screen, point) {
     }
     
     return false;
-}
-
-// Update video time based on progress
-function updateVideoTime(progress) {
-    // Progress bar has been removed, so this function no longer needs to do anything
-    // Keeping the function to maintain code structure in case we need to reimplement
 }
 
 // Create a floating text indicator for mode changes

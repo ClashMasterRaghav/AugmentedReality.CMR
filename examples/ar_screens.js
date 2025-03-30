@@ -40,6 +40,9 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const borderGeometry = new THREE.ShapeGeometry(roundedRectShape);
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
+    borderPanel.userData = {
+        type: 'border'
+    };
     browserWindow.add(borderPanel);
     
     // Find and update the drag handle reference in userData
@@ -101,12 +104,20 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     let backgroundMaterial;
     
     if (content && content.isVideoTexture) {
-        // Use video texture if provided
+        // Use video texture if provided with correct mapping to fill the screen
         backgroundMaterial = new THREE.MeshBasicMaterial({
             map: content,
             side: THREE.DoubleSide,
             depthTest: false
         });
+        
+        // Set texture mapping to ensure full coverage
+        content.wrapS = THREE.ClampToEdgeWrapping;
+        content.wrapT = THREE.ClampToEdgeWrapping;
+        content.repeat.set(1, 1);
+        content.offset.set(0, 0);
+        content.center.set(0.5, 0.5);
+        content.needsUpdate = true;
     } else {
         // Create a gradient texture for the background
         const canvas = document.createElement('canvas');
@@ -592,8 +603,9 @@ export function selectScreen(screen) {
     if (selectedScreen) {
         // Change border color back to normal
         const borderMesh = selectedScreen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.z - (-0.001)) < 0.0001);
+            child.userData && child.userData.type === 'border' || 
+            (child.geometry && child.geometry.type === 'ShapeGeometry' && 
+            Math.abs(child.position.z - (-0.001)) < 0.0001));
             
         if (borderMesh) {
             borderMesh.material.color.set(0x2196F3); // Blue border
@@ -607,8 +619,9 @@ export function selectScreen(screen) {
     
     // Highlight border for selected screen
     const borderMesh = screen.children.find(child => 
-        child.geometry && child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.z - (-0.001)) < 0.0001);
+        child.userData && child.userData.type === 'border' || 
+        (child.geometry && child.geometry.type === 'ShapeGeometry' && 
+        Math.abs(child.position.z - (-0.001)) < 0.0001));
         
     if (borderMesh) {
         borderMesh.material.color.set(0x4CAF50); // Green border

@@ -50,6 +50,13 @@ export function loadVideoTexture() {
         videoTexture.format = THREE.RGBAFormat;
         videoTexture.crossOrigin = 'anonymous';
         
+        // Configure texture for proper mapping
+        videoTexture.wrapS = THREE.ClampToEdgeWrapping;
+        videoTexture.wrapT = THREE.ClampToEdgeWrapping;
+        videoTexture.repeat.set(1, 1);
+        videoTexture.offset.set(0, 0);
+        videoTexture.center.set(0.5, 0.5);
+        
         // Add event listeners for video load status
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
@@ -58,11 +65,15 @@ export function loadVideoTexture() {
             
             // Update the mute icon to reflect the default muted state
             updateMuteIcons(true);
+            
+            // Start updating video progress in the timeline
+            videoElement.addEventListener('timeupdate', updateVideoProgress);
         });
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // No longer need to update progress bars since they've been removed
+            // Update progress indicators
+            updateVideoProgress();
         });
         
         videoElement.addEventListener('error', (e) => {
