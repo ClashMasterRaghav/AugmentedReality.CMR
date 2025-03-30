@@ -67,9 +67,25 @@ function initAREnvironment() {
     
     document.body.appendChild(arButton);
     
+    // Add event listener for session start
+    renderer.xr.addEventListener('sessionstart', function() {
+        console.log("AR session started");
+        isARMode = true;
+        
+        // Wait a moment before showing tutorial to let the AR environment initialize
+        setTimeout(() => {
+            import('./ar_ui.js').then(UI => {
+                if (UI.showARTutorial) {
+                    UI.showARTutorial();
+                }
+            });
+        }, 3000);
+    });
+
     // Add event listener for session end
     renderer.xr.addEventListener('sessionend', function() {
         console.log("AR session ended");
+        isARMode = false;
         // Reload the page to return to initial state
         window.location.reload();
     });

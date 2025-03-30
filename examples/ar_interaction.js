@@ -205,94 +205,121 @@ function getScreenFromIntersect(object) {
 function handleButtonAction(button) {
     if (!button || !button.userData) return;
     
-    console.log("Button action:", button.userData.action);
+    // Create visual feedback
+    createButtonFeedback(button);
     
+    // Get the action and execute it
     const action = button.userData.action;
-    let screen = null;
     
-    // Find associated screen
-    if (button.userData.screen) {
-        screen = button.userData.screen;
-    } else if (selectedScreen) {
-        screen = selectedScreen;
+    switch(action) {
+        case 'playButton':
+            // Toggle video playback
+            toggleVideoPlayback();
+            break;
+            
+        case 'volumeButton':
+            // Toggle video mute
+            toggleVideoMute();
+            break;
+            
+        case 'createScreen':
+            createNewScreen();
+            break;
+            
+        case 'moveScreen':
+            toggleMoveMode(button);
+            break;
+            
+        case 'rotateScreen':
+            toggleRotateMode(button);
+            break;
+            
+        case 'newScreen':
+            createNewScreen();
+            break;
+            
+        case 'deleteScreen':
+            // Delete the last interacted screen
+            deleteLastScreen();
+            break;
     }
     
-    // Play/pause button
-    if (action === 'playButton' && screen) {
-        // Check if video control function exists
-        if (videoControlFunctions.togglePlayback) {
-            // Toggle playback
-            videoControlFunctions.togglePlayback();
-            console.log("Toggle video playback");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-        } else {
-            console.error("Video playback function not found");
-        }
+    // Provide haptic feedback
+    if (navigator.vibrate) {
+        navigator.vibrate(15);
     }
-    // Volume/mute button
-    else if (action === 'volumeButton' && screen) {
-        // Check if mute function exists
-        if (videoControlFunctions.toggleMute) {
-            // Toggle mute
-            videoControlFunctions.toggleMute();
-            console.log("Toggle video mute");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-        } else {
-            console.error("Video mute function not found");
-        }
-    }
+}
+
+// Create visual feedback for button press
+function createButtonFeedback(button) {
+    // Store original scale
+    const originalScale = button.scale.clone();
     
-    // Original functionality for other buttons
-    else if (action === 'createScreen') {
-        createNewScreen();
-    } else if (action === 'moveScreen') {
-        toggleMoveMode(button);
-    } else if (action === 'rotateScreen') {
-        toggleRotateMode(button);
-    } else if (action === 'newScreen') {
-        createNewScreen();
-    } else if (action === 'deleteScreen') {
-        // Delete the last interacted screen
-        deleteLastScreen();
+    // Create pulse effect
+    button.scale.multiplyScalar(1.2);
+    button.material.color.setHex(0x6699ff); // Change to highlight color
+    
+    // Create glow effect
+    const glowSize = button.geometry.parameters.radius * 1.5;
+    const glowGeometry = new THREE.CircleGeometry(glowSize, 32);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x6699ff,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+        depthTest: true
+    });
+    
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.001; // Slightly behind button
+    button.add(glowMesh);
+    
+    // Reset after animation
+    setTimeout(() => {
+        // Animate scale back to normal
+        const startTime = performance.now();
+        const duration = 200; // ms
         
-        // Visual feedback
-        const iconMesh = button.children[0];
-        if (iconMesh) {
-            // Apply a quick scale animation
-            iconMesh.scale.set(1.2, 1.2, 1.2);
-            setTimeout(() => {
-                iconMesh.scale.set(1, 1, 1);
-            }, 150);
+        function animateBack() {
+            const elapsedTime = performance.now() - startTime;
+            const progress = Math.min(elapsedTime / duration, 1);
+            
+            // Ease out
+            const t = 1 - Math.pow(1 - progress, 2);
+            
+            button.scale.lerp(originalScale, t);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateBack);
+            } else {
+                button.scale.copy(originalScale);
+                button.material.color.setHex(0x444444); // Reset color
+                
+                // Remove glow with fade out
+                const startFadeTime = performance.now();
+                const fadeDuration = 150; // ms
+                
+                function fadeOutGlow() {
+                    const fadeElapsed = performance.now() - startFadeTime;
+                    const fadeProgress = Math.min(fadeElapsed / fadeDuration, 1);
+                    
+                    glowMaterial.opacity = 0.5 * (1 - fadeProgress);
+                    
+                    if (fadeProgress < 1) {
+                        requestAnimationFrame(fadeOutGlow);
+                    } else {
+                        button.remove(glowMesh);
+                        glowMaterial.dispose();
+                        glowGeometry.dispose();
+                    }
+                }
+                
+                requestAnimationFrame(fadeOutGlow);
+            }
         }
-    }
+        
+        requestAnimationFrame(animateBack);
+    }, 100);
 }
 
 // Create a new screen
@@ -985,10 +1012,45 @@ function onTouchEnd(event) {
     isPinching = false;
 }
 
-// Handle progress bar touch for video seeking
+// Handle progress bar touch for video seeking (updated to work with timeline)
 function handleProgressBarTouch(screen, point) {
-    // Progress bar has been removed, so this function no longer needs to do anything
-    // Keeping the function to maintain code structure in case we need to reimplement
+    if (!screen || !screen.userData || !screen.userData.controls) return false;
+    
+    // Find the timeline
+    const timeline = screen.userData.controls.timeline;
+    
+    if (!timeline) return false;
+    
+    // Convert world point to local screen coordinates
+    let localPoint = point.clone();
+    screen.worldToLocal(localPoint);
+    
+    // Convert to timeline local coordinates
+    let timelineLocalPoint = localPoint.clone();
+    timeline.worldToLocal(timelineLocalPoint);
+    
+    // Get timeline width
+    const timelineWidth = timeline.geometry.parameters.width;
+    
+    // Check if hit is within timeline area
+    if (Math.abs(timelineLocalPoint.y) < 0.02 && 
+        timelineLocalPoint.x >= -timelineWidth/2 && 
+        timelineLocalPoint.x <= timelineWidth/2) {
+        
+        // Calculate progress based on x position (0-1)
+        const progress = (timelineLocalPoint.x + timelineWidth/2) / timelineWidth;
+        
+        // Update video time
+        updateVideoTime(progress);
+        
+        // Provide haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(15);
+        }
+        
+        return true;
+    }
+    
     return false;
 }
 

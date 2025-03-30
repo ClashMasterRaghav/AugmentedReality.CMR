@@ -88,8 +88,39 @@ export function loadVideoTexture() {
 
 // Update video progress on all screens - function simplified since progress bars are removed
 function updateVideoProgress() {
-    // This function is now empty as progress bars have been removed
-    // Keeping the function to maintain code structure in case we need to reimplement
+    if (!videoElement || !screens) return;
+    
+    const progress = currentTime / duration;
+    
+    screens.forEach(screen => {
+        if (!screen.userData || !screen.userData.controls) return;
+        
+        // Find the timeline components
+        const timelineProgress = screen.userData.controls.progress;
+        const timelineHandle = screen.userData.controls.handle;
+        const timeDisplay = screen.userData.controls.timeDisplay;
+        
+        if (timelineProgress && timelineHandle) {
+            // Update progress indicator width
+            timelineProgress.scale.x = progress;
+            
+            // Update handle position
+            const timeline = screen.userData.controls.timeline;
+            if (timeline) {
+                const fullWidth = timeline.geometry.parameters.width;
+                timelineHandle.position.x = -fullWidth/2 + (fullWidth * progress);
+            }
+            
+            // Update time display
+            if (timeDisplay && timeDisplay.userData && timeDisplay.userData.updateTime) {
+                timeDisplay.userData.updateTime(currentTime, duration);
+            }
+            
+            // Update progress in userData
+            screen.userData.controls.currentTime = currentTime;
+            screen.userData.controls.duration = duration;
+        }
+    });
 }
 
 // Toggle video playback
@@ -106,6 +137,24 @@ export function toggleVideoPlayback() {
         videoElement.pause();
         updatePlayPauseIcons(true);
     }
+}
+
+// Update video time based on progress
+export function updateVideoTime(progress) {
+    if (!videoElement) return;
+    
+    // Clamp progress to 0-1 range
+    progress = Math.max(0, Math.min(1, progress));
+    
+    // Set video time
+    const newTime = duration * progress;
+    videoElement.currentTime = newTime;
+    
+    // Update current time
+    currentTime = newTime;
+    
+    // Update progress display
+    updateVideoProgress();
 }
 
 // Toggle video mute

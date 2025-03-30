@@ -1,6 +1,6 @@
 // UI elements and controls for AR experience
 import * as THREE from 'three';
-import { scene, camera, renderer, controller } from './ar_core.js';
+import { scene, camera, renderer, controller, isARMode } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
 
 // Global UI elements
@@ -12,15 +12,19 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let isResizeModeActive = false;
 
+// Track if the tutorial has been shown
+let tutorialShown = false;
+
+// Export notification container reference
+export let notificationContainer;
+
 // Export notification functions explicitly at the top level
 export function createNotification(message, type = 'info') {
-    console.log(`Notification (${type}): ${message}`);
-    
-    // Create DOM notification
-    createDOMNotification(message, type);
-    
-    // Create 3D notification if renderer is available
-    if (renderer && camera) {
+    // Create DOM notification for non-AR mode
+    if (!isARMode) {
+        createDOMNotification(message, type);
+    } else {
+        // Create 3D notification in AR mode
         create3DNotification(message, type);
     }
 }
@@ -32,6 +36,26 @@ export const showNotification = createNotification;
 export function initUI() {
     createControlPanel();
     createVirtualKeyboard();
+    
+    // Create notification container
+    notificationContainer = document.getElementById('notificationContainer');
+    if (!notificationContainer) {
+        notificationContainer = document.createElement('div');
+        notificationContainer.id = 'notificationContainer';
+        notificationContainer.style.position = 'absolute';
+        notificationContainer.style.bottom = '20px';
+        notificationContainer.style.left = '50%';
+        notificationContainer.style.transform = 'translateX(-50%)';
+        notificationContainer.style.width = '80%';
+        notificationContainer.style.maxWidth = '300px';
+        notificationContainer.style.zIndex = '300';
+        document.body.appendChild(notificationContainer);
+    }
+    
+    // Create welcome message
+    setTimeout(() => {
+        createNotification('Welcome to AR Multi-Screen Experience', 'success');
+    }, 1000);
 }
 
 // Create a notification in the DOM
@@ -627,4 +651,152 @@ export function setButtonPressed(button, isPressed) {
     } else {
         button.material.color.set(button.userData.originalColor);
     }
+}
+
+// Show the AR tutorial for first-time users
+export function showARTutorial() {
+    if (tutorialShown || !isARMode) return;
+    
+    tutorialShown = true;
+    
+    const tutorialSteps = [
+        {
+            message: "Welcome to AR Experience!",
+            position: new THREE.Vector3(0, 0.05, -0.5),
+            duration: 3000
+        },
+        {
+            message: "Touch screens to select them",
+            position: new THREE.Vector3(0, 0, -0.5),
+            duration: 3000
+        },
+        {
+            message: "Drag the top bar to move screens",
+            position: new THREE.Vector3(0, -0.05, -0.5),
+            duration: 3000
+        },
+        {
+            message: "Use buttons for playback control",
+            position: new THREE.Vector3(0, -0.1, -0.5),
+            duration: 3000
+        },
+        {
+            message: "Slide the timeline to navigate video",
+            position: new THREE.Vector3(0, -0.15, -0.5),
+            duration: 3000
+        }
+    ];
+    
+    showTutorialSteps(tutorialSteps);
+}
+
+// Display tutorial steps sequentially
+function showTutorialSteps(steps, index = 0) {
+    if (index >= steps.length) return;
+    
+    const step = steps[index];
+    
+    // Create step card
+    const tutorialCard = createTutorialCard(step.message);
+    
+    // Position relative to camera
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(camera.quaternion);
+    
+    const position = camera.position.clone().add(
+        cameraDirection.clone().multiplyScalar(0.5)
+    );
+    
+    // Apply any vertical offset
+    position.y += step.position.y;
+    
+    tutorialCard.position.copy(position);
+    
+    // Make card face the camera
+    tutorialCard.lookAt(camera.position);
+    
+    scene.add(tutorialCard);
+    
+    // Move to next step after duration
+    setTimeout(() => {
+        // Fade out card
+        const startTime = performance.now();
+        const fadeDuration = 500; // ms
+        
+        function fadeOut() {
+            const elapsedTime = performance.now() - startTime;
+            const progress = Math.min(elapsedTime / fadeDuration, 1);
+            
+            if (progress < 1) {
+                // Fade out and move up
+                tutorialCard.material.opacity = 1 - progress;
+                tutorialCard.position.y += 0.001;
+                
+                requestAnimationFrame(fadeOut);
+            } else {
+                // Remove card and show next step
+                scene.remove(tutorialCard);
+                tutorialCard.material.dispose();
+                tutorialCard.geometry.dispose();
+                
+                // Show next step after a small delay
+                setTimeout(() => {
+                    showTutorialSteps(steps, index + 1);
+                }, 300);
+            }
+        }
+        
+        requestAnimationFrame(fadeOut);
+    }, step.duration);
+}
+
+// Create a tutorial card with text
+function createTutorialCard(message) {
+    // Create canvas for the card
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw card background with rounded corners
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    const radius = 20;
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(canvas.width - radius, 0);
+    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+    ctx.lineTo(canvas.width, canvas.height - radius);
+    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+    ctx.lineTo(radius, canvas.height);
+    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Add a subtle glow border
+    ctx.strokeStyle = 'rgba(100, 149, 237, 0.7)'; // Cornflower blue
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Draw text
+    ctx.fillStyle = 'white';
+    ctx.font = '24px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    // Create card
+    const geometry = new THREE.PlaneGeometry(0.4, 0.1);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false
+    });
+    
+    return new THREE.Mesh(geometry, material);
 }
