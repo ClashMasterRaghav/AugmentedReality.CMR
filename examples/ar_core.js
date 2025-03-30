@@ -180,7 +180,7 @@ export function animate() {
 }
 
 // Render function
-export function render(timestamp, frame) {
+function render(timestamp, frame) {
     // Handle screen placement or movement with controller
     if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
