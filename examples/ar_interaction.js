@@ -279,6 +279,19 @@ function handleButtonAction(button) {
         toggleRotateMode(button);
     } else if (action === 'newScreen') {
         createNewScreen();
+    } else if (action === 'deleteScreen') {
+        // Delete the last interacted screen
+        deleteLastScreen();
+        
+        // Visual feedback
+        const iconMesh = button.children[0];
+        if (iconMesh) {
+            // Apply a quick scale animation
+            iconMesh.scale.set(1.2, 1.2, 1.2);
+            setTimeout(() => {
+                iconMesh.scale.set(1, 1, 1);
+            }, 150);
+        }
     }
 }
 
@@ -976,17 +989,12 @@ function onTouchEnd(event) {
 function handleProgressBarTouch(screen, point) {
     if (!screen || !screen.userData || !screen.userData.controls) return false;
     
-    // Get screen dimensions
-    const screenWidth = 1.0; // default screen width
+    // Find the progress bar background
+    const progressBar = screen.children.find(child => 
+        child.userData && 
+        child.userData.type === 'progressBar');
     
-    // Get progress bar from screen
-    const progressBg = screen.children.find(child => 
-        child.geometry && 
-        child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.y - (-0.28)) < 0.01 &&
-        child.material.color.getHex() === 0x333333);
-    
-    if (!progressBg) return false;
+    if (!progressBar) return false;
     
     // Convert world point to local screen coordinates
     let localPoint = point.clone();
@@ -994,13 +1002,51 @@ function handleProgressBarTouch(screen, point) {
         localPoint = screen.worldToLocal(localPoint.clone());
     }
     
-    // Check if hit is within progress bar area
-    if (Math.abs(localPoint.y - (-0.28)) < 0.02 && 
-        Math.abs(localPoint.x) < screenWidth * 0.45) {
+    // Get screen height for position check
+    const screenHeight = 0.75; // Default height
+    
+    // Check if hit is within progress bar area (near bottom of screen)
+    if (Math.abs(localPoint.y - (-screenHeight / 2 + 0.025)) < 0.025) {
+        // Get progress bar width for calculation
+        const progressBarWidth = progressBar.geometry.parameters.width;
         
         // Calculate progress based on x position
-        const progress = (localPoint.x + (screenWidth * 0.45)) / (screenWidth * 0.9);
-        updateVideoTime(Math.max(0, Math.min(1, progress)));
+        // Clamp x position to progress bar bounds
+        const clampedX = Math.max(-progressBarWidth/2, Math.min(progressBarWidth/2, localPoint.x));
+        
+        // Convert to 0-1 range
+        const progress = (clampedX + progressBarWidth/2) / progressBarWidth;
+        
+        // Update video time
+        updateVideoTime(progress);
+        
+        // Update percentage text immediately for better feedback
+        if (screen.userData.controls.progressBar && 
+            screen.userData.controls.progressBar.userData && 
+            screen.userData.controls.progressBar.userData.percentText) {
+            
+            const percentData = screen.userData.controls.progressBar.userData.percentText;
+            const percentCtx = percentData.context;
+            
+            // Clear canvas
+            percentCtx.clearRect(0, 0, percentData.canvas.width, percentData.canvas.height);
+            
+            // Draw percentage text
+            percentCtx.fillStyle = '#ffffff';
+            percentCtx.font = '16px Arial';
+            percentCtx.textAlign = 'center';
+            percentCtx.textBaseline = 'middle';
+            percentCtx.fillText(`${Math.round(progress * 100)}%`, percentData.canvas.width / 2, percentData.canvas.height / 2);
+            
+            // Update texture
+            percentData.texture.needsUpdate = true;
+        }
+        
+        // Provide haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(15);
+        }
+        
         return true;
     }
     
@@ -1137,4 +1183,127 @@ export function setupVideoControls(mediaModule) {
         videoControlFunctions.toggleMute = mediaModule.toggleVideoMute;
         console.log("Video controls setup complete");
     }
+}
+
+// Function to delete the last interacted screen (most recently selected)
+function deleteLastScreen() {
+    // If no screens, do nothing
+    if (!screens || screens.length === 0) {
+        console.log("No screens to delete");
+        createModeChangeIndicator('No Screens to Delete');
+        return false;
+    }
+    
+    // Get the screen to delete (either the selected one or the last one in the array)
+    const screenToDelete = selectedScreen || screens[screens.length - 1];
+    
+    if (!screenToDelete) {
+        console.log("No screen selected for deletion");
+        return false;
+    }
+    
+    console.log("Deleting screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
+    
+    // Create visual deletion effect
+    createDeletionEffect(screenToDelete.position.clone());
+    
+    // Remove from scene
+    scene.remove(screenToDelete);
+    
+    // Remove from screens array
+    const index = screens.indexOf(screenToDelete);
+    if (index > -1) {
+        screens.splice(index, 1);
+    }
+    
+    // If the selected screen was deleted, reset selectedScreen
+    if (selectedScreen === screenToDelete) {
+        selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
+        
+        // If we have a new selected screen, select it
+        if (selectedScreen) {
+            selectScreen(selectedScreen);
+        }
+    }
+    
+    // Provide haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate([30, 20, 40]); // Pattern for "delete" feel
+    }
+    
+    createModeChangeIndicator('Screen Deleted');
+    return true;
+}
+
+// Create deletion visual effect
+function createDeletionEffect(position) {
+    // Create particles for deletion effect
+    const particleCount = 20;
+    const particleGroup = new THREE.Group();
+    
+    for (let i = 0; i < particleCount; i++) {
+        const size = Math.random() * 0.02 + 0.01;
+        const geometry = new THREE.PlaneGeometry(size, size);
+        const material = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(Math.random(), Math.random(), Math.random()),
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        
+        const particle = new THREE.Mesh(geometry, material);
+        
+        // Random position within screen bounds
+        particle.position.set(
+            position.x + (Math.random() - 0.5) * 0.5,
+            position.y + (Math.random() - 0.5) * 0.5,
+            position.z + (Math.random() - 0.5) * 0.1
+        );
+        
+        // Random velocity
+        particle.userData.velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02
+        );
+        
+        particleGroup.add(particle);
+    }
+    
+    scene.add(particleGroup);
+    
+    // Animate particles
+    const startTime = performance.now();
+    const duration = 1000; // 1 second
+    
+    function animateParticles() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
+        
+        if (progress < 1) {
+            // Update each particle
+            particleGroup.children.forEach(particle => {
+                // Move based on velocity
+                particle.position.add(particle.userData.velocity);
+                
+                // Fade out
+                particle.material.opacity = 0.8 * (1 - progress);
+                
+                // Rotate
+                particle.rotation.x += 0.01;
+                particle.rotation.y += 0.01;
+            });
+            
+            requestAnimationFrame(animateParticles);
+        } else {
+            // Clean up
+            particleGroup.children.forEach(particle => {
+                particle.geometry.dispose();
+                particle.material.dispose();
+            });
+            scene.remove(particleGroup);
+        }
+    }
+    
+    requestAnimationFrame(animateParticles);
 } 

@@ -159,24 +159,59 @@ export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
     
-    // Panel background - fully opaque now
-    const panelSize = { width: 0.25, height: 0.15 };
+    // Panel background - sleek modern design with rounded corners
+    const panelSize = { width: 0.18, height: 0.08 };
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    
+    // Create rounded panel texture
+    const panelCanvas = document.createElement('canvas');
+    panelCanvas.width = 256;
+    panelCanvas.height = 128;
+    const panelCtx = panelCanvas.getContext('2d');
+    
+    // Draw rounded rectangle with gradient
+    const cornerRadius = 20;
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+    panelCtx.lineTo(cornerRadius, panelCanvas.height);
+    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    
+    // Create gradient
+    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+    gradient.addColorStop(0, '#1a1a1a');
+    gradient.addColorStop(1, '#0a0a0a');
+    panelCtx.fillStyle = gradient;
+    panelCtx.fill();
+    
+    // Add subtle border
+    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    panelCtx.lineWidth = 2;
+    panelCtx.stroke();
+    
+    // Create texture from canvas
+    const panelTexture = new THREE.CanvasTexture(panelCanvas);
     const panelMaterial = new THREE.MeshBasicMaterial({
-        color: 0x111111,
-        transparent: false, // Make fully opaque
-        opacity: 1.0,
+        map: panelTexture,
+        transparent: true,
+        opacity: 0.9,
         side: THREE.DoubleSide
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     controlPanel.add(panelMesh);
     
-    // Add stronger glow effect around the panel
-    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.02, panelSize.height + 0.02);
+    // Add subtle glow effect
+    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
     const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x00ccff,
+        color: 0x2196F3,
         transparent: true,
-        opacity: 0.7, // Increased opacity for better visibility
+        opacity: 0.2,
         side: THREE.DoubleSide
     });
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -184,18 +219,17 @@ export function createControlPanel() {
     controlPanel.add(glowMesh);
     
     // Define button parameters
-    const buttonSize = 0.06; // Larger buttons for touch
-    const buttonSpacing = 0.08;
+    const buttonSize = 0.04; // Smaller, more subtle buttons
+    const buttonSpacing = 0.06;
     
-    // Create buttons - only 3 buttons: New Screen, Move, and Rotate
+    // Create buttons - only 2 buttons: Add Screen and Delete Screen
     const buttonPositions = [
-        { x: -buttonSpacing, y: 0 },  // Left - New Screen
-        { x: 0, y: 0 },               // Center - Move
-        { x: buttonSpacing, y: 0 }    // Right - Rotate
+        { x: -buttonSpacing/2, y: 0 },  // Left - Add Screen
+        { x: buttonSpacing/2, y: 0 }    // Right - Delete Screen
     ];
     
-    const buttonActions = ['newScreen', 'moveScreen', 'rotateScreen'];
-    const buttonColors = [0x2196F3, 0x777777, 0x777777]; // Blue, Grey, Grey
+    const buttonActions = ['newScreen', 'deleteScreen'];
+    const buttonColors = [0x2196F3, 0xFF5252]; // Blue, Red
     
     buttonPositions.forEach((position, index) => {
         // Create button mesh with circle geometry for better touch targeting
@@ -203,7 +237,7 @@ export function createControlPanel() {
         const buttonMaterial = new THREE.MeshBasicMaterial({
             color: buttonColors[index],
             transparent: true,
-            opacity: 1.0, // Full opacity for buttons
+            opacity: 0.9,
             side: THREE.DoubleSide
         });
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
@@ -211,19 +245,19 @@ export function createControlPanel() {
         button.userData = {
             type: 'button',
             action: buttonActions[index],
-            hoverColor: 0x4FC3F7,
-            activeColor: index === 0 ? 0x2196F3 : 0x44cc88, // New button is blue, others green when active
-            inactiveColor: 0x777777,
+            hoverColor: index === 0 ? 0x4FC3F7 : 0xFF7575, // Light blue for add, light red for delete
+            activeColor: buttonColors[index],
+            inactiveColor: buttonColors[index],
             originalColor: buttonColors[index],
-            isToggle: index > 0, // Move and Rotate are toggles
-            isActive: index === 0 // Only New Screen starts as active
+            isToggle: false, // No toggle buttons
+            isActive: true // Both are active by default
         };
         
         controlPanel.add(button);
         
         // Add icon to button using canvas texture
         const iconTexture = createButtonIcon(index);
-        const iconSize = buttonSize * 0.8; // Larger icon
+        const iconSize = buttonSize * 0.7;
         const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
             map: iconTexture,
@@ -271,28 +305,6 @@ export function createControlPanel() {
         
         this.position.copy(position);
         this.quaternion.copy(camera.quaternion);
-        
-        // Update button states
-        const buttons = this.children.filter(child => 
-            child.userData && child.userData.type === 'button');
-        
-        buttons.forEach(button => {
-            if (button.userData.action === 'moveScreen') {
-                if (button.userData.isActive !== isMoveModeActive) {
-                    button.userData.isActive = isMoveModeActive;
-                    button.material.color.set(isMoveModeActive ? 
-                        button.userData.activeColor : 
-                        button.userData.inactiveColor);
-                }
-            } else if (button.userData.action === 'rotateScreen') {
-                if (button.userData.isActive !== isRotateModeActive) {
-                    button.userData.isActive = isRotateModeActive;
-                    button.material.color.set(isRotateModeActive ? 
-                        button.userData.activeColor : 
-                        button.userData.inactiveColor);
-                }
-            }
-        });
     };
     
     scene.add(controlPanel);
@@ -311,79 +323,64 @@ function createButtonIcon(buttonIndex) {
     // Set up shared styling
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 8; // Thicker lines for visibility
+    ctx.lineWidth = 6; // Thinner lines for a more elegant look
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     
     // Draw different icons based on button index
     switch(buttonIndex) {
         case 0: // New Screen icon - Plus symbol
             ctx.beginPath();
-            ctx.moveTo(35, 64);
-            ctx.lineTo(93, 64);
+            ctx.moveTo(40, 64);
+            ctx.lineTo(88, 64);
             ctx.stroke();
             
             ctx.beginPath();
-            ctx.moveTo(64, 35);
-            ctx.lineTo(64, 93);
-            ctx.stroke();
-            break;
-            
-        case 1: // Move icon - Four arrows
-            ctx.beginPath();
-            // Left arrow
-            ctx.moveTo(25, 64);
-            ctx.lineTo(45, 64);
-            ctx.moveTo(35, 54);
-            ctx.lineTo(25, 64);
-            ctx.lineTo(35, 74);
-            
-            // Right arrow
-            ctx.moveTo(103, 64);
-            ctx.lineTo(83, 64);
-            ctx.moveTo(93, 54);
-            ctx.lineTo(103, 64);
-            ctx.lineTo(93, 74);
-            
-            // Up arrow
-            ctx.moveTo(64, 25);
-            ctx.lineTo(64, 45);
-            ctx.moveTo(54, 35);
-            ctx.lineTo(64, 25);
-            ctx.lineTo(74, 35);
-            
-            // Down arrow
-            ctx.moveTo(64, 103);
-            ctx.lineTo(64, 83);
-            ctx.moveTo(54, 93);
-            ctx.lineTo(64, 103);
-            ctx.lineTo(74, 93);
-            
+            ctx.moveTo(64, 40);
+            ctx.lineTo(64, 88);
             ctx.stroke();
             break;
             
-        case 2: // Rotate icon - Circular arrows for X and Y rotation
+        case 1: // Delete Screen icon - Trash can
+            // Draw trash can body
             ctx.beginPath();
-            // X-axis rotation (horizontal oval)
-            ctx.save();
-            ctx.scale(1.5, 0.8);
-            ctx.arc(64/1.5, 64/0.8, 20, 0, 2 * Math.PI);
-            ctx.restore();
+            ctx.moveTo(40, 44);
+            ctx.lineTo(40, 94);
+            ctx.quadraticCurveTo(40, 98, 44, 98);
+            ctx.lineTo(84, 98);
+            ctx.quadraticCurveTo(88, 98, 88, 94);
+            ctx.lineTo(88, 44);
             ctx.stroke();
             
-            // Y-axis rotation (vertical oval)
+            // Draw lid
             ctx.beginPath();
-            ctx.save();
-            ctx.scale(0.8, 1.5);
-            ctx.arc(64/0.8, 64/1.5, 20, 0, 2 * Math.PI);
-            ctx.restore();
+            ctx.moveTo(36, 44);
+            ctx.lineTo(92, 44);
             ctx.stroke();
             
-            // Arrow head
+            // Draw handle
             ctx.beginPath();
-            ctx.moveTo(100, 64);
-            ctx.lineTo(90, 54);
-            ctx.lineTo(90, 74);
-            ctx.fill();
+            ctx.moveTo(56, 44);
+            ctx.lineTo(56, 36);
+            ctx.lineTo(72, 36);
+            ctx.lineTo(72, 44);
+            ctx.stroke();
+            
+            // Draw lines inside trash can
+            ctx.beginPath();
+            ctx.moveTo(52, 56);
+            ctx.lineTo(52, 86);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(64, 56);
+            ctx.lineTo(64, 86);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(76, 56);
+            ctx.lineTo(76, 86);
+            ctx.stroke();
             break;
     }
     

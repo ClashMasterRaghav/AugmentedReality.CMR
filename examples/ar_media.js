@@ -91,25 +91,73 @@ function updateVideoProgress() {
     const progress = currentTime / duration;
     
     screens.forEach(screen => {
-        // Find progress bar in screen
-        const progressBar = screen.children.find(child => 
-            child.geometry && 
-            child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.y - (-0.28)) < 0.01 &&
-            child.material.color.getHex() === 0xff0000);
+        if (!screen.userData || !screen.userData.controls) return;
+        
+        // Find the progress indicator in the screen
+        const progressBar = screen.userData.controls.progressBar;
         
         if (progressBar) {
-            // Get screen width (for calculations)
-            const screenWidth = 1.0; // default screen width
+            // Get parent progressBar background for measuring
+            const progressBarBg = progressBar.parent;
+            if (!progressBarBg) return;
             
-            // Update progress bar width and position
-            progressBar.scale.x = progress;
-            // Adjust position to keep left-aligned
-            progressBar.position.x = -(screenWidth * 0.45) + (progress * screenWidth * 0.45);
+            // Update progress bar width
+            const fullWidth = progressBarBg.geometry.parameters.width;
+            progressBar.scale.x = fullWidth * progress;
+            
+            // Update position to anchor from left edge (half the scaled width)
+            progressBar.position.x = -(fullWidth / 2) + (progressBar.scale.x / 2);
             
             // Update progress in userData
-            if (screen.userData && screen.userData.controls) {
-                screen.userData.controls.progress = progress;
+            screen.userData.controls.progress = progress;
+            
+            // Add percentage text to the progress bar if not exists
+            if (!progressBar.userData.percentText) {
+                const percentCanvas = document.createElement('canvas');
+                percentCanvas.width = 64;
+                percentCanvas.height = 32;
+                const percentCtx = percentCanvas.getContext('2d');
+                
+                // Create a texture for percentage display
+                const percentTexture = new THREE.CanvasTexture(percentCanvas);
+                const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
+                const percentMaterial = new THREE.MeshBasicMaterial({
+                    map: percentTexture,
+                    transparent: true,
+                    depthTest: false
+                });
+                
+                const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
+                percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
+                percentMesh.renderOrder = 25; // Render on top
+                progressBarBg.add(percentMesh);
+                
+                // Store in userData for updates
+                progressBar.userData.percentText = {
+                    canvas: percentCanvas,
+                    context: percentCtx,
+                    mesh: percentMesh,
+                    texture: percentTexture
+                };
+            }
+            
+            // Update percentage text
+            if (progressBar.userData.percentText) {
+                const percentData = progressBar.userData.percentText;
+                const percentCtx = percentData.context;
+                
+                // Clear canvas
+                percentCtx.clearRect(0, 0, percentData.canvas.width, percentData.canvas.height);
+                
+                // Draw percentage text
+                percentCtx.fillStyle = '#ffffff';
+                percentCtx.font = '16px Arial';
+                percentCtx.textAlign = 'center';
+                percentCtx.textBaseline = 'middle';
+                percentCtx.fillText(`${Math.round(progress * 100)}%`, percentData.canvas.width / 2, percentData.canvas.height / 2);
+                
+                // Update texture
+                percentData.texture.needsUpdate = true;
             }
         }
     });

@@ -195,18 +195,54 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         screen.add(progressBar);
         
         // Progress indicator - starts with zero width
-        const progressIndicatorGeometry = new THREE.PlaneGeometry(0.001, progressBarHeight - 0.002);
+        const progressIndicatorGeometry = new THREE.PlaneGeometry(progressBarGeometry.parameters.width, progressBarHeight - 0.002);
         const progressIndicatorMaterial = new THREE.MeshBasicMaterial({
             color: 0x4285f4, // Google blue for a modern look
             side: THREE.DoubleSide,
             depthTest: false
         });
         const progressIndicator = new THREE.Mesh(progressIndicatorGeometry, progressIndicatorMaterial);
-        progressIndicator.position.set(-(screenWidth - 0.02) / 2, 0, 0.001);
+        progressIndicator.position.set(-(progressBarGeometry.parameters.width / 2), 0, 0.001);
+        progressIndicator.scale.set(0, 1, 1); // Start with zero width
         progressIndicator.userData = {
             type: 'progressIndicator'
         };
         progressBar.add(progressIndicator);
+        
+        // Add percentage text display
+        const percentCanvas = document.createElement('canvas');
+        percentCanvas.width = 64;
+        percentCanvas.height = 32;
+        const percentCtx = percentCanvas.getContext('2d');
+        
+        // Draw initial "0%" text
+        percentCtx.fillStyle = '#ffffff';
+        percentCtx.font = '16px Arial';
+        percentCtx.textAlign = 'center';
+        percentCtx.textBaseline = 'middle';
+        percentCtx.fillText('0%', percentCanvas.width / 2, percentCanvas.height / 2);
+        
+        // Create percentage display
+        const percentTexture = new THREE.CanvasTexture(percentCanvas);
+        const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
+        const percentMaterial = new THREE.MeshBasicMaterial({
+            map: percentTexture,
+            transparent: true,
+            depthTest: false
+        });
+        
+        const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
+        percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
+        percentMesh.renderOrder = 25; // Render on top
+        progressBar.add(percentMesh);
+        
+        // Store reference in userData for updates
+        progressIndicator.userData.percentText = {
+            canvas: percentCanvas,
+            context: percentCtx,
+            mesh: percentMesh,
+            texture: percentTexture
+        };
         
         // Add control buttons with refined positioning
         const playButton = addControlButton(screen, 'play', -0.12, -screenHeight / 2 + 0.025, 0.03);
