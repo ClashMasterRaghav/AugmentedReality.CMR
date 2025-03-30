@@ -43,28 +43,17 @@ export function loadVideoTexture() {
             return createFallbackTexture("Video source not available");
         }
         
-        // Create video texture with improved settings
+        // Create video texture
         videoTexture = new THREE.VideoTexture(videoElement);
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.magFilter = THREE.LinearFilter;
         videoTexture.format = THREE.RGBAFormat;
         videoTexture.crossOrigin = 'anonymous';
         
-        // Enable transform matrix for proper aspect ratio
-        videoTexture.matrixAutoUpdate = false;
-        
-        // Manual control over texture transform
-        videoTexture.wrapS = THREE.ClampToEdgeWrapping;
-        videoTexture.wrapT = THREE.ClampToEdgeWrapping;
-        
         // Add event listeners for video load status
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
             duration = videoElement.duration || 100;
-            
-            // Update texture matrix for proper aspect ratio
-            updateVideoAspectRatio();
-            
             updateExistingScreensWithVideo();
             
             // Update the mute icon to reflect the default muted state
@@ -73,6 +62,7 @@ export function loadVideoTexture() {
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
+            // No longer need to update progress bars since they've been removed
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -94,42 +84,6 @@ export function loadVideoTexture() {
         console.error("Error in loadVideoTexture:", error);
         return createFallbackTexture("Error: " + error.message);
     }
-}
-
-// Update video texture aspect ratio based on video dimensions
-function updateVideoAspectRatio() {
-    if (!videoTexture || !videoElement) return;
-    
-    // Get actual video dimensions when available
-    const videoWidth = videoElement.videoWidth || 16;
-    const videoHeight = videoElement.videoHeight || 9;
-    const videoAspect = videoWidth / videoHeight;
-    
-    console.log(`Video dimensions: ${videoWidth}x${videoHeight}, aspect: ${videoAspect}`);
-    
-    // The screen aspect ratio is 4:3 (1.33)
-    const screenAspect = 1.0 / 0.75; // width/height = 1.33...
-    
-    // Set transformation matrix to properly display video
-    if (videoAspect > screenAspect) {
-        // Video is wider than screen - fit to height
-        const scale = screenAspect / videoAspect;
-        videoTexture.matrix.setUvTransform(
-            0.5 * (1 - scale), 0,  // offset x, y
-            scale, 1,              // scale x, y
-            0, 0.5, 0.5            // rotation, center x, center y
-        );
-    } else {
-        // Video is taller than screen - fit to width
-        const scale = videoAspect / screenAspect;
-        videoTexture.matrix.setUvTransform(
-            0, 0.5 * (1 - scale),  // offset x, y
-            1, scale,              // scale x, y
-            0, 0.5, 0.5            // rotation, center x, center y
-        );
-    }
-    
-    videoTexture.needsUpdate = true;
 }
 
 // Update video progress on all screens - function simplified since progress bars are removed
@@ -362,15 +316,13 @@ function updateExistingScreensWithVideo() {
         // Look for the content panel in the screen
         for (const child of screen.children) {
             if (child.geometry && 
-                (child.geometry.type === 'PlaneGeometry' || child.geometry.type === 'ShapeGeometry') &&
+                child.geometry.type === 'PlaneGeometry' &&
                 child.material && 
                 child.material.type === 'MeshBasicMaterial') {
                 
                 // Update material with video texture
                 child.material.map = videoTexture;
                 child.material.needsUpdate = true;
-                
-                console.log("Updated screen with video texture");
                 break;
             }
         }

@@ -9,16 +9,6 @@ import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
 
-// Try to import Stats if available
-let Stats;
-try {
-    // Dynamic import to avoid errors if not available
-    Stats = THREE.Stats || null;
-} catch (e) {
-    console.log('Stats not available');
-    Stats = null;
-}
-
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
 export let controller, controllerGrip;
@@ -34,7 +24,6 @@ export let selectedScreen = null;
 export let selectedKey = null;
 export let container;
 export let isARMode = false;
-export let stats; // Make stats available to other modules
 
 // Main initialization function called from ar_main.js
 export function initAR() {
@@ -52,7 +41,7 @@ export function initAR() {
 
 // Initialize the AR environment
 function initAREnvironment() {
-    container = document.createElement('div');
+    const container = document.createElement('div');
     document.body.appendChild(container);
 
     scene = new THREE.Scene();
@@ -69,19 +58,6 @@ function initAREnvironment() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
-
-    // Initialize performance stats if available
-    try {
-        if (Stats) {
-            stats = new Stats();
-            stats.domElement.style.position = 'absolute';
-            stats.domElement.style.top = '0px';
-            container.appendChild(stats.domElement);
-        }
-    } catch (e) {
-        console.log('Stats not available, continuing without performance monitoring');
-        stats = null;
-    }
 
     // AR Button with session end event handling
     const arButton = ARButton.createButton(renderer, {
@@ -170,17 +146,19 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Core animation loop
+// Animation loop
 export function animate() {
-    // Set up renderer's animation loop
     renderer.setAnimationLoop(render);
+    
+    // Update video textures in every frame
+    updateVideoTextures();
     
     // Check if in AR mode
     isARMode = renderer.xr.isPresenting;
 }
 
 // Render function
-function render(timestamp, frame) {
+export function render() {
     // Handle screen placement or movement with controller
     if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
@@ -264,14 +242,6 @@ function render(timestamp, frame) {
     // Update screen visual effects
     updateScreenEffects();
     
-    // Update video textures in every frame
-    updateVideoTextures();
-    
-    // Update stats if available
-    if (stats) {
-        stats.update();
-    }
-    
     // Render the scene
     renderer.render(scene, camera);
 }
@@ -280,9 +250,3 @@ function render(timestamp, frame) {
 function createStartScreen() {
     const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
 }
-
-// Make sure all required functions are exported
-export { 
-    initAR,     // Initialize AR environment
-    animate     // Set up animation loop
-};
