@@ -1370,32 +1370,6 @@ function findScreenForDragHandle(dragHandle) {
     return null;
 }
 
-// Handle touch end event
-function onTouchEnd() {
-    // Skip if we weren't dragging
-    if (!touchDragging) return;
-    
-    // Reset drag handle color
-    if (intersectedDragHandle && intersectedDragHandle.material) {
-        // Restore original color if available
-        if (intersectedDragHandle.userData && intersectedDragHandle.userData.originalColor !== undefined) {
-            intersectedDragHandle.material.color.setHex(intersectedDragHandle.userData.originalColor);
-        } else {
-            // Default color
-            intersectedDragHandle.material.color.set(0x333333);
-        }
-    }
-    
-    // Reset touch state
-    touchDragging = false;
-    touchMoving = false;
-    intersectedDragHandle = null;
-    intersectedScreen = null;
-    
-    // Reset touch position
-    touchStartPosition.set(0, 0);
-}
-
 // Find screen object from any child object
 function findScreenForObject(object) {
     // Check if object is a screen itself
