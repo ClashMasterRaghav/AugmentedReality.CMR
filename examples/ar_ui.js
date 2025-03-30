@@ -154,7 +154,7 @@ function create3DNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Create a minimalist control panel with buttons
+// Create a minimalist control panel with improved draggability
 export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
@@ -185,7 +185,7 @@ export function createControlPanel() {
     
     // Modern gradient (dark mode style) - DARKER TOP
     const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
-    gradient.addColorStop(0, '#1a1a2e'); // Much darker blue at top
+    gradient.addColorStop(0, '#111827'); // Very dark blue at top, almost black
     gradient.addColorStop(0.4, '#1e3048'); // Transition
     gradient.addColorStop(1, '#1a1a2e'); // Even darker at bottom
     panelCtx.fillStyle = gradient;
@@ -210,38 +210,38 @@ export function createControlPanel() {
     panelCtx.lineWidth = 3;
     panelCtx.stroke();
     
-    // Create dedicated drag area at the top - LARGER, more obvious
-    // First draw a darker rectangle across the top
-    panelCtx.fillStyle = 'rgba(20, 20, 40, 0.9)'; // Very dark blue for drag area
+    // Create dedicated drag area at the top - LARGER, more obvious, similar to screens
+    // First draw a darker rectangle across the top (topbar style like screens)
+    panelCtx.fillStyle = 'rgba(20, 20, 35, 0.95)'; // Even darker for better contrast
     panelCtx.beginPath();
-    panelCtx.roundRect(0, 0, panelCanvas.width, 80, { tl: cornerRadius, tr: cornerRadius, bl: 0, br: 0 });
+    panelCtx.roundRect(0, 0, panelCanvas.width, 95, { tl: cornerRadius, tr: cornerRadius, bl: 0, br: 0 });
     panelCtx.fill();
     
-    // Add a visible drag handle
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    // Add a visible grab handle - thicker for better visibility
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
     panelCtx.beginPath();
-    panelCtx.roundRect(panelCanvas.width/2 - 50, 20, 100, 10, 5);
+    panelCtx.roundRect(panelCanvas.width/2 - 60, 25, 120, 12, 6);
     panelCtx.fill();
     
-    // Add dotted pattern to drag handle for better visibility
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    // Add dotted pattern to drag handle for better visibility - larger dots
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     for (let i = 0; i < 3; i++) {
         panelCtx.beginPath();
-        panelCtx.arc(panelCanvas.width/2 - 25 + i*25, 25, 3, 0, Math.PI * 2);
+        panelCtx.arc(panelCanvas.width/2 - 30 + i*30, 31, 4, 0, Math.PI * 2);
         panelCtx.fill();
     }
     
-    // Add an explicit "DRAG HERE" text
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    panelCtx.font = 'bold 18px Arial';
+    // Add an explicit "GRAB & DRAG" text
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    panelCtx.font = 'bold 20px Arial';
     panelCtx.textAlign = 'center';
-    panelCtx.fillText('DRAG HERE', panelCanvas.width/2, 50);
+    panelCtx.fillText('GRAB & DRAG', panelCanvas.width/2, 60);
     
     // Add title text to the control panel - MOVED LOWER
     panelCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     panelCtx.font = 'bold 18px Arial';
     panelCtx.textAlign = 'center';
-    panelCtx.fillText('AR Controls', panelCanvas.width/2, 100);
+    panelCtx.fillText('AR Controls', panelCanvas.width/2, 110);
     
     // Create texture from canvas
     const panelTexture = new THREE.CanvasTexture(panelCanvas);
@@ -267,31 +267,50 @@ export function createControlPanel() {
     glowMesh.position.z = -0.002;
     controlPanel.add(glowMesh);
     
-    // Create larger and more visible draggable indicator for better UX - EVEN LARGER
-    const dragAreaHeight = 0.06; // Increased height for easier grabbing (50% of panel height)
-    const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width, dragAreaHeight);
+    // Create larger and more visible topbar-style drag handle inspired by screen design
+    const dragBarHeight = 0.07; // Even larger height - ~half the panel height
+    const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width, dragBarHeight);
     const dragIndicatorMaterial = new THREE.MeshBasicMaterial({
-        color: 0x203055, // Darker blue for drag area
-        transparent: false,
-        opacity: 0.5,
+        color: 0x1a1a2e, // Darker blue for drag area
+        transparent: true,
+        opacity: 0.8,
         side: THREE.DoubleSide
     });
     const dragIndicator = new THREE.Mesh(dragIndicatorGeometry, dragIndicatorMaterial);
-    dragIndicator.position.set(0, panelSize.height/2 - dragAreaHeight/2, 0.001);
+    dragIndicator.position.set(0, panelSize.height/2 - dragBarHeight/2, 0.001);
     dragIndicator.userData = {
         type: 'dragHandle',
-        isDragArea: true
+        isDragArea: true,
+        originalColor: 0x1a1a2e, // Store original color for restore after dragging
+        hoverColor: 0x2a4d7f // Lighter blue for hover state
     };
     controlPanel.add(dragIndicator);
     
+    // Add grip lines to make it look more draggable (like screen top bar)
+    const gripGeometry = new THREE.PlaneGeometry(0.08, 0.004);
+    const gripMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    
+    // Add three grip lines
+    for (let i = -1; i <= 1; i++) {
+        const grip = new THREE.Mesh(gripGeometry, gripMaterial);
+        grip.position.set(i * 0.03, panelSize.height/2 - 0.025, 0.002);
+        grip.userData = { isPartOfDragHandle: true };
+        controlPanel.add(grip);
+    }
+    
     // Define button parameters - SMALLER buttons positioned lower and more compact
     const buttonSize = 0.055; // Even smaller buttons
-    const buttonSpacing = 0.14; // Less space between buttons, moved closer together
+    const buttonSpacing = 0.10; // Less space between buttons
     
     // Create buttons - Add Screen and Delete Screen - MOVED MUCH LOWER for larger drag area
     const buttonPositions = [
-        { x: -buttonSpacing/2, y: -0.15 },  // Left - Add Screen - MOVED FURTHER DOWN
-        { x: buttonSpacing/2, y: -0.15 }   // Right - Delete Screen - MOVED FURTHER DOWN
+        { x: -buttonSpacing/2, y: -0.055 },  // Left - Add Screen - MOVED FURTHER DOWN
+        { x: buttonSpacing/2, y: -0.055 }   // Right - Delete Screen - MOVED FURTHER DOWN
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];

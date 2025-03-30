@@ -668,17 +668,26 @@ function onTouchStart(event) {
         const panelIntersects = raycaster.intersectObject(controlPanel, true);
         
         if (panelIntersects.length > 0) {
-            // IMPROVED: Make the entire top portion of the panel draggable
+            // Get info about intersection
             const hitPoint = panelIntersects[0].point.clone();
             const localPoint = controlPanel.worldToLocal(hitPoint.clone());
             const hitObject = panelIntersects[0].object;
             
-            // Check if we hit the drag handle explicitly
-            const isDragHandle = hitObject.userData && hitObject.userData.isDragArea;
+            // Enhanced drag detection - check if we hit:
+            // 1. The explicit drag handle or grip lines
+            // 2. The top portion of the panel
+            // 3. Any object marked as part of drag handle
+            const isDragHandle = hitObject.userData && (
+                hitObject.userData.isDragArea || 
+                hitObject.userData.isPartOfDragHandle ||
+                (hitObject.parent && hitObject.parent.userData && hitObject.parent.userData.isDragArea)
+            );
             
-            // Check if we're in the top 40% of the panel or hit the explicit drag area
-            if (localPoint.y > 0.0 || isDragHandle) {
-                console.log("Starting control panel drag - hit at local Y:", localPoint.y);
+            // More generous y-position check for the top section
+            const isInDragArea = localPoint.y > 0.0;
+            
+            if (isDragHandle || isInDragArea) {
+                console.log("Starting control panel drag - detected via:", isDragHandle ? "drag handle" : "top area");
                 
                 // Store initial panel position and rotation
                 initialPanelPosition.copy(controlPanel.position);
@@ -691,13 +700,31 @@ function onTouchStart(event) {
                 isPanelBeingDragged = true;
                 controlPanel.userData.isDragging = true;
                 
-                // Add visual feedback
-                createModeChangeIndicator('Panel Unlocked - Drag to Reposition');
-                
-                // Provide haptic feedback
+                // Provide strong haptic feedback like screen dragging
                 if (navigator.vibrate) {
-                    navigator.vibrate(30);
+                    navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel, same as screen dragging
                 }
+                
+                // Visual feedback - highlight the drag handle if available
+                const dragHandle = controlPanel.children.find(
+                    child => child.userData && child.userData.isDragArea
+                );
+                
+                if (dragHandle && dragHandle.userData.hoverColor) {
+                    // Store original color if not already stored
+                    if (!dragHandle.userData.originalColor) {
+                        dragHandle.userData.originalColor = dragHandle.material.color.getHex();
+                    }
+                    
+                    // Highlight with hover color
+                    dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
+                    
+                    // Add slight scale-up effect
+                    dragHandle.scale.set(1.05, 1.05, 1.05);
+                }
+                
+                // Add visual feedback
+                createModeChangeIndicator('Panel Unlocked - Drag to Position');
                 
                 return;
             }
@@ -952,33 +979,43 @@ function onTouchMove(event) {
         
         // Get camera direction and up vectors
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        forward.y = 0; // Keep panel at a constant height
+        forward.y = 0; // Keep panel at a constant height relative to camera view
         forward.normalize();
         
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         const up = new THREE.Vector3(0, 1, 0);
         
-        // Create a plane perpendicular to the camera's view direction
-        const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-            forward, 
-            initialPanelPosition.clone()
-        );
+        // IMPROVED: Use same approach as screen dragging for more intuitive movement
+        // Calculate movement delta from touch (like screen dragging)
+        const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+        const deltaY = currentTouchPosition.y - previousTouchPosition.y;
         
-        // Raycast to the drag plane
-        const intersection = new THREE.Vector3();
-        raycaster.ray.intersectPlane(dragPlane, intersection);
+        // Get camera's right and up vectors for moving in screen space
+        const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
         
-        // Calculate new position, accounting for the original offset
-        const newPosition = intersection.clone().sub(panelDragOffset);
+        // Scale factor for more responsive movement
+        const moveScale = 0.6; // Slightly less than screen movement for finer control
         
-        // Keep the y position within reasonable bounds
-        newPosition.y = THREE.MathUtils.clamp(newPosition.y, -0.5, 0.5);
+        // Create movement vector
+        const movement = new THREE.Vector3()
+            .addScaledVector(cameraRight, deltaX * moveScale)
+            .addScaledVector(cameraUp, deltaY * moveScale);
+        
+        // Apply movement with smooth lerping
+        const newPosition = controlPanel.position.clone().add(movement);
+        
+        // Keep y position within reasonable bounds
+        newPosition.y = THREE.MathUtils.clamp(newPosition.y, -0.4, 0.5);
         
         // Smoothly move panel to new position
-        controlPanel.position.lerp(newPosition, 0.7);
+        controlPanel.position.lerp(newPosition, 0.8); // More direct movement (0.8 vs 0.7)
         
-        // Make panel always face the camera (only horizontally)
+        // Make panel always face the camera
         controlPanel.lookAt(camera.position);
+        
+        // Optional visual feedback for movement (like screens)
+        createMoveIndicator(controlPanel.position.clone(), 0.02);
         
         return;
     }
@@ -1144,6 +1181,21 @@ function onTouchEnd(event) {
     if (isPanelBeingDragged && controlPanel) {
         console.log("Finished dragging control panel");
         
+        // Reset the drag handle appearance
+        const dragHandle = controlPanel.children.find(
+            child => child.userData && child.userData.isDragArea
+        );
+        
+        if (dragHandle) {
+            // Restore original color
+            if (dragHandle.userData.originalColor) {
+                dragHandle.material.color.setHex(dragHandle.userData.originalColor);
+            }
+            
+            // Reset scale
+            dragHandle.scale.set(1.0, 1.0, 1.0);
+        }
+        
         // Save the current position
         controlPanel.userData.isDragging = false;
         isPanelBeingDragged = false;
@@ -1153,17 +1205,20 @@ function onTouchEnd(event) {
         
         // Provide haptic feedback
         if (navigator.vibrate) {
-            navigator.vibrate(20);
+            navigator.vibrate([20, 10, 20]); // Pattern for "release" feel
         }
         
         // Slight bounce animation
         const finalPosition = controlPanel.position.clone();
         
         const bounceAnimation = () => {
-            controlPanel.position.y += 0.01;
+            // More noticeable bounce effect like screen dragging
+            controlPanel.position.y += 0.015;
+            
             setTimeout(() => {
+                // Smoothly settle back to final position
                 controlPanel.position.lerp(finalPosition, 0.3);
-            }, 80);
+            }, 100);
         };
         
         bounceAnimation();
