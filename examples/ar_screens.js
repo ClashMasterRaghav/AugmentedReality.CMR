@@ -9,7 +9,7 @@ export let screens = [];
 
 // Create a new browser screen
 export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
-    // Screen dimensions
+    // Screen dimensions - use fixed values
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
@@ -39,14 +39,14 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     borderPanel.position.z = -0.001;
     browserWindow.add(borderPanel);
     
-    // Find and update the drag handle reference in userData
-    const topBar = browserWindow.children.find(child => 
+    // Find and update all drag handle references in userData
+    const dragHandles = browserWindow.children.filter(child => 
         child.userData && child.userData.type === 'dragHandle');
     
-    if (topBar) {
-        topBar.userData.screen = browserWindow;
-        browserWindow.userData.dragHandle = topBar;
-    }
+    browserWindow.userData.dragHandles = dragHandles;
+    dragHandles.forEach(handle => {
+        handle.userData.screen = browserWindow;
+    });
     
     // Add to scene and screens array
     scene.add(browserWindow);
@@ -65,9 +65,9 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     // Create the screen container
     const screen = new THREE.Group();
     
-    // Define screen dimensions
-    const screenWidth = size.x;
-    const screenHeight = size.y;
+    // Define screen dimensions - fixed dimensions to ensure consistency
+    const screenWidth = 1.0; // Fixed width
+    const screenHeight = 0.75; // Fixed height
     const topBarHeight = 0.06; // Thinner top bar
     
     // Create a minimalist, elegant top bar that spans the entire width
@@ -173,96 +173,25 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     background.renderOrder = 1;
     screen.add(background);
     
-    // Add progress bar if we have video content
-    if (content && content.isVideoTexture) {
-        // Progress bar background - full width, fits within screen bounds
-        const progressBarHeight = 0.015; // Thinner progress bar
-        const progressBarGeometry = new THREE.PlaneGeometry(screenWidth - 0.02, progressBarHeight);
-        const progressBarMaterial = new THREE.MeshBasicMaterial({
-            color: 0x333333,
-            transparent: true,
-            opacity: 0.7,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        const progressBar = new THREE.Mesh(progressBarGeometry, progressBarMaterial);
-        progressBar.position.set(0, -screenHeight / 2 + 0.025, 0.011);
-        progressBar.renderOrder = 15;
-        progressBar.userData = {
-            type: 'progressBar',
-            screen: screen
-        };
-        screen.add(progressBar);
-        
-        // Progress indicator - starts with zero width
-        const progressIndicatorGeometry = new THREE.PlaneGeometry(progressBarGeometry.parameters.width, progressBarHeight - 0.002);
-        const progressIndicatorMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4285f4, // Google blue for a modern look
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        const progressIndicator = new THREE.Mesh(progressIndicatorGeometry, progressIndicatorMaterial);
-        progressIndicator.position.set(-(progressBarGeometry.parameters.width / 2), 0, 0.001);
-        progressIndicator.scale.set(0, 1, 1); // Start with zero width
-        progressIndicator.userData = {
-            type: 'progressIndicator'
-        };
-        progressBar.add(progressIndicator);
-        
-        // Add percentage text display
-        const percentCanvas = document.createElement('canvas');
-        percentCanvas.width = 64;
-        percentCanvas.height = 32;
-        const percentCtx = percentCanvas.getContext('2d');
-        
-        // Draw initial "0%" text
-        percentCtx.fillStyle = '#ffffff';
-        percentCtx.font = '16px Arial';
-        percentCtx.textAlign = 'center';
-        percentCtx.textBaseline = 'middle';
-        percentCtx.fillText('0%', percentCanvas.width / 2, percentCanvas.height / 2);
-        
-        // Create percentage display
-        const percentTexture = new THREE.CanvasTexture(percentCanvas);
-        const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
-        const percentMaterial = new THREE.MeshBasicMaterial({
-            map: percentTexture,
-            transparent: true,
-            depthTest: false
-        });
-        
-        const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
-        percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
-        percentMesh.renderOrder = 25; // Render on top
-        progressBar.add(percentMesh);
-        
-        // Store reference in userData for updates
-        progressIndicator.userData.percentText = {
-            canvas: percentCanvas,
-            context: percentCtx,
-            mesh: percentMesh,
-            texture: percentTexture
-        };
-        
-        // Add control buttons with refined positioning
-        const playButton = addControlButton(screen, 'play', -0.12, -screenHeight / 2 + 0.025, 0.03);
-        playButton.userData.videoControl = true;
-        playButton.userData.videoAction = 'togglePlayback';
-        
-        const volumeButton = addControlButton(screen, 'volume', 0.12, -screenHeight / 2 + 0.025, 0.03);
-        volumeButton.userData.videoControl = true;
-        volumeButton.userData.videoAction = 'toggleMute';
-        
-        // Store controls in userData
-        screen.userData.controls = {
-            progress: 0,
-            isPlaying: true,
-            isMuted: false,
-            progressBar: progressIndicator,
-            playButton: playButton,
-            volumeButton: volumeButton
-        };
-    }
+    // Make the top 2/3 of the screen draggable
+    const dragAreaHeight = screenHeight * 0.66; // 2/3 of screen height
+    const dragAreaGeometry = new THREE.PlaneGeometry(screenWidth, dragAreaHeight);
+    const dragAreaMaterial = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.0, // Invisible
+        side: THREE.DoubleSide,
+        depthTest: false
+    });
+    
+    const dragArea = new THREE.Mesh(dragAreaGeometry, dragAreaMaterial);
+    dragArea.position.set(0, screenHeight/6, 0.003); // Position in top 2/3 of screen
+    dragArea.renderOrder = 5;
+    dragArea.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        screen: screen
+    };
+    screen.add(dragArea);
     
     // Position the entire screen
     screen.position.copy(position);

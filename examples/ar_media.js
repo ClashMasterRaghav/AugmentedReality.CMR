@@ -1,16 +1,18 @@
 // Media handling for AR experience (video and audio)
 import * as THREE from 'three';
 import { scene, camera } from './ar_core.js';
-import { screens } from './ar_screens.js';
+import { screens, createNewBrowserScreen } from './ar_screens.js';
+import { createModeChangeIndicator } from './ar_ui.js';
 
 // Export video texture reference
 export let videoTexture;
 export let videoElement;
 export let currentTime = 0;
 export let duration = 100; // Default duration if not available
+export let availableVideos = []; // Array to store available videos
 
 // Load video texture for AR content
-export function loadVideoTexture() {
+export function loadVideoTexture(videoPath = null) {
     try {
         console.log("Loading video texture...");
         
@@ -22,25 +24,31 @@ export function loadVideoTexture() {
             return createFallbackTexture("Video element not found");
         }
         
-        // Check if video source is available
-        const sources = videoElement.querySelectorAll('source');
-        if (!sources || sources.length === 0) {
-            console.warn('No video sources found');
-            return createFallbackTexture("No video sources found");
-        }
-        
-        let sourceFound = false;
-        for (const source of sources) {
-            if (source.src) {
-                sourceFound = true;
-                console.log("Using video source:", source.src);
-                break;
+        // If a specific video path is provided, use it
+        if (videoPath) {
+            console.log("Using provided video path:", videoPath);
+            videoElement.innerHTML = `<source src="${videoPath}" type="video/mp4">`;
+        } else {
+            // Check if video source is available
+            const sources = videoElement.querySelectorAll('source');
+            if (!sources || sources.length === 0) {
+                console.warn('No video sources found');
+                return createFallbackTexture("No video sources found");
             }
-        }
-        
-        if (!sourceFound) {
-            console.warn('All video sources are empty');
-            return createFallbackTexture("Video source not available");
+            
+            let sourceFound = false;
+            for (const source of sources) {
+                if (source.src) {
+                    sourceFound = true;
+                    console.log("Using video source:", source.src);
+                    break;
+                }
+            }
+            
+            if (!sourceFound) {
+                console.warn('All video sources are empty');
+                return createFallbackTexture("Video source not available");
+            }
         }
         
         // Create video texture
@@ -59,8 +67,6 @@ export function loadVideoTexture() {
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // Update progress bars on all screens
-            updateVideoProgress();
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -84,81 +90,154 @@ export function loadVideoTexture() {
     }
 }
 
-// Update video progress on all screens
-function updateVideoProgress() {
-    if (!videoElement || !screens) return;
+// Scan for available videos in the _ar_videos folder
+export function scanForVideos() {
+    try {
+        console.log("Scanning for videos in _ar_videos folder...");
+        
+        // Path to the videos folder
+        const videoFolderPath = '/textures/_ar_videos/';
+        
+        // This would normally be a server-side operation, but for client-side we'll simulate
+        // by checking for common video files or create a placeholder list
+        const demoVideos = [
+            { name: "Sample Video 1", path: `${videoFolderPath}sample1.mp4` },
+            { name: "Sample Video 2", path: `${videoFolderPath}sample2.mp4` },
+            { name: "Demo Reel", path: `${videoFolderPath}demo.mp4` }
+        ];
+        
+        // Set the available videos
+        availableVideos = demoVideos;
+        
+        console.log(`Found ${availableVideos.length} videos`);
+        return availableVideos;
+    } catch (error) {
+        console.error("Error scanning for videos:", error);
+        return [];
+    }
+}
+
+// Create a video selection menu in AR
+export function createVideoSelectionMenu(position = new THREE.Vector3(0, 0, -1.2)) {
+    if (availableVideos.length === 0) {
+        scanForVideos();
+    }
     
-    const progress = currentTime / duration;
+    // Create a menu screen
+    const menuScreen = createNewBrowserScreen(position);
+    menuScreen.userData.type = 'videoMenu';
     
+    // Create a canvas for the menu
+    const menuCanvas = document.createElement('canvas');
+    menuCanvas.width = 1024;
+    menuCanvas.height = 768;
+    const ctx = menuCanvas.getContext('2d');
+    
+    // Draw background
+    ctx.fillStyle = '#121212';
+    ctx.fillRect(0, 0, menuCanvas.width, menuCanvas.height);
+    
+    // Draw title
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '40px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Select Video', menuCanvas.width / 2, 60);
+    
+    // Draw video options
+    const buttonHeight = 100;
+    const buttonWidth = 800;
+    const startY = 150;
+    const padding = 20;
+    
+    availableVideos.forEach((video, index) => {
+        const y = startY + (buttonHeight + padding) * index;
+        
+        // Button background
+        ctx.fillStyle = '#333333';
+        ctx.fillRect((menuCanvas.width - buttonWidth) / 2, y, buttonWidth, buttonHeight);
+        
+        // Button text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(video.name, menuCanvas.width / 2, y + buttonHeight / 2);
+        
+        // Store button data for interaction
+        const buttonData = {
+            x: (menuCanvas.width - buttonWidth) / 2,
+            y: y,
+            width: buttonWidth,
+            height: buttonHeight,
+            videoPath: video.path,
+            videoName: video.name
+        };
+        
+        if (!menuScreen.userData.buttons) {
+            menuScreen.userData.buttons = [];
+        }
+        
+        menuScreen.userData.buttons.push(buttonData);
+    });
+    
+    // Apply canvas as texture to the screen
+    const menuTexture = new THREE.CanvasTexture(menuCanvas);
+    const backgroundMesh = menuScreen.children.find(child => 
+        child.material && !child.userData.type);
+    
+    if (backgroundMesh) {
+        backgroundMesh.material.map = menuTexture;
+        backgroundMesh.material.needsUpdate = true;
+    }
+    
+    // Add click handler for video selection
+    menuScreen.userData.handleMenuClick = function(normalizedX, normalizedY) {
+        const buttons = this.buttons;
+        if (!buttons) return;
+        
+        // Convert normalized coords to canvas coords
+        const canvasX = normalizedX * menuCanvas.width;
+        const canvasY = (1 - normalizedY) * menuCanvas.height;
+        
+        // Check if a button was clicked
+        for (const button of buttons) {
+            if (canvasX >= button.x && canvasX <= button.x + button.width &&
+                canvasY >= button.y && canvasY <= button.y + button.height) {
+                
+                // Load the selected video
+                loadVideoTexture(button.videoPath);
+                
+                // Show notification
+                createModeChangeIndicator(`Loading video: ${button.videoName}`);
+                
+                // Remove the menu screen
+                const index = screens.indexOf(menuScreen);
+                if (index > -1) {
+                    screens.splice(index, 1);
+                    scene.remove(menuScreen);
+                }
+                
+                return true;
+            }
+        }
+        return false;
+    };
+    
+    return menuScreen;
+}
+
+// Update existing screens with the new video texture
+function updateExistingScreensWithVideo() {
     screens.forEach(screen => {
-        if (!screen.userData || !screen.userData.controls) return;
+        // Find the background mesh
+        const backgroundMesh = screen.children.find(child => 
+            child.material && 
+            child.material.map !== undefined && 
+            !child.userData.type);
         
-        // Find the progress indicator in the screen
-        const progressBar = screen.userData.controls.progressBar;
-        
-        if (progressBar) {
-            // Get parent progressBar background for measuring
-            const progressBarBg = progressBar.parent;
-            if (!progressBarBg) return;
-            
-            // Update progress bar width
-            const fullWidth = progressBarBg.geometry.parameters.width;
-            progressBar.scale.x = fullWidth * progress;
-            
-            // Update position to anchor from left edge (half the scaled width)
-            progressBar.position.x = -(fullWidth / 2) + (progressBar.scale.x / 2);
-            
-            // Update progress in userData
-            screen.userData.controls.progress = progress;
-            
-            // Add percentage text to the progress bar if not exists
-            if (!progressBar.userData.percentText) {
-                const percentCanvas = document.createElement('canvas');
-                percentCanvas.width = 64;
-                percentCanvas.height = 32;
-                const percentCtx = percentCanvas.getContext('2d');
-                
-                // Create a texture for percentage display
-                const percentTexture = new THREE.CanvasTexture(percentCanvas);
-                const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
-                const percentMaterial = new THREE.MeshBasicMaterial({
-                    map: percentTexture,
-                    transparent: true,
-                    depthTest: false
-                });
-                
-                const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
-                percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
-                percentMesh.renderOrder = 25; // Render on top
-                progressBarBg.add(percentMesh);
-                
-                // Store in userData for updates
-                progressBar.userData.percentText = {
-                    canvas: percentCanvas,
-                    context: percentCtx,
-                    mesh: percentMesh,
-                    texture: percentTexture
-                };
-            }
-            
-            // Update percentage text
-            if (progressBar.userData.percentText) {
-                const percentData = progressBar.userData.percentText;
-                const percentCtx = percentData.context;
-                
-                // Clear canvas
-                percentCtx.clearRect(0, 0, percentData.canvas.width, percentData.canvas.height);
-                
-                // Draw percentage text
-                percentCtx.fillStyle = '#ffffff';
-                percentCtx.font = '16px Arial';
-                percentCtx.textAlign = 'center';
-                percentCtx.textBaseline = 'middle';
-                percentCtx.fillText(`${Math.round(progress * 100)}%`, percentData.canvas.width / 2, percentData.canvas.height / 2);
-                
-                // Update texture
-                percentData.texture.needsUpdate = true;
-            }
+        if (backgroundMesh && videoTexture) {
+            backgroundMesh.material.map = videoTexture;
+            backgroundMesh.material.needsUpdate = true;
         }
     });
 }
@@ -169,13 +248,13 @@ export function toggleVideoPlayback() {
     
     if (videoElement.paused) {
         videoElement.play().then(() => {
-            updatePlayPauseIcons(false);
+            createModeChangeIndicator("Video Playing");
         }).catch(e => {
             console.error("Video play error:", e);
         });
     } else {
         videoElement.pause();
-        updatePlayPauseIcons(true);
+        createModeChangeIndicator("Video Paused");
     }
 }
 
@@ -184,7 +263,7 @@ export function toggleVideoMute() {
     if (!videoElement) return;
     
     videoElement.muted = !videoElement.muted;
-    updateMuteIcons(videoElement.muted);
+    createModeChangeIndicator(videoElement.muted ? "Video Muted" : "Video Unmuted");
 }
 
 // Update play/pause icons on all screens
@@ -354,9 +433,9 @@ function createControlIcon(type) {
     return texture;
 }
 
-// Create a fallback texture when video fails
-function createFallbackTexture(errorMessage = "Video not available") {
-    console.log("Creating fallback texture:", errorMessage);
+// Create a fallback texture when video can't be loaded
+function createFallbackTexture(message = "No video available") {
+    console.log("Creating fallback texture:", message);
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
@@ -370,34 +449,13 @@ function createFallbackTexture(errorMessage = "Video not available") {
     ctx.fillStyle = '#ffffff';
     ctx.font = '24px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(errorMessage, canvas.width/2, canvas.height/2 - 20);
+    ctx.fillText(message, canvas.width/2, canvas.height/2 - 20);
     ctx.font = '16px Arial';
     ctx.fillText('Video will appear when available', canvas.width/2, canvas.height/2 + 20);
     
     // Create a texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
-}
-
-// Update existing screens with video texture
-function updateExistingScreensWithVideo() {
-    if (!videoTexture) return;
-    
-    screens.forEach(screen => {
-        // Look for the content panel in the screen
-        for (const child of screen.children) {
-            if (child.geometry && 
-                child.geometry.type === 'PlaneGeometry' &&
-                child.material && 
-                child.material.type === 'MeshBasicMaterial') {
-                
-                // Update material with video texture
-                child.material.map = videoTexture;
-                child.material.needsUpdate = true;
-                break;
-            }
-        }
-    });
 }
 
 // Create a dynamic video overlay for screen

@@ -3,11 +3,10 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createVirtualKeyboard } from './ar_ui.js';
+import { createControlPanel, createVirtualKeyboard, initUI, createModeChangeIndicator } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
-import { initUI, createNotification } from './ar_ui.js';
-import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
+import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures, scanForVideos } from './ar_media.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
@@ -61,8 +60,9 @@ function initAREnvironment() {
 
     // AR Button with session end event handling
     const arButton = ARButton.createButton(renderer, {
+        requiredFeatures: ['hit-test'],
         optionalFeatures: ['dom-overlay'],
-        domOverlay: { root: document.body }
+        domOverlay: { root: document.getElementById('overlay') }
     });
     
     document.body.appendChild(arButton);
@@ -115,6 +115,9 @@ function initAREnvironment() {
 
     // Initialize UI elements
     initUI();
+    
+    // Scan for available videos
+    scanForVideos();
     
     // Preload video texture right after scene setup
     console.log("Initializing video functionality");
@@ -248,5 +251,13 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    if (screens.length === 0) {
+        const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+        console.log("Created welcome screen at startup");
+    }
+}
+
+// Handle controller select event
+function onSelect() {
+    // ... existing code ...
 }

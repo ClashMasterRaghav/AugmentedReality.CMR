@@ -46,6 +46,8 @@ export function setupEventListeners() {
     renderer.domElement.addEventListener('touchstart', onTouchStart, false);
     renderer.domElement.addEventListener('touchmove', onTouchMove, false);
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+    
+    console.log("Event listeners setup complete");
 }
 
 // Handle controller selection start
@@ -201,98 +203,105 @@ function getScreenFromIntersect(object) {
     return null;
 }
 
-// Handle button actions
-function handleButtonAction(button) {
+// Handle button actions based on the action type
+export function handleButtonAction(button) {
     if (!button || !button.userData) return;
     
-    console.log("Button action:", button.userData.action);
-    
+    // Get the action type from userData
     const action = button.userData.action;
-    let screen = null;
     
-    // Find associated screen
-    if (button.userData.screen) {
-        screen = button.userData.screen;
-    } else if (selectedScreen) {
-        screen = selectedScreen;
+    // Provide haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(25); // Short vibration for button press
     }
     
-    // Play/pause button
-    if (action === 'playButton' && screen) {
-        // Check if video control function exists
-        if (videoControlFunctions.togglePlayback) {
-            // Toggle playback
-            videoControlFunctions.togglePlayback();
-            console.log("Toggle video playback");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-        } else {
-            console.error("Video playback function not found");
-        }
-    }
-    // Volume/mute button
-    else if (action === 'volumeButton' && screen) {
-        // Check if mute function exists
-        if (videoControlFunctions.toggleMute) {
-            // Toggle mute
-            videoControlFunctions.toggleMute();
-            console.log("Toggle video mute");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-        } else {
-            console.error("Video mute function not found");
-        }
-    }
+    console.log("Button action:", action);
     
-    // Original functionality for other buttons
-    else if (action === 'createScreen') {
-        createNewScreen();
-    } else if (action === 'moveScreen') {
-        toggleMoveMode(button);
-    } else if (action === 'rotateScreen') {
-        toggleRotateMode(button);
-    } else if (action === 'newScreen') {
-        createNewScreen();
-    } else if (action === 'deleteScreen') {
-        // Delete the last interacted screen
-        deleteLastScreen();
+    // Handle different button actions
+    switch(action) {
+        case 'addScreen':
+            // Create a new screen
+            const screenPosition = new THREE.Vector3(
+                camera.position.x, 
+                camera.position.y, 
+                camera.position.z
+            ).add(new THREE.Vector3(0, 0, -1.2)); // Position in front of camera
+            
+            createNewBrowserScreen(screenPosition);
+            createModeChangeIndicator('New Screen Added');
+            break;
+            
+        case 'deleteScreen':
+            // Delete the last interacted screen
+            if (deleteLastScreen()) {
+                // Notification is handled in deleteLastScreen
+            }
+            break;
+            
+        case 'selectVideo':
+            // Open video selection menu
+            const menuPosition = new THREE.Vector3(
+                camera.position.x, 
+                camera.position.y, 
+                camera.position.z
+            ).add(new THREE.Vector3(0, 0, -1.2)); // Position in front of camera
+            
+            createVideoSelectionMenu(menuPosition);
+            createModeChangeIndicator('Select a Video');
+            break;
+            
+        default:
+            if (button.userData.videoControl && button.userData.videoAction) {
+                // Handle video controls if available
+                const videoAction = button.userData.videoAction;
+                
+                if (videoControlFunctions[videoAction]) {
+                    videoControlFunctions[videoAction]();
+                }
+            }
+            break;
+    }
+}
+
+// Handle touch events for screens and menus
+export function handleScreenTouch(intersects) {
+    if (!intersects || intersects.length === 0) return;
+    
+    // Check if we hit a screen
+    for (const intersect of intersects) {
+        if (!intersect.object || !intersect.object.parent) continue;
         
-        // Visual feedback
-        const iconMesh = button.children[0];
-        if (iconMesh) {
-            // Apply a quick scale animation
-            iconMesh.scale.set(1.2, 1.2, 1.2);
-            setTimeout(() => {
-                iconMesh.scale.set(1, 1, 1);
-            }, 150);
+        const screen = findScreenForObject(intersect.object);
+        
+        if (!screen) continue;
+        
+        // Check if this is a video menu
+        if (screen.userData && screen.userData.type === 'videoMenu' && screen.userData.handleMenuClick) {
+            // Get touch coordinates on the screen
+            const touchPoint = intersect.point.clone();
+            const screenLocalPoint = screen.worldToLocal(touchPoint);
+            
+            // Convert to normalized coordinates (0-1)
+            const normalizedX = (screenLocalPoint.x + 0.5);
+            const normalizedY = (screenLocalPoint.y + 0.375);
+            
+            // Call the menu click handler
+            screen.userData.handleMenuClick(normalizedX, normalizedY);
+            return true;
+        }
+        
+        // Handle standard screen interaction
+        if (screen.userData && screen.userData.isInteractive) {
+            // Make this the selected screen
+            if (screen !== selectedScreen) {
+                selectScreen(screen);
+            }
+            
+            return true;
         }
     }
+    
+    return false;
 }
 
 // Create a new screen
@@ -1202,10 +1211,14 @@ function deleteLastScreen() {
         return false;
     }
     
-    console.log("Deleting screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
+    const screenId = screenToDelete.userData ? screenToDelete.userData.id : "unknown";
+    console.log("Deleting screen with ID:", screenId);
     
     // Create visual deletion effect
     createDeletionEffect(screenToDelete.position.clone());
+    
+    // Show which screen is being deleted with a toast notification
+    createModeChangeIndicator(`Deleting Screen ${screenId}`);
     
     // Remove from scene
     scene.remove(screenToDelete);
@@ -1216,13 +1229,15 @@ function deleteLastScreen() {
         screens.splice(index, 1);
     }
     
-    // If the selected screen was deleted, reset selectedScreen
+    // Clear any references to the deleted screen
     if (selectedScreen === screenToDelete) {
-        selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
+        selectedScreen = null;
         
-        // If we have a new selected screen, select it
-        if (selectedScreen) {
+        // Select a new screen if available
+        if (screens.length > 0) {
+            selectedScreen = screens[screens.length - 1];
             selectScreen(selectedScreen);
+            createModeChangeIndicator(`Selected Screen ${selectedScreen.userData.id}`);
         }
     }
     
@@ -1231,7 +1246,6 @@ function deleteLastScreen() {
         navigator.vibrate([30, 20, 40]); // Pattern for "delete" feel
     }
     
-    createModeChangeIndicator('Screen Deleted');
     return true;
 }
 
@@ -1306,4 +1320,122 @@ function createDeletionEffect(position) {
     }
     
     requestAnimationFrame(animateParticles);
-} 
+}
+
+// Find a drag handle object from an intersection
+function findDragHandleObject(object) {
+    // Check if object is a drag handle itself
+    if (object.userData && object.userData.type === 'dragHandle') {
+        return object;
+    }
+    
+    // Check parent hierarchy for drag handle
+    let parent = object.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'dragHandle') {
+            return parent;
+        }
+        parent = parent.parent;
+    }
+    
+    return null;
+}
+
+// Find screen for drag handle
+function findScreenForDragHandle(dragHandle) {
+    // If the drag handle has a reference to its screen, use it
+    if (dragHandle.userData && dragHandle.userData.screen) {
+        return dragHandle.userData.screen;
+    }
+    
+    // Search in screens array for a screen that has this drag handle
+    for (const screen of screens) {
+        // Check if the screen has dragHandles array
+        if (screen.userData && screen.userData.dragHandles) {
+            // Check if the drag handle is in the array
+            if (screen.userData.dragHandles.includes(dragHandle)) {
+                return screen;
+            }
+        }
+        
+        // If not found in dragHandles array, check children
+        for (const child of screen.children) {
+            if (child === dragHandle) {
+                return screen;
+            }
+        }
+    }
+    
+    console.warn("Could not find screen for drag handle:", dragHandle.uuid);
+    return null;
+}
+
+// Handle touch end event
+function onTouchEnd() {
+    // Skip if we weren't dragging
+    if (!touchDragging) return;
+    
+    // Reset drag handle color
+    if (intersectedDragHandle && intersectedDragHandle.material) {
+        // Restore original color if available
+        if (intersectedDragHandle.userData && intersectedDragHandle.userData.originalColor !== undefined) {
+            intersectedDragHandle.material.color.setHex(intersectedDragHandle.userData.originalColor);
+        } else {
+            // Default color
+            intersectedDragHandle.material.color.set(0x333333);
+        }
+    }
+    
+    // Reset touch state
+    touchDragging = false;
+    touchMoving = false;
+    intersectedDragHandle = null;
+    intersectedScreen = null;
+    
+    // Reset touch position
+    touchStartPosition.set(0, 0);
+}
+
+// Find screen object from any child object
+function findScreenForObject(object) {
+    // Check if object is a screen itself
+    if (object.userData && object.userData.type === 'screen') {
+        return object;
+    }
+    
+    // Check parent hierarchy
+    let parent = object.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'screen') {
+            return parent;
+        }
+        
+        // Check if this is a screen child (like a drag handle)
+        if (parent.userData && parent.userData.screen) {
+            return parent.userData.screen;
+        }
+        
+        parent = parent.parent;
+    }
+    
+    // Search screens array by traversing the entire scene graph
+    for (const screen of screens) {
+        if (isChildOf(object, screen)) {
+            return screen;
+        }
+    }
+    
+    return null;
+}
+
+// Helper to check if an object is a child of another
+function isChildOf(object, parent) {
+    let current = object;
+    while (current) {
+        if (current === parent) {
+            return true;
+        }
+        current = current.parent;
+    }
+    return false;
+}
