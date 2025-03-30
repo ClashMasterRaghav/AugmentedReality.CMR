@@ -287,6 +287,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         const playButton = addControlButton(screen, 'pause', -screenWidth/2 + 0.05, -screenHeight/2 + 0.05, 0.03);
         playButton.userData.videoControl = true;
         playButton.userData.videoAction = 'togglePlayback';
+        playButton.userData.action = 'playButton'; // Set the action name to match what ar_interaction.js expects
         
         // Keep volume button on bottom right, but initialize with muted icon
         const volumeButton = addControlButton(screen, 'muted', screenWidth/2 - 0.05, -screenHeight/2 + 0.05, 0.03);
@@ -324,7 +325,7 @@ function addControlButton(screen, type, x, y, size) {
     button.renderOrder = 20; // Very high render order to ensure it's drawn on top
     button.userData = {
         type: 'button',
-        action: type + 'Button',
+        action: type + 'Button', // This will still be overridden by specific buttons with userData.action
         screen: screen
     };
     
