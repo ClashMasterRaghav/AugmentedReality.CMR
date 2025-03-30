@@ -50,13 +50,6 @@ export function loadVideoTexture() {
         videoTexture.format = THREE.RGBAFormat;
         videoTexture.crossOrigin = 'anonymous';
         
-        // Configure texture for proper mapping
-        videoTexture.wrapS = THREE.ClampToEdgeWrapping;
-        videoTexture.wrapT = THREE.ClampToEdgeWrapping;
-        videoTexture.repeat.set(1, 1);
-        videoTexture.offset.set(0, 0);
-        videoTexture.center.set(0.5, 0.5);
-        
         // Add event listeners for video load status
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
@@ -65,15 +58,11 @@ export function loadVideoTexture() {
             
             // Update the mute icon to reflect the default muted state
             updateMuteIcons(true);
-            
-            // Start updating video progress in the timeline
-            videoElement.addEventListener('timeupdate', updateVideoProgress);
         });
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // Update progress indicators
-            updateVideoProgress();
+            // No longer need to update progress bars since they've been removed
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -99,39 +88,8 @@ export function loadVideoTexture() {
 
 // Update video progress on all screens - function simplified since progress bars are removed
 function updateVideoProgress() {
-    if (!videoElement || !screens) return;
-    
-    const progress = currentTime / duration;
-    
-    screens.forEach(screen => {
-        if (!screen.userData || !screen.userData.controls) return;
-        
-        // Find the timeline components
-        const timelineProgress = screen.userData.controls.progress;
-        const timelineHandle = screen.userData.controls.handle;
-        const timeDisplay = screen.userData.controls.timeDisplay;
-        
-        if (timelineProgress && timelineHandle) {
-            // Update progress indicator width
-            timelineProgress.scale.x = progress;
-            
-            // Update handle position
-            const timeline = screen.userData.controls.timeline;
-            if (timeline) {
-                const fullWidth = timeline.geometry.parameters.width;
-                timelineHandle.position.x = -fullWidth/2 + (fullWidth * progress);
-            }
-            
-            // Update time display
-            if (timeDisplay && timeDisplay.userData && timeDisplay.userData.updateTime) {
-                timeDisplay.userData.updateTime(currentTime, duration);
-            }
-            
-            // Update progress in userData
-            screen.userData.controls.currentTime = currentTime;
-            screen.userData.controls.duration = duration;
-        }
-    });
+    // This function is now empty as progress bars have been removed
+    // Keeping the function to maintain code structure in case we need to reimplement
 }
 
 // Toggle video playback
@@ -148,24 +106,6 @@ export function toggleVideoPlayback() {
         videoElement.pause();
         updatePlayPauseIcons(true);
     }
-}
-
-// Update video time based on progress
-export function updateVideoTime(progress) {
-    if (!videoElement) return;
-    
-    // Clamp progress to 0-1 range
-    progress = Math.max(0, Math.min(1, progress));
-    
-    // Set video time
-    const newTime = duration * progress;
-    videoElement.currentTime = newTime;
-    
-    // Update current time
-    currentTime = newTime;
-    
-    // Update progress display
-    updateVideoProgress();
 }
 
 // Toggle video mute
