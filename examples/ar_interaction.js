@@ -5,7 +5,7 @@ import {
     isPlacingScreen, newScreen, isMoveModeActive,
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
-import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
+import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen, toggleResize } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
@@ -29,11 +29,24 @@ let isDraggingHandle = false;
 let draggedScreen = null;
 let dragOffset = new THREE.Vector3();
 
+// Variables for resize handle functionality
+let isResizing = false;
+let resizedScreen = null;
+let initialResizePosition = new THREE.Vector2();
+let initialScreenSize = new THREE.Vector2();
+
 // Import necessary video functions
 let videoControlFunctions = {
     togglePlayback: null,
     toggleMute: null
 };
+
+// Variables for pinch-to-resize gesture
+let pinchStartScale = null;
+let pinchScreen = null;
+let lastPinchDistance = 0;
+let resizeStartTime = 0;
+let isShowingResizeUI = false;
 
 // Setup event listeners
 export function setupEventListeners() {
@@ -42,10 +55,17 @@ export function setupEventListeners() {
     controller.addEventListener('selectstart', onSelectStart);
     controller.addEventListener('selectend', onSelectEnd);
     
-    // Touch events
+    // Touch-based interaction (for AR on mobile)
     renderer.domElement.addEventListener('touchstart', onTouchStart, false);
     renderer.domElement.addEventListener('touchmove', onTouchMove, false);
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+    
+    // Add multitouch pinch-to-resize support
+    renderer.domElement.addEventListener('gesturestart', onGestureStart, false);
+    renderer.domElement.addEventListener('gesturechange', onGestureChange, false);
+    renderer.domElement.addEventListener('gestureend', onGestureEnd, false);
+    
+    console.log("Event listeners set up");
 }
 
 // Handle controller selection start
@@ -214,12 +234,25 @@ function handleButtonAction(button) {
     switch(action) {
         case 'playButton':
             // Toggle video playback
-            toggleVideoPlayback();
+            import('./ar_media.js').then(mediaModule => {
+                if (mediaModule.toggleVideoPlayback) {
+                    mediaModule.toggleVideoPlayback();
+                } else {
+                    console.error("Video playback function not found");
+                }
+            });
             break;
             
         case 'volumeButton':
+        case 'mutedButton':
             // Toggle video mute
-            toggleVideoMute();
+            import('./ar_media.js').then(mediaModule => {
+                if (mediaModule.toggleVideoMute) {
+                    mediaModule.toggleVideoMute();
+                } else {
+                    console.error("Video mute function not found");
+                }
+            });
             break;
             
         case 'createScreen':
@@ -252,74 +285,106 @@ function handleButtonAction(button) {
 
 // Create visual feedback for button press
 function createButtonFeedback(button) {
-    // Store original scale
+    if (!button) return;
+    
+    // Store original properties
+    const originalColor = button.material ? button.material.color.clone() : new THREE.Color(0x333333);
     const originalScale = button.scale.clone();
     
-    // Create pulse effect
-    button.scale.multiplyScalar(1.2);
-    button.material.color.setHex(0x6699ff); // Change to highlight color
-    
-    // Create glow effect
-    const glowSize = button.geometry.parameters.radius * 1.5;
-    const glowGeometry = new THREE.CircleGeometry(glowSize, 32);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x6699ff,
+    // Create burst effect
+    const burstGeometry = new THREE.CircleGeometry(button.userData.size || 0.05, 32);
+    const burstMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4fc3f7,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    
+    const burst = new THREE.Mesh(burstGeometry, burstMaterial);
+    burst.scale.set(0.8, 0.8, 1);
+    burst.position.z = -0.001;
+    button.add(burst);
+    
+    // Scale up button for press effect
+    button.scale.multiplyScalar(1.15);
+    
+    // Change color for feedback
+    if (button.material) {
+        button.material.color.set(0x4fc3f7);
+    }
+    
+    // Create ripple effect
+    const rippleGeometry = new THREE.CircleGeometry(button.userData.size || 0.05, 32);
+    const rippleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.6,
         side: THREE.DoubleSide,
         depthTest: true
     });
     
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.z = -0.001; // Slightly behind button
-    button.add(glowMesh);
+    const ripple = new THREE.Mesh(rippleGeometry, rippleMaterial);
+    ripple.scale.set(1, 1, 1);
+    ripple.position.z = -0.002;
+    button.add(ripple);
     
-    // Reset after animation
-    setTimeout(() => {
-        // Animate scale back to normal
-        const startTime = performance.now();
-        const duration = 200; // ms
+    // Animate feedback effects
+    const startTime = performance.now();
+    const duration = 400; // ms
+    
+    function animateFeedback() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
         
-        function animateBack() {
-            const elapsedTime = performance.now() - startTime;
-            const progress = Math.min(elapsedTime / duration, 1);
-            
-            // Ease out
-            const t = 1 - Math.pow(1 - progress, 2);
-            
-            button.scale.lerp(originalScale, t);
-            
-            if (progress < 1) {
-                requestAnimationFrame(animateBack);
+        if (progress < 1) {
+            // Button scale animation (press and release)
+            if (progress < 0.3) {
+                // Press down phase
+                button.scale.lerp(new THREE.Vector3(1.15, 1.15, 1), 0.3);
             } else {
-                button.scale.copy(originalScale);
-                button.material.color.setHex(0x444444); // Reset color
-                
-                // Remove glow with fade out
-                const startFadeTime = performance.now();
-                const fadeDuration = 150; // ms
-                
-                function fadeOutGlow() {
-                    const fadeElapsed = performance.now() - startFadeTime;
-                    const fadeProgress = Math.min(fadeElapsed / fadeDuration, 1);
-                    
-                    glowMaterial.opacity = 0.5 * (1 - fadeProgress);
-                    
-                    if (fadeProgress < 1) {
-                        requestAnimationFrame(fadeOutGlow);
-                    } else {
-                        button.remove(glowMesh);
-                        glowMaterial.dispose();
-                        glowGeometry.dispose();
-                    }
-                }
-                
-                requestAnimationFrame(fadeOutGlow);
+                // Release phase
+                button.scale.lerp(originalScale, 0.2);
             }
+            
+            // Burst effect
+            if (progress < 0.5) {
+                // Initial burst
+                burst.scale.set(0.8 + progress * 0.4, 0.8 + progress * 0.4, 1);
+                burstMaterial.opacity = 0.7 * (1 - progress * 2);
+            }
+            
+            // Ripple effect
+            ripple.scale.set(1 + progress, 1 + progress, 1);
+            rippleMaterial.opacity = 0.6 * (1 - progress);
+            
+            // Color transition
+            if (button.material) {
+                const t = progress < 0.5 ? progress * 2 : 1 - (progress - 0.5) * 2;
+                button.material.color.lerp(originalColor, 1 - t);
+            }
+            
+            requestAnimationFrame(animateFeedback);
+        } else {
+            // Clean up
+            button.scale.copy(originalScale);
+            if (button.material) {
+                button.material.color.copy(originalColor);
+            }
+            button.remove(burst);
+            button.remove(ripple);
+            burstMaterial.dispose();
+            rippleMaterial.dispose();
+            burstGeometry.dispose();
+            rippleGeometry.dispose();
         }
-        
-        requestAnimationFrame(animateBack);
-    }, 100);
+    }
+    
+    // Provide haptic feedback if available
+    if (navigator.vibrate) {
+        navigator.vibrate(20);
+    }
+    
+    requestAnimationFrame(animateFeedback);
 }
 
 // Create a new screen
@@ -410,45 +475,6 @@ function toggleRotateMode(button) {
     console.log("Rotate mode:", isRotateModeActive ? "activated" : "deactivated");
 }
 
-// Toggle resize for a screen
-function toggleResize(screen) {
-    if (!screen) return;
-    
-    // Check current scale
-    const currentScale = screen.scale.x;
-    
-    // Store original scale if not already stored
-    if (!screen.userData.hasOwnProperty('originalScale')) {
-        screen.userData.originalScale = screen.scale.clone();
-    }
-    
-    // Toggle between sizes
-    if (Math.abs(currentScale - 1.0) < 0.1) {
-        // Scale up to 1.5x
-        screen.scale.set(1.5, 1.5, 1);
-        
-        // Create visual feedback for resize
-        createModeChangeIndicator('Screen Enlarged');
-    } else if (Math.abs(currentScale - 1.5) < 0.1) {
-        // Scale up to 2.0x
-        screen.scale.set(2.0, 2.0, 1);
-        
-        // Create visual feedback for resize
-        createModeChangeIndicator('Screen Maximized');
-    } else {
-        // Return to original scale
-        screen.scale.set(1.0, 1.0, 1);
-        
-        // Create visual feedback for resize
-        createModeChangeIndicator('Screen Reset');
-    }
-    
-    // Provide haptic feedback if available
-    if (navigator.vibrate) {
-        navigator.vibrate(30);
-    }
-}
-
 // Toggle fullscreen for a screen (kept for backward compatibility)
 function toggleFullscreen(screen) {
     if (!screen) return;
@@ -527,435 +553,494 @@ function findAllButtons() {
     return buttons;
 }
 
-// Touch start handler
+// Handle gesture start for pinch events
+function onGestureStart(event) {
+    // Prevent default to avoid browser handling (like zoom)
+    event.preventDefault();
+    
+    // We'll use our custom touch-based implementation instead
+}
+
+// Handle gesture change for pinch events
+function onGestureChange(event) {
+    // Prevent default to avoid browser handling
+    event.preventDefault();
+    
+    // We'll use our custom touch-based implementation instead
+}
+
+// Handle gesture end for pinch events
+function onGestureEnd(event) {
+    // Prevent default
+    event.preventDefault();
+    
+    // We'll use our custom touch-based implementation instead
+}
+
+// Handle touch start events
 function onTouchStart(event) {
-    event.preventDefault();
+    if (!isARMode) return;
     
-    console.log("Touch start detected in AR");
+    // Get touch points
+    const touches = event.touches;
     
-    // Single touch handling
-    const touch = event.touches[0];
-    
-    if (!touch) {
-        console.log("No valid touch point");
-        return;
-    }
-    
-    // Convert touch to normalized device coordinates
-    initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    initialTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-    currentTouchPosition.copy(initialTouchPosition);
-    
-    console.log("Touch position:", initialTouchPosition.x.toFixed(3), initialTouchPosition.y.toFixed(3));
-    
-    // Update raycaster
-    raycaster.setFromCamera(initialTouchPosition, camera);
-    
-    // Double tap detection
-    const now = performance.now();
-    const doubleTapDetected = (now - lastTapTime) < 300;
-    lastTapTime = now;
-    
-    // Identify all screens close to our touch ray
-    const screenIntersections = [];
-    
-    // Cast ray against all screens to find potential candidates
-    screens.forEach(screen => {
-        // Use a more generous ray for each screen
-        const intersects = raycaster.intersectObject(screen, true);
-        if (intersects.length > 0) {
-            // Store information about the hit including distance
-            screenIntersections.push({
-                screen: screen,
-                distance: intersects[0].distance,
-                object: intersects[0].object,
-                point: intersects[0].point // Store intersection point
-            });
-        }
-    });
-    
-    // Sort by distance so we prioritize closer screens
-    screenIntersections.sort((a, b) => a.distance - b.distance);
-    
-    // PRIORITY 1: Check for button interactions
-    const buttons = findAllButtons();
-    console.log("Checking", buttons.length, "buttons for intersection");
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
-    
-    if (buttonIntersects.length > 0) {
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
-        if (buttonObj) {
-            console.log("Button touched:", buttonObj.userData.action);
-            
-            // Visual feedback
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7);
-            
-            // Scale up and back for button press effect
-            const originalScale = buttonObj.scale.clone();
-            buttonObj.scale.multiplyScalar(1.2);
-            
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-                buttonObj.scale.copy(originalScale);
-            }, 200);
-            
-            // Provide haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(40);
-            }
-            
-            // Handle the button action
-            handleButtonAction(buttonObj);
-            return;
-        }
-    }
-    
-    // PRIORITY 2: Check closest screen for progress bar interaction
-    if (screenIntersections.length > 0) {
-        const closestHit = screenIntersections[0];
-        const screen = closestHit.screen;
+    // Check for pinch gesture (2 fingers)
+    if (touches.length === 2) {
+        // Calculate initial distance between touches
+        const touch1 = new THREE.Vector2(touches[0].clientX, touches[0].clientY);
+        const touch2 = new THREE.Vector2(touches[1].clientX, touches[1].clientY);
+        lastPinchDistance = touch1.distanceTo(touch2);
         
-        // Check if we hit the progress bar
-        if (handleProgressBarTouch(screen, closestHit.point)) {
-            console.log("Progress bar touched on screen:", screen.userData.id);
-            return;
-        }
-    }
-    
-    // PRIORITY 3: Check for draggable areas on screens
-    let draggableAreaHit = false;
-    let intersectedScreen = null;
-    
-    // Check for draggable area hits on the closest screens first
-    for (const hit of screenIntersections) {
-        const screen = hit.screen;
-        // Get position relative to the screen
-        let localPoint = hit.point.clone();
-        if (screen.worldToLocal) {
-            localPoint = screen.worldToLocal(localPoint.clone());
-        }
+        // Find screen under the midpoint of the two touches
+        const midpoint = new THREE.Vector2(
+            (touch1.x + touch2.x) / 2,
+            (touch1.y + touch2.y) / 2
+        );
         
-        // Screen dimensions
-        const screenHeight = 0.75; // Standard screen height
+        // Convert to NDC
+        const normalizedPoint = new THREE.Vector2(
+            (midpoint.x / window.innerWidth) * 2 - 1,
+            -(midpoint.y / window.innerHeight) * 2 + 1
+        );
         
-        // Check if we're in the top 2/3 of the screen
-        // The top of the screen is at y = screenHeight/2
-        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
-            // We hit the draggable area
-            intersectedScreen = screen;
-            draggableAreaHit = true;
-            break;
-        }
-    }
-    
-    // If we found a draggable area, set up for dragging
-    if (draggableAreaHit && intersectedScreen) {
-        console.log("Starting drag on screen:", intersectedScreen.userData.id, "via draggable area");
+        // Raycasting to find screen
+        raycaster.setFromCamera(normalizedPoint, camera);
+        const intersects = raycaster.intersectObjects(screens, true);
         
-        // Set up drag state
-        isDraggingHandle = true;
-        draggedScreen = intersectedScreen;
-        
-        // Preserve original scale
-        if (!intersectedScreen.userData.originalScale) {
-            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
-        } else {
-            // Restore original scale when starting drag
-            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
-        }
-        
-        // Select this screen
-        selectScreen(intersectedScreen);
-        selectedScreen = intersectedScreen;
-        
-        // Calculate offset - use a fixed offset for better positioning
-        dragOffset.set(0, 0, 0);
-        
-        // Visual feedback - highlight the top bar if available
-        if (intersectedScreen.userData.dragHandle) {
-            intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
-        }
-        
-        // Strong haptic feedback to confirm grab
-        if (navigator.vibrate) {
-            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
-        }
-        
-        createModeChangeIndicator('Dragging Screen');
-        return;
-    }
-    
-    // PRIORITY 4: Regular screen selection - use the closest screen from our sorted list
-    if (screenIntersections.length > 0) {
-        const closestHit = screenIntersections[0];
-        const screen = closestHit.screen;
-        
-        console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
-        
-        // Select the screen
-        selectScreen(screen);
-        selectedScreen = screen;
-        
-        // Double tap to toggle resize
-        if (doubleTapDetected) {
-            console.log("Double tap detected, toggling resize");
-            toggleResize(screen);
-            
-            // Provide haptic feedback
-            if (navigator.vibrate) {
-                navigator.vibrate([30, 20, 30]);
-            }
-            
-            createModeChangeIndicator('Size Changed');
-            return;
-        }
-        
-        // Flash highlight around selected screen
-        flashScreenHighlight(screen);
-        createModeChangeIndicator('Screen Selected');
-    }
-}
-
-// Flash a highlight effect around a selected screen
-function flashScreenHighlight(screen) {
-    // Find the border or create one if it doesn't exist
-    let highlightMesh = screen.children.find(child => 
-        child.userData && child.userData.isHighlight);
-    
-    if (!highlightMesh) {
-        // Get screen dimensions (use the first plane geometry as reference)
-        const screenMesh = screen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry');
-        
-        let width = 1.05;
-        let height = 0.8;
-        
-        if (screenMesh && screenMesh.geometry) {
-            // Extract dimensions from existing geometry
-            const size = new THREE.Vector3();
-            screenMesh.geometry.computeBoundingBox();
-            screenMesh.geometry.boundingBox.getSize(size);
-            
-            // Scale slightly larger than the original screen
-            width = size.x * 1.05;
-            height = size.y * 1.05;
-        }
-        
-        // Create highlight mesh
-        const glowGeometry = new THREE.PlaneGeometry(width, height);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4fc3f7,
-            transparent: true,
-            opacity: 0,
-            side: THREE.DoubleSide
-        });
-        
-        highlightMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        highlightMesh.position.z = -0.01;
-        highlightMesh.userData = { isHighlight: true };
-        screen.add(highlightMesh);
-    }
-    
-    // Animate the highlight
-    let opacity = 0;
-    const fadeIn = () => {
-        opacity += 0.1;
-        highlightMesh.material.opacity = opacity;
-        
-        if (opacity < 0.6) {
-            requestAnimationFrame(fadeIn);
-        } else {
-            // Fade out
-            const fadeOut = () => {
-                opacity -= 0.1;
-                highlightMesh.material.opacity = opacity;
+        // Look for a screen in the intersections
+        for (const intersect of intersects) {
+            const screen = getScreenFromIntersect(intersect.object);
+            if (screen) {
+                console.log("Pinch gesture started on screen:", screen.userData.id);
+                isPinching = true;
+                pinchScreen = screen;
+                pinchStartScale = screen.scale.clone();
+                resizeStartTime = Date.now();
                 
-                if (opacity > 0) {
-                    requestAnimationFrame(fadeOut);
+                // Highlight the screen to indicate resizing
+                flashScreenHighlight(screen, 0x4488ff); // Blue highlight for resize
+                
+                // Enable resize visuals
+                toggleResize(screen, true);
+                
+                // Create a resize indicator
+                createResizeIndicator(midpoint);
+                isShowingResizeUI = true;
+                
+                // Select this screen
+                selectScreen(screen);
+                
+                // Provide haptic feedback to indicate resize mode
+                if (navigator.vibrate) {
+                    navigator.vibrate([15, 15]);
                 }
-            };
-            requestAnimationFrame(fadeOut);
-        }
-    };
-    
-    requestAnimationFrame(fadeIn);
-}
-
-// Touch move handler - make the movement more responsive and direct
-function onTouchMove(event) {
-    // Always prevent default to avoid browser gestures
-    event.preventDefault();
-    
-    // Make sure we have a valid touch point
-    const touch = event.touches[0];
-    if (!touch) {
-        return;
-    }
-    
-    // Convert touch to normalized device coordinates
-    const previousTouchPosition = currentTouchPosition.clone();
-    currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-    
-    // Handle dragging via the drag handle - even more direct approach
-    if (isDraggingHandle && draggedScreen) {
-        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
-        
-        try {
-            // Preserve original scale
-            if (draggedScreen.userData && draggedScreen.userData.originalScale) {
-                // Ensure scale doesn't change during movement
-                draggedScreen.scale.copy(draggedScreen.userData.originalScale);
+                
+                return;
             }
-            
-            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
-            // Calculate movement delta from touch
-            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
-            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
-            
-            // Get camera's right and up vectors for moving in screen space
-            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-            
-            // Scale for more noticeable movement in AR - INCREASED for faster movement
-            const moveScale = 0.35; // Significantly increased for better AR response
-            
-            // Create movement vector
-            const movement = new THREE.Vector3()
-                .addScaledVector(cameraRight, deltaX * moveScale)
-                .addScaledVector(cameraUp, deltaY * moveScale);
-            
-            // Apply movement directly
-            draggedScreen.position.add(movement);
-            
-            // Make screen face the camera
-            draggedScreen.lookAt(camera.position);
-            
-            // Optional visual feedback
-            createMoveIndicator(draggedScreen.position.clone(), 0.03);
-            
-        } catch (error) {
-            console.error("Error in drag movement:", error);
         }
-        
-        return;
     }
     
-    // We're not handling other forms of movement to simplify the interaction model
-    // This keeps the drag handle as the primary way to move screens, which improves reliability
-}
-
-// Move screen based on touch movement
-function moveScreenWithTouch() {
-    if (!selectedScreen) return;
-    
-    // Create more direct movement with less complexity
-    // Use a simplified approach that always works
-    
-    // Get the camera's forward and right vectors
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    
-    // Calculate the touch delta
-    const touchDelta = new THREE.Vector2(
-        currentTouchPosition.x - initialTouchPosition.x,
-        currentTouchPosition.y - initialTouchPosition.y
+    // For single touch, check for resize handle interaction first
+    const touch = event.touches[0];
+    const normalizedPoint = new THREE.Vector2(
+        (touch.clientX / window.innerWidth) * 2 - 1,
+        -(touch.clientY / window.innerHeight) * 2 + 1
     );
     
-    // Scale the movement (adjust multiplier as needed)
-    const movementSpeed = 2.0;
+    raycaster.setFromCamera(normalizedPoint, camera);
+    const intersects = raycaster.intersectObjects(screens, true);
     
-    // Create movement vector in world space
-    const movement = new THREE.Vector3()
-        .addScaledVector(right, touchDelta.x * movementSpeed)
-        .addScaledVector(new THREE.Vector3(0, 1, 0), touchDelta.y * movementSpeed);
-    
-    // Apply movement directly
-    selectedScreen.position.add(movement);
-    
-    // Ensure screen always faces the camera
-    selectedScreen.lookAt(camera.position);
-    
-    // Keep the screen at a reasonable distance
-    const distanceToCamera = selectedScreen.position.distanceTo(camera.position);
-    if (distanceToCamera < 0.5 || distanceToCamera > 5) {
-        // Get direction from camera to screen
-        const direction = selectedScreen.position.clone().sub(camera.position).normalize();
-        
-        // Set new position at ideal distance
-        const idealDistance = THREE.MathUtils.clamp(distanceToCamera, 0.5, 5);
-        selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
-    }
-    
-    // Optional: Add visual feedback
-    createMoveIndicator(selectedScreen.position.clone(), 0.03);
-    
-    // Update control panel if needed
-    if (controlPanel && controlPanel.userData && controlPanel.userData.update) {
-        controlPanel.userData.update();
-    }
-}
-
-// Create a visual indicator for movement feedback
-function createMoveIndicator(position, size) {
-    // Create a small dot that fades quickly
-    const geometry = new THREE.SphereGeometry(size, 8, 8);
-    const material = new THREE.MeshBasicMaterial({
-        color: 0x4fc3f7,
-        transparent: true,
-        opacity: 0.3
-    });
-    
-    const indicator = new THREE.Mesh(geometry, material);
-    indicator.position.copy(position);
-    
-    // Add to scene
-    scene.add(indicator);
-    
-    // Animate fading out
-    const startTime = performance.now();
-    const duration = 200; // 200ms
-    
-    function fadeOut() {
-        const elapsed = performance.now() - startTime;
-        const progress = elapsed / duration;
-        
-        if (progress < 1) {
-            material.opacity = 0.3 * (1 - progress);
-            indicator.scale.x = 1 - (progress * 0.5);
-            indicator.scale.y = 1 - (progress * 0.5);
-            indicator.scale.z = 1 - (progress * 0.5);
-            requestAnimationFrame(fadeOut);
-        } else {
-            scene.remove(indicator);
-            geometry.dispose();
-            material.dispose();
+    // Check for resize handle intersection
+    for (const intersect of intersects) {
+        if (intersect.object.userData && intersect.object.userData.type === 'resizeHandle') {
+            // We've clicked on a resize handle
+            const screen = intersect.object.userData.screen || getScreenFromIntersect(intersect.object);
+            if (screen) {
+                isResizing = true;
+                resizedScreen = screen;
+                initialResizePosition.set(touch.clientX, touch.clientY);
+                initialScreenSize.set(
+                    screen.userData.width || 1, 
+                    screen.userData.height || 0.6
+                );
+                
+                // Save initial scale
+                initialScale.copy(screen.scale);
+                
+                // Highlight the screen
+                flashScreenHighlight(screen, 0x4488ff); // Blue highlight for resize
+                
+                // Enable resize visuals
+                toggleResize(screen, true);
+                
+                // Create resize indicator
+                createResizeIndicator(new THREE.Vector2(touch.clientX, touch.clientY));
+                isShowingResizeUI = true;
+                
+                // Select this screen
+                selectScreen(screen);
+                
+                // Provide haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(20);
+                }
+                
+                return;
+            }
         }
     }
     
-    requestAnimationFrame(fadeOut);
+    // If not resizing, use the original touch handling
+    handleSingleTouch(event);
 }
 
-// Rotate screen based on touch movement
-function rotateScreenWithTouch() {
-    if (!selectedScreen) return;
+// Handle pinch resize during touch move
+function handlePinchResize(event) {
+    const touches = event.touches;
     
-    // Calculate deltas from initial position
-    const deltaX = currentTouchPosition.x - initialMousePosition.x;
-    const deltaY = currentTouchPosition.y - initialMousePosition.y;
+    // Calculate current distance between touches
+    const touch1 = new THREE.Vector2(touches[0].clientX, touches[0].clientY);
+    const touch2 = new THREE.Vector2(touches[1].clientX, touches[1].clientY);
+    const currentDistance = touch1.distanceTo(touch2);
     
-    // Apply rotation - Y axis movement controls X rotation and vice versa
-    selectedScreen.rotation.x = initialRotation.x + (deltaY * 2);
-    selectedScreen.rotation.y = initialRotation.y + (deltaX * 2);
+    // Calculate scale factor based on change in distance
+    const scaleFactor = currentDistance / lastPinchDistance;
     
-    // Limit rotation angles
-    selectedScreen.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, selectedScreen.rotation.x));
+    // Add easing when scale changes direction
+    let easedScaleFactor = scaleFactor;
+    if ((scaleFactor > 1 && lastScaleFactor < 1) || 
+        (scaleFactor < 1 && lastScaleFactor > 1)) {
+        // Smooth the transition when changing direction
+        easedScaleFactor = 1 + (scaleFactor - 1) * 0.7;
+    }
+    
+    // Store for next comparison
+    lastScaleFactor = scaleFactor;
+    lastPinchDistance = currentDistance;
+    
+    // Apply scale with constraints
+    if (pinchScreen && pinchStartScale) {
+        // Calculate new scale based on accumulated factor from start
+        const elapsedTime = Date.now() - resizeStartTime;
+        const adjustedFactor = Math.pow(easedScaleFactor, Math.min(1, elapsedTime / 300));
+        
+        // Calculate new scale
+        const newScale = pinchScreen.scale.clone().multiplyScalar(adjustedFactor);
+        
+        // Constrain scaling to reasonable limits
+        const minScale = 0.3;
+        const maxScale = 2.5;
+        
+        newScale.x = Math.max(minScale, Math.min(maxScale, newScale.x));
+        newScale.y = Math.max(minScale, Math.min(maxScale, newScale.y));
+        newScale.z = 1; // Keep z scale unchanged
+        
+        // Apply scale with smoothing
+        pinchScreen.scale.lerp(newScale, 0.2);
+        
+        // Update original scale in userData to persist the change
+        pinchScreen.userData.originalScale = pinchScreen.scale.clone();
+        
+        // Update midpoint for resize indicator
+        const midpoint = new THREE.Vector2(
+            (touch1.x + touch2.x) / 2,
+            (touch1.y + touch2.y) / 2
+        );
+        updateResizeIndicator(midpoint, scaleFactor > 1 ? 'grow' : 'shrink');
+        
+        // Provide subtle haptic feedback for significant changes
+        if (navigator.vibrate && Math.abs(scaleFactor - 1) > 0.05) {
+            const intensity = Math.min(20, Math.abs(scaleFactor - 1) * 100);
+            navigator.vibrate(Math.round(intensity));
+        }
+        
+        // Show current scale as a percentage
+        const scalePercent = Math.round(pinchScreen.scale.x * 100 / pinchStartScale.x);
+        updateResizeText(`${scalePercent}%`);
+    }
+}
+
+// Handle resizing with resize handle
+function handleResizeHandle(event) {
+    if (!isResizing || !resizedScreen) return;
+    
+    const touch = event.touches[0];
+    const currentPosition = new THREE.Vector2(touch.clientX, touch.clientY);
+    
+    // Calculate the delta from the initial position
+    const deltaX = (currentPosition.x - initialResizePosition.x) / window.innerWidth;
+    const deltaY = (currentPosition.y - initialResizePosition.y) / window.innerHeight;
+    
+    // Calculate new scale factors (increased sensitivity)
+    const scaleX = initialScale.x * (1 + deltaX * 2.5);
+    const scaleY = initialScale.y * (1 - deltaY * 2.5); // Invert Y for natural feeling
+    
+    // Apply constraints
+    const minScale = 0.3;
+    const maxScale = 2.5;
+    
+    const newScale = new THREE.Vector3(
+        Math.max(minScale, Math.min(maxScale, scaleX)),
+        Math.max(minScale, Math.min(maxScale, scaleY)),
+        1
+    );
+    
+    // Apply scale with smoothing
+    resizedScreen.scale.lerp(newScale, 0.2);
+    
+    // Update original scale in userData
+    resizedScreen.userData.originalScale = resizedScreen.scale.clone();
+    
+    // Update resize indicator
+    updateResizeIndicator(currentPosition, deltaX > 0 ? 'grow' : 'shrink');
+    
+    // Show current scale
+    const scalePercent = Math.round(resizedScreen.scale.x * 100 / initialScale.x);
+    updateResizeText(`${scalePercent}%`);
+    
+    // Provide subtle haptic feedback
+    const scaleDelta = Math.abs(resizedScreen.scale.x - initialScale.x);
+    if (navigator.vibrate && scaleDelta > 0.01) {
+        navigator.vibrate(Math.min(15, scaleDelta * 50));
+    }
+}
+
+// Handle touch move events
+function onTouchMove(event) {
+    if (!isARMode) return;
+    
+    // Prevent default behavior to avoid scrolling
+    event.preventDefault();
+    
+    // Check for pinch gesture
+    if (isPinching && event.touches.length === 2) {
+        handlePinchResize(event);
+        return;
+    }
+    
+    // Check for resize handle drag
+    if (isResizing && resizedScreen) {
+        handleResizeHandle(event);
+        return;
+    }
+    
+    // Otherwise use standard touch move handling
+    handleStandardTouchMove(event);
+}
+
+// Function to handle standard single-touch operations
+function handleSingleTouch(event) {
+    // Get the first touch
+    const touch = event.touches[0];
+    
+    // Convert touch to normalized device coordinates
+    const normalizedPoint = new THREE.Vector2(
+        (touch.clientX / window.innerWidth) * 2 - 1,
+        -(touch.clientY / window.innerHeight) * 2 + 1
+    );
+    
+    // Set up raycaster
+    raycaster.setFromCamera(normalizedPoint, camera);
+    
+    // Check for intersections with screens
+    const intersects = raycaster.intersectObjects(screens, true);
+    
+    // Handle screen interaction
+    handleScreenInteraction(intersects, normalizedPoint, touch);
+}
+
+// Function to handle standard touch move (separating from pinch handling)
+function handleStandardTouchMove(event) {
+    // Get the first touch
+    const touch = event.touches[0];
+    
+    // Exit if we're not actively dragging anything
+    if (!isDraggingHandle && !isRotatingScreen) return;
+    
+    // Convert touch to normalized device coordinates
+    const normalizedPoint = new THREE.Vector2(
+        (touch.clientX / window.innerWidth) * 2 - 1,
+        -(touch.clientY / window.innerHeight) * 2 + 1
+    );
+    
+    // Handle moving screen with touch
+    if (isDraggingHandle && draggedScreen) {
+        moveScreenWithTouch();
+    }
+    
+    // Handle rotating screen with touch
+    if (isRotatingScreen && selectedScreen) {
+        rotateScreenWithTouch();
+    }
+}
+
+// Create a resize indicator
+function createResizeIndicator(position) {
+    // Check if there's already an indicator
+    if (scene.userData.resizeIndicator) {
+        scene.remove(scene.userData.resizeIndicator);
+    }
+    
+    // Create indicator
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw resize indicator
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.beginPath();
+    ctx.arc(64, 64, 48, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw diagonal arrows
+    ctx.strokeStyle = '#4488ff';
+    ctx.lineWidth = 4;
+    
+    // Top-left to bottom-right arrow
+    ctx.beginPath();
+    ctx.moveTo(32, 32);
+    ctx.lineTo(96, 96);
+    ctx.stroke();
+    
+    // Arrow heads
+    ctx.beginPath();
+    ctx.moveTo(32, 32);
+    ctx.lineTo(32, 42);
+    ctx.moveTo(32, 32);
+    ctx.lineTo(42, 32);
+    ctx.moveTo(96, 96);
+    ctx.lineTo(96, 86);
+    ctx.moveTo(96, 96);
+    ctx.lineTo(86, 96);
+    ctx.stroke();
+    
+    // Bottom-left to top-right arrow
+    ctx.beginPath();
+    ctx.moveTo(32, 96);
+    ctx.lineTo(96, 32);
+    ctx.stroke();
+    
+    // Arrow heads
+    ctx.beginPath();
+    ctx.moveTo(32, 96);
+    ctx.lineTo(32, 86);
+    ctx.moveTo(32, 96);
+    ctx.lineTo(42, 96);
+    ctx.moveTo(96, 32);
+    ctx.lineTo(96, 42);
+    ctx.moveTo(96, 32);
+    ctx.lineTo(86, 32);
+    ctx.stroke();
+    
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
+    });
+    
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(0.15, 0.15, 1);
+    
+    // Position in world space
+    const vector = new THREE.Vector3();
+    vector.set(
+        (position.x / window.innerWidth) * 2 - 1,
+        -(position.y / window.innerHeight) * 2 + 1,
+        0.5
+    );
+    vector.unproject(camera);
+    
+    // Position sprite in front of camera
+    const dir = vector.sub(camera.position).normalize();
+    const distance = -camera.position.z / dir.z;
+    const pos = camera.position.clone().add(dir.multiplyScalar(distance * 0.8));
+    sprite.position.copy(pos);
+    
+    scene.add(sprite);
+    scene.userData.resizeIndicator = sprite;
+}
+
+// Update resize indicator
+function updateResizeIndicator(position, type) {
+    const indicator = scene.userData.resizeIndicator;
+    if (!indicator) return;
+    
+    // Update position
+    const vector = new THREE.Vector3();
+    vector.set(
+        (position.x / window.innerWidth) * 2 - 1,
+        -(position.y / window.innerHeight) * 2 + 1,
+        0.5
+    );
+    vector.unproject(camera);
+    
+    const dir = vector.sub(camera.position).normalize();
+    const distance = -camera.position.z / dir.z;
+    const pos = camera.position.clone().add(dir.multiplyScalar(distance * 0.8));
+    indicator.position.copy(pos);
+    
+    // Update visual based on grow/shrink
+    if (type === 'grow') {
+        indicator.scale.lerp(new THREE.Vector3(0.18, 0.18, 1), 0.3);
+    } else {
+        indicator.scale.lerp(new THREE.Vector3(0.12, 0.12, 1), 0.3);
+    }
 }
 
 // Touch end handler
 function onTouchEnd(event) {
+    // Clean up resize UI
+    if (isShowingResizeUI) {
+        // Remove the resize indicator
+        if (scene.userData.resizeIndicator) {
+            scene.remove(scene.userData.resizeIndicator);
+            delete scene.userData.resizeIndicator;
+        }
+        
+        // Remove text indicator if it exists
+        if (scene.userData.resizeIndicator && 
+            scene.userData.resizeIndicator.userData && 
+            scene.userData.resizeIndicator.userData.textSprite) {
+            scene.remove(scene.userData.resizeIndicator.userData.textSprite);
+        }
+        
+        isShowingResizeUI = false;
+        
+        // Show resize complete notification
+        if (isPinching || isResizing) {
+            createModeChangeIndicator('Resize Complete');
+        }
+    }
+    
+    // Reset resize state
+    if (isPinching || isResizing) {
+        // Save state
+        if (pinchScreen) {
+            pinchScreen.userData.originalScale = pinchScreen.scale.clone();
+            // Disable resize visuals
+            toggleResize(pinchScreen, false);
+        }
+        if (resizedScreen) {
+            resizedScreen.userData.originalScale = resizedScreen.scale.clone();
+            // Disable resize visuals
+            toggleResize(resizedScreen, false);
+        }
+        
+        // Provide haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(30);
+        }
+    }
+    
+    // Reset resize flags
+    isPinching = false;
+    pinchScreen = null;
+    pinchStartScale = null;
+    isResizing = false;
+    resizedScreen = null;
+    
     // Check if we were dragging with the handle
     if (isDraggingHandle && draggedScreen) {
         console.log("Finished dragging screen:", draggedScreen.userData.id);
@@ -1009,7 +1094,6 @@ function onTouchEnd(event) {
     // Reset other flags
     isTouchMovingScreen = false;
     isRotatingScreen = false;
-    isPinching = false;
 }
 
 // Handle progress bar touch for video seeking (updated to work with timeline)
@@ -1056,8 +1140,15 @@ function handleProgressBarTouch(screen, point) {
 
 // Update video time based on progress
 function updateVideoTime(progress) {
-    // Progress bar has been removed, so this function no longer needs to do anything
-    // Keeping the function to maintain code structure in case we need to reimplement
+    import('./ar_media.js').then(mediaModule => {
+        if (mediaModule.updateVideoTime) {
+            mediaModule.updateVideoTime(progress);
+        } else {
+            console.error("updateVideoTime function not found in media module");
+        }
+    }).catch(error => {
+        console.error("Error importing media module:", error);
+    });
 }
 
 // Create a floating text indicator for mode changes
@@ -1301,4 +1392,186 @@ function createDeletionEffect(position) {
     }
     
     requestAnimationFrame(animateParticles);
+}
+
+// Rotate screen based on touch movement
+function rotateScreenWithTouch() {
+    if (!selectedScreen) return;
+    
+    // Calculate deltas from initial position
+    const deltaX = currentTouchPosition.x - initialMousePosition.x;
+    const deltaY = currentTouchPosition.y - initialMousePosition.y;
+    
+    // Apply rotation - Y axis movement controls X rotation and vice versa
+    selectedScreen.rotation.x = initialRotation.x + (deltaY * 2);
+    selectedScreen.rotation.y = initialRotation.y + (deltaX * 2);
+    
+    // Limit rotation angles
+    selectedScreen.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, selectedScreen.rotation.x));
+}
+
+// Move screen based on touch movement
+function moveScreenWithTouch() {
+    if (!selectedScreen) return;
+    
+    // Create more direct movement with less complexity
+    // Use a simplified approach that always works
+    
+    // Get the camera's forward and right vectors
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    
+    // Calculate the touch delta
+    const touchDelta = new THREE.Vector2(
+        currentTouchPosition.x - initialTouchPosition.x,
+        currentTouchPosition.y - initialTouchPosition.y
+    );
+    
+    // Scale the movement (adjust multiplier as needed)
+    const movementSpeed = 2.0;
+    
+    // Create movement vector in world space
+    const movement = new THREE.Vector3()
+        .addScaledVector(right, touchDelta.x * movementSpeed)
+        .addScaledVector(new THREE.Vector3(0, 1, 0), touchDelta.y * movementSpeed);
+    
+    // Apply movement directly
+    selectedScreen.position.add(movement);
+    
+    // Ensure screen always faces the camera
+    selectedScreen.lookAt(camera.position);
+    
+    // Keep the screen at a reasonable distance
+    const distanceToCamera = selectedScreen.position.distanceTo(camera.position);
+    if (distanceToCamera < 0.5 || distanceToCamera > 5) {
+        // Get direction from camera to screen
+        const direction = selectedScreen.position.clone().sub(camera.position).normalize();
+        
+        // Set new position at ideal distance
+        const idealDistance = THREE.MathUtils.clamp(distanceToCamera, 0.5, 5);
+        selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
+    }
+    
+    // Optional: Add visual feedback
+    createMoveIndicator(selectedScreen.position.clone(), 0.03);
+    
+    // Update control panel if needed
+    if (controlPanel && controlPanel.userData && controlPanel.userData.update) {
+        controlPanel.userData.update();
+    }
+}
+
+// Create a visual indicator for movement feedback
+function createMoveIndicator(position, size) {
+    // Create a small dot that fades quickly
+    const geometry = new THREE.SphereGeometry(size, 8, 8);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x4fc3f7,
+        transparent: true,
+        opacity: 0.3
+    });
+    
+    const indicator = new THREE.Mesh(geometry, material);
+    indicator.position.copy(position);
+    
+    // Add to scene
+    scene.add(indicator);
+    
+    // Animate fading out
+    const startTime = performance.now();
+    const duration = 200; // 200ms
+    
+    function fadeOut() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
+        
+        if (progress < 1) {
+            material.opacity = 0.3 * (1 - progress);
+            indicator.scale.x = 1 - (progress * 0.5);
+            indicator.scale.y = 1 - (progress * 0.5);
+            indicator.scale.z = 1 - (progress * 0.5);
+            requestAnimationFrame(fadeOut);
+        } else {
+            scene.remove(indicator);
+            geometry.dispose();
+            material.dispose();
+        }
+    }
+    
+    requestAnimationFrame(fadeOut);
+}
+
+// Update resize indicator text
+function updateResizeText(text) {
+    const indicator = scene.userData.resizeIndicator;
+    if (!indicator || !text) return;
+    
+    // Update the text if we already have a text sprite
+    if (indicator.userData && indicator.userData.textSprite) {
+        const textSprite = indicator.userData.textSprite;
+        
+        // Update the canvas with new text
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#48f';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, canvas.width/2, canvas.height/2);
+        
+        // Update the texture
+        if (textSprite.material.map) {
+            textSprite.material.map.dispose();
+        }
+        textSprite.material.map = new THREE.CanvasTexture(canvas);
+        textSprite.material.needsUpdate = true;
+        
+        return;
+    }
+    
+    // Create a new text sprite if it doesn't exist
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#48f';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, canvas.width/2, canvas.height/2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
+    });
+    
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(0.15, 0.1, 1);
+    
+    // Position above the resize indicator
+    sprite.position.copy(indicator.position);
+    sprite.position.y += 0.15;
+    
+    scene.add(sprite);
+    
+    // Store a reference to the text sprite
+    indicator.userData = indicator.userData || {};
+    indicator.userData.textSprite = sprite;
 } 

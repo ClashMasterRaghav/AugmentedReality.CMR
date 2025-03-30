@@ -184,7 +184,7 @@ export function createControlPanel() {
     controlPanel = new THREE.Group();
     
     // Panel background - sleek modern design with rounded corners
-    const panelSize = { width: 0.18, height: 0.08 };
+    const panelSize = { width: 0.24, height: 0.10 }; // Increase panel size
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
     
     // Create rounded panel texture
@@ -194,7 +194,7 @@ export function createControlPanel() {
     const panelCtx = panelCanvas.getContext('2d');
     
     // Draw rounded rectangle with gradient
-    const cornerRadius = 20;
+    const cornerRadius = 25; // Increase corner radius
     panelCtx.beginPath();
     panelCtx.moveTo(cornerRadius, 0);
     panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
@@ -215,8 +215,8 @@ export function createControlPanel() {
     panelCtx.fill();
     
     // Add subtle border
-    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    panelCtx.lineWidth = 2;
+    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // Increased border brightness
+    panelCtx.lineWidth = 3; // Thicker border
     panelCtx.stroke();
     
     // Create texture from canvas
@@ -230,12 +230,12 @@ export function createControlPanel() {
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     controlPanel.add(panelMesh);
     
-    // Add subtle glow effect
-    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
+    // Add subtle glow effect with more prominent blue
+    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.015, panelSize.height + 0.015);
     const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x2196F3,
+        color: 0x4fc3f7, // Brighter blue
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.25, // Increased opacity
         side: THREE.DoubleSide
     });
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -243,8 +243,8 @@ export function createControlPanel() {
     controlPanel.add(glowMesh);
     
     // Define button parameters
-    const buttonSize = 0.04; // Smaller, more subtle buttons
-    const buttonSpacing = 0.06;
+    const buttonSize = 0.055; // Increase button size by 37.5%
+    const buttonSpacing = 0.07;
     
     // Create buttons - only 2 buttons: Add Screen and Delete Screen
     const buttonPositions = [
@@ -292,8 +292,8 @@ export function createControlPanel() {
         iconMesh.position.z = 0.002;
         button.add(iconMesh);
         
-        // Add subtle shadow/depth effect
-        const buttonShadowGeometry = new THREE.CircleGeometry(buttonSize / 2 + 0.002, 32);
+        // Add subtle shadow/depth effect with increased size
+        const buttonShadowGeometry = new THREE.CircleGeometry(buttonSize / 2 + 0.003, 32);
         const buttonShadowMaterial = new THREE.MeshBasicMaterial({
             color: 0x000000,
             transparent: true,
@@ -303,6 +303,20 @@ export function createControlPanel() {
         const buttonShadow = new THREE.Mesh(buttonShadowGeometry, buttonShadowMaterial);
         buttonShadow.position.z = -0.001;
         button.add(buttonShadow);
+        
+        // Add subtle pulse animation for visual interest
+        const pulseAnimation = () => {
+            if (!button.parent) return; // Stop if button is removed
+            
+            const time = Date.now() * 0.001; // Convert to seconds
+            const pulseScale = 1 + Math.sin(time * 2) * 0.03; // Subtle 3% size variation
+            
+            button.scale.set(pulseScale, pulseScale, 1);
+            requestAnimationFrame(pulseAnimation);
+        };
+        
+        // Start pulse animation
+        requestAnimationFrame(pulseAnimation);
     });
     
     // Add control panel to scene
