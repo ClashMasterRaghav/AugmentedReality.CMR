@@ -301,7 +301,8 @@ function createNewScreen() {
     const matrix = new THREE.Matrix4();
     matrix.makeRotationFromQuaternion(camera.quaternion);
     
-    const position = new THREE.Vector3(0, 0, -1.0);
+    // Use -1.5 to match the default screen distance (instead of -1.0)
+    const position = new THREE.Vector3(0, 0, -1.5);
     position.applyMatrix4(matrix);
     position.add(camera.position);
     

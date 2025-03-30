@@ -8,7 +8,7 @@ import { videoTexture } from './ar_media.js';
 export let screens = [];
 
 // Create a new browser screen
-export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2)) {
+export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
