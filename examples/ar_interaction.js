@@ -48,26 +48,54 @@ export function setupEventListeners() {
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
-// Handle controller selection start
+// Handle the start of selection event
 function onSelectStart(event) {
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    // Store selection state
+    controller.userData.isSelecting = true;
     
-    // Check for button intersections
-    const buttons = findAllButtons();
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
+    // Get intersection point
+    const intersection = getIntersection(event);
+    if (!intersection) return;
     
-    if (buttonIntersects.length > 0) {
-        // Visual feedback for button press
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
-        if (buttonObj) {
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7); // Highlight color
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-            }, 200);
+    // Get intersected object
+    const object = intersection.object;
+    
+    // Check if we're intersecting a button
+    const button = getButtonFromIntersect(object);
+    if (button) {
+        // Set button as hovered and give visual feedback
+        button.userData.isHovered = true;
+        
+        // Add hover effect (subtle scale up)
+        button.scale.set(1.1, 1.1, 1);
+        
+        // Store the original button color if not already stored
+        if (!button.userData.originalColor && button.material) {
+            button.userData.originalColor = button.material.color.clone();
+            
+            // Slightly brighten button on hover
+            const hoverColor = button.userData.originalColor.clone().multiplyScalar(1.2);
+            button.material.color.copy(hoverColor);
+        }
+        
+        return;
+    }
+    
+    // Check if we hit a screen
+    const screen = getScreenFromIntersect(object);
+    if (screen) {
+        // Select this screen
+        selectScreen(screen);
+        
+        // If we hit the drag handle, start dragging
+        if (object.userData && object.userData.type === 'dragHandle') {
+            isDraggingHandle = true;
+            draggedScreen = screen;
+            
+            // Visual feedback for grabbing
+            if (object.material) {
+                object.material.color.set(0x00ccff); // Bright blue to indicate grabbing
+            }
         }
     }
 }
@@ -96,54 +124,109 @@ function getButtonFromIntersect(object) {
 
 // Handle controller selection end
 function onSelectEnd(event) {
-    if (isPlacingScreen && newScreen) {
-        // Finalize the placement of the new screen
-        isPlacingScreen = false;
-        newScreen = null;
-        console.log("Screen placed successfully");
-        return;
+    controller.userData.isSelecting = false;
+    
+    // Get intersection point
+    const intersection = getIntersection(event);
+    const object = intersection ? intersection.object : null;
+    
+    // If we were dragging a handle, reset its appearance
+    if (isDraggingHandle && draggedScreen) {
+        // Reset the drag handle appearance
+        const dragHandle = draggedScreen.userData.dragHandle;
+        if (dragHandle && dragHandle.material) {
+            dragHandle.material.color.set(dragHandle.userData.originalColor || 0x333333);
+        }
+        
+        // Reset dragging state
+        isDraggingHandle = false;
+        draggedScreen = null;
+    }
+    
+    // Reset hover states for all buttons
+    resetAllButtonHoverStates();
+    
+    // If we hit a button, trigger its action
+    if (object) {
+        const button = getButtonFromIntersect(object);
+        if (button) {
+            handleButtonAction(button);
+        }
     }
 }
 
-// Handle controller selection
-function onSelect(event) {
-    // Raycast to detect interactive elements
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+// Reset hover states for all buttons
+function resetAllButtonHoverStates() {
+    // Find all buttons in screens
+    screens.forEach(screen => {
+        screen.children.forEach(child => {
+            if (child.userData && child.userData.type === 'button') {
+                // Reset hover state
+                if (child.userData.isHovered) {
+                    child.userData.isHovered = false;
+                    
+                    // Reset scale
+                    child.scale.set(1, 1, 1);
+                    
+                    // Reset color if original color was stored
+                    if (child.userData.originalColor && child.material) {
+                        child.material.color.copy(child.userData.originalColor);
+                    }
+                }
+            }
+        });
+    });
     
-    // First, check for button interactions
-    const buttons = findAllButtons();
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
-    
-    if (buttonIntersects.length > 0) {
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
-        if (buttonObj) {
-            handleButtonAction(buttonObj);
-            return;
+    // Find all buttons in control panels
+    scene.children.forEach(child => {
+        if (child.userData && child.userData.type === 'controlPanel') {
+            child.children.forEach(button => {
+                if (button.userData && button.userData.type === 'button') {
+                    // Reset hover state
+                    if (button.userData.isHovered) {
+                        button.userData.isHovered = false;
+                        
+                        // Reset scale
+                        button.scale.set(1, 1, 1);
+                        
+                        // Reset color if original color was stored
+                        if (button.userData.originalColor && button.material) {
+                            button.material.color.copy(button.userData.originalColor);
+                        }
+                    }
+                }
+            });
         }
+    });
+}
+
+// Handle select (equivalent to click) event
+function onSelect(event) {
+    // Get intersection point
+    const intersection = getIntersection(event);
+    if (!intersection) return;
+    
+    const object = intersection.object;
+    const point = intersection.point;
+    
+    // Check if we're clicking a button
+    const button = getButtonFromIntersect(object);
+    if (button) {
+        handleButtonAction(button);
+        return;
     }
     
-    // Then check for screen selection
-    const screenIntersects = raycaster.intersectObjects(screens, true);
-    
-    if (screenIntersects.length > 0) {
-        const screenObj = getScreenFromIntersect(screenIntersects[0].object);
-        if (screenObj) {
-            selectScreen(screenObj);
-            
-            // If in move mode, start moving
-            if (isMoveModeActive) {
-                isTouchMovingScreen = true;
-            }
-            
-            // If in rotate mode, start rotating
-            if (isRotateModeActive) {
-                isRotatingScreen = true;
-                initialRotation.copy(screenObj.rotation);
-            }
-        }
+    // Check if we hit a screen
+    const screen = getScreenFromIntersect(object);
+    if (screen) {
+        // Select this screen
+        selectScreen(screen);
+        
+        // Check if we hit the progress bar (no longer needed since it was removed)
+        // handleProgressBarTouch(screen, point);
+        
+        // Flash highlight to show selection
+        flashScreenHighlight(screen);
     }
 }
 
@@ -217,6 +300,9 @@ function handleButtonAction(button) {
         screen = selectedScreen;
     }
     
+    // Add visual and haptic feedback for button press
+    addButtonPressEffect(button);
+    
     // Play/pause button
     if (action === 'playButton' && screen) {
         // Check if video control function exists
@@ -224,21 +310,6 @@ function handleButtonAction(button) {
             // Toggle playback
             videoControlFunctions.togglePlayback();
             console.log("Toggle video playback");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
         } else {
             console.error("Video playback function not found");
         }
@@ -250,21 +321,6 @@ function handleButtonAction(button) {
             // Toggle mute
             videoControlFunctions.toggleMute();
             console.log("Toggle video mute");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
-            
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
         } else {
             console.error("Video mute function not found");
         }
@@ -282,15 +338,71 @@ function handleButtonAction(button) {
     } else if (action === 'deleteScreen') {
         // Delete the last interacted screen
         deleteLastScreen();
+    }
+}
+
+// Add visual feedback for button press
+function addButtonPressEffect(button) {
+    // Set button as pressed in userData
+    button.userData.isPressed = true;
+    
+    // Visual feedback - scale down quickly then back up with bounce
+    if (button) {
+        // Get the icon mesh if it exists (first child usually)
+        const iconMesh = button.children.length > 0 ? button.children[0] : null;
         
-        // Visual feedback
-        const iconMesh = button.children[0];
-        if (iconMesh) {
-            // Apply a quick scale animation
-            iconMesh.scale.set(1.2, 1.2, 1.2);
-            setTimeout(() => {
-                iconMesh.scale.set(1, 1, 1);
-            }, 150);
+        // Quick scale down
+        button.scale.set(0.85, 0.85, 1);
+        
+        // Add a slight color change
+        const originalColor = button.material.color.clone();
+        const brighterColor = originalColor.clone().multiplyScalar(1.3);
+        button.material.color.copy(brighterColor);
+        
+        // Bounce back after a short delay
+        setTimeout(() => {
+            // Animate scale back with slight bounce
+            const startTime = performance.now();
+            const duration = 200; // ms
+            
+            function animateButtonBounce() {
+                const elapsed = performance.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                if (progress < 1) {
+                    // Ease out bounce
+                    const easedProgress = 1 - Math.pow(1 - progress, 2);
+                    const bounceEffect = progress > 0.5 ? Math.sin(progress * Math.PI * 3) * 0.1 * (1 - progress) : 0;
+                    
+                    // Scale back up with bounce
+                    button.scale.set(
+                        0.85 + (0.15 * easedProgress) + bounceEffect,
+                        0.85 + (0.15 * easedProgress) + bounceEffect,
+                        1
+                    );
+                    
+                    // Transition color back to original
+                    button.material.color.lerpColors(
+                        brighterColor, 
+                        originalColor, 
+                        easedProgress
+                    );
+                    
+                    requestAnimationFrame(animateButtonBounce);
+                } else {
+                    // Restore original appearance
+                    button.scale.set(1, 1, 1);
+                    button.material.color.copy(originalColor);
+                    button.userData.isPressed = false;
+                }
+            }
+            
+            requestAnimationFrame(animateButtonBounce);
+        }, 100);
+        
+        // Haptic feedback if available
+        if (navigator.vibrate) {
+            navigator.vibrate(20);
         }
     }
 }
@@ -1240,4 +1352,38 @@ function createDeletionEffect(position) {
     }
     
     requestAnimationFrame(animateParticles);
+}
+
+// Helper function to get intersection with ray from controller
+function getIntersection(event) {
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // Check for intersections with all objects
+    const allObjects = [];
+    
+    // Add screens and their children
+    screens.forEach(screen => {
+        allObjects.push(screen);
+        screen.children.forEach(child => {
+            allObjects.push(child);
+        });
+    });
+    
+    // Add control panels and UI elements
+    scene.children.forEach(child => {
+        if (child.userData && (child.userData.type === 'controlPanel' || child.userData.type === 'ui')) {
+            allObjects.push(child);
+            child.children.forEach(subChild => {
+                allObjects.push(subChild);
+            });
+        }
+    });
+    
+    // Find intersections
+    const intersects = raycaster.intersectObjects(allObjects, true);
+    
+    return intersects.length > 0 ? intersects[0] : null;
 } 

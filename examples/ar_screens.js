@@ -7,6 +7,35 @@ import { videoTexture } from './ar_media.js';
 // Array to store screen objects
 export let screens = [];
 
+// Helper function to create a rounded rectangle geometry
+function createRoundedRectGeometry(width, height, radius, segments = 8) {
+    // Create shape with rounded corners
+    const shape = new THREE.Shape();
+    
+    // Start at top left, just after the corner
+    shape.moveTo(-width/2 + radius, -height/2);
+    
+    // Bottom edge with bottom-right corner
+    shape.lineTo(width/2 - radius, -height/2);
+    shape.absarc(width/2 - radius, -height/2 + radius, radius, Math.PI * 1.5, Math.PI * 2, false);
+    
+    // Right edge with top-right corner
+    shape.lineTo(width/2, height/2 - radius);
+    shape.absarc(width/2 - radius, height/2 - radius, radius, 0, Math.PI * 0.5, false);
+    
+    // Top edge with top-left corner
+    shape.lineTo(-width/2 + radius, height/2);
+    shape.absarc(-width/2 + radius, height/2 - radius, radius, Math.PI * 0.5, Math.PI, false);
+    
+    // Left edge with bottom-left corner
+    shape.lineTo(-width/2, -height/2 + radius);
+    shape.absarc(-width/2 + radius, -height/2 + radius, radius, Math.PI, Math.PI * 1.5, false);
+    
+    // Create geometry from shape
+    const geometry = new THREE.ShapeGeometry(shape, segments);
+    return geometry;
+}
+
 // Create a new browser screen
 export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     // Screen dimensions
@@ -29,8 +58,9 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
         originalScale: new THREE.Vector3(1, 1, 1) // Store original scale to prevent scaling issues
     };
     
-    // Add border for better visibility
-    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    // Add border for better visibility with rounded corners
+    const cornerRadius = 0.04; // Rounded corner radius
+    const borderGeometry = createRoundedRectGeometry(screenWidth + 0.02, screenHeight + 0.02, cornerRadius);
     const borderMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x444444, // Dark gray border
         side: THREE.DoubleSide
@@ -38,6 +68,20 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
     browserWindow.add(borderPanel);
+    
+    // Add a subtle glow effect around the border
+    const glowGeometry = createRoundedRectGeometry(screenWidth + 0.04, screenHeight + 0.04, cornerRadius + 0.01);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x88ccff,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.DoubleSide
+    });
+    const glowBorder = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowBorder.position.z = -0.002;
+    glowBorder.userData.isGlow = true;
+    browserWindow.add(glowBorder);
+    browserWindow.userData.glowBorder = glowBorder;
     
     // Find and update the drag handle reference in userData
     const topBar = browserWindow.children.find(child => 
@@ -51,6 +95,43 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Add to scene and screens array
     scene.add(browserWindow);
     screens.push(browserWindow);
+    
+    // Add a subtle "appear" animation
+    browserWindow.scale.set(0.8, 0.8, 1);
+    browserWindow.userData.originalOpacity = borderMaterial.opacity;
+    borderMaterial.opacity = 0.6;
+    
+    // Animate scale and opacity
+    const startTime = performance.now();
+    const duration = 400; // ms
+    
+    function animateAppear() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease in-out progress
+        const easedProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        
+        // Scale up and fade in
+        browserWindow.scale.set(
+            0.8 + (0.2 * easedProgress),
+            0.8 + (0.2 * easedProgress),
+            1
+        );
+        
+        borderMaterial.opacity = 0.6 + (0.4 * easedProgress);
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateAppear);
+        } else {
+            browserWindow.scale.set(1, 1, 1);
+            borderMaterial.opacity = 1.0;
+        }
+    }
+    
+    requestAnimationFrame(animateAppear);
     
     console.log("Created screen with ID:", browserWindow.userData.id);
     
@@ -69,9 +150,11 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     const screenWidth = size.x;
     const screenHeight = size.y;
     const topBarHeight = 0.06; // Thinner top bar
+    const cornerRadius = 0.04; // Rounded corner radius
     
     // Content background - create this first so it's behind the top bar
-    const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    // Use rounded corners for the content background
+    const backgroundGeometry = createRoundedRectGeometry(screenWidth, screenHeight, cornerRadius);
     let backgroundMaterial;
     
     if (content && content.isVideoTexture) {
@@ -101,8 +184,42 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     background.renderOrder = 1;
     screen.add(background);
     
-    // Create a solid black top bar that spans the entire width
-    const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
+    // Create a solid black top bar that spans the width but respects the rounded corners at the top
+    // For top bar, we use a custom shape to match the top rounded corners
+    const topBarShape = new THREE.Shape();
+    
+    // Start at bottom left of top bar
+    topBarShape.moveTo(-screenWidth/2, screenHeight/2 - topBarHeight);
+    
+    // Bottom edge (straight)
+    topBarShape.lineTo(screenWidth/2, screenHeight/2 - topBarHeight);
+    
+    // Right edge with top-right corner
+    topBarShape.lineTo(screenWidth/2, screenHeight/2 - cornerRadius);
+    topBarShape.absarc(
+        screenWidth/2 - cornerRadius, 
+        screenHeight/2 - cornerRadius, 
+        cornerRadius, 
+        0, 
+        Math.PI * 0.5, 
+        false
+    );
+    
+    // Top edge with top-left corner
+    topBarShape.lineTo(-screenWidth/2 + cornerRadius, screenHeight/2);
+    topBarShape.absarc(
+        -screenWidth/2 + cornerRadius, 
+        screenHeight/2 - cornerRadius, 
+        cornerRadius, 
+        Math.PI * 0.5, 
+        Math.PI, 
+        false
+    );
+    
+    // Close the shape
+    topBarShape.lineTo(-screenWidth/2, screenHeight/2 - topBarHeight);
+    
+    const topBarGeometry = new THREE.ShapeGeometry(topBarShape);
     const topBarMaterial = new THREE.MeshBasicMaterial({
         color: 0x111111, // Solid black color
         transparent: false, // No transparency
@@ -110,7 +227,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         depthTest: true // Enable depth testing to prevent seeing through
     });
     const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
-    topBar.position.set(0, screenHeight / 2 - topBarHeight / 2, 0.004);
+    topBar.position.z = 0.004;
     topBar.renderOrder = 10;
     topBar.userData = {
         type: 'dragHandle',
@@ -439,13 +556,26 @@ export function selectScreen(screen) {
     if (selectedScreen) {
         // Change border color back to normal
         const borderMesh = selectedScreen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry' && 
+            child.geometry && child.geometry.type === 'ShapeGeometry' && 
             Math.abs(child.position.z - (-0.001)) < 0.0001);
             
         if (borderMesh) {
-            borderMesh.material.color.set(0x2196F3); // Blue border
+            borderMesh.material.color.set(0x444444); // Dark gray border
             borderMesh.material.opacity = 0.7;
         }
+        
+        // Hide glow effect
+        const glowBorder = selectedScreen.userData.glowBorder;
+        if (glowBorder) {
+            glowBorder.material.opacity = 0.0;
+        }
+        
+        // Stop any animations
+        if (selectedScreen.userData.selectionAnimation) {
+            cancelAnimationFrame(selectedScreen.userData.selectionAnimation);
+            selectedScreen.userData.selectionAnimation = null;
+        }
+        
         selectedScreen.userData.isSelected = false;
     }
     
@@ -454,7 +584,7 @@ export function selectScreen(screen) {
     
     // Highlight border for selected screen
     const borderMesh = screen.children.find(child => 
-        child.geometry && child.geometry.type === 'PlaneGeometry' && 
+        child.geometry && child.geometry.type === 'ShapeGeometry' && 
         Math.abs(child.position.z - (-0.001)) < 0.0001);
         
     if (borderMesh) {
@@ -462,10 +592,71 @@ export function selectScreen(screen) {
         borderMesh.material.opacity = 1.0;
     }
     
+    // Show and animate glow effect
+    const glowBorder = screen.userData.glowBorder;
+    if (glowBorder) {
+        // Start with a subtle glow
+        glowBorder.material.opacity = 0.2;
+        
+        // Create pulsing animation for the glow
+        const startTime = performance.now();
+        
+        function animateGlow() {
+            const elapsed = performance.now() - startTime;
+            // Create a 1.5-second pulse cycle
+            const pulseProgress = (elapsed % 1500) / 1500;
+            
+            // Use a sine wave to create smooth pulsing (range 0.2 to 0.5)
+            const opacity = 0.2 + (Math.sin(pulseProgress * Math.PI * 2) * 0.15 + 0.15);
+            glowBorder.material.opacity = opacity;
+            
+            // Store animation reference for cancellation
+            screen.userData.selectionAnimation = requestAnimationFrame(animateGlow);
+        }
+        
+        // Start the animation
+        screen.userData.selectionAnimation = requestAnimationFrame(animateGlow);
+    }
+    
+    // Create a subtle "selected" animation
+    const originalScale = screen.scale.clone();
+    screen.scale.set(originalScale.x * 1.05, originalScale.y * 1.05, originalScale.z);
+    
+    // Animate back to original scale with a slight bounce
+    const scaleStartTime = performance.now();
+    const scaleDuration = 300; // ms
+    
+    function animateScale() {
+        const elapsed = performance.now() - scaleStartTime;
+        const progress = Math.min(elapsed / scaleDuration, 1);
+        
+        if (progress < 1) {
+            // Ease out with slight bounce
+            const easedProgress = 1 - Math.pow(1 - progress, 3);
+            const bounceEffect = Math.sin(progress * Math.PI * (1 + progress * 2)) * 0.03 * (1 - progress);
+            
+            screen.scale.set(
+                originalScale.x * (1 + 0.05 * (1 - easedProgress) + bounceEffect),
+                originalScale.y * (1 + 0.05 * (1 - easedProgress) + bounceEffect),
+                originalScale.z
+            );
+            
+            requestAnimationFrame(animateScale);
+        } else {
+            // Ensure we end exactly at the original scale
+            screen.scale.copy(originalScale);
+        }
+    }
+    
+    requestAnimationFrame(animateScale);
+    
     // Position keyboard under selected screen if needed
     if (virtualKeyboard) {
         updateKeyboardPosition(screen);
     }
+    
+    // Store selected screen reference
+    selectedScreen = screen;
 }
 
 // Update keyboard position relative to the selected screen
@@ -493,19 +684,53 @@ export function updateKeyboardPosition(screen) {
 
 // Update visual effects for screens
 export function updateScreenEffects() {
+    // Get current time for animations
+    const time = Date.now() * 0.001;
+    
     screens.forEach(screen => {
-        if (screen.userData.isSelected) {
-            // Find the border mesh
-            const borderMesh = screen.children.find(child => 
-                child.geometry && child.geometry.type === 'PlaneGeometry' && 
-                Math.abs(child.position.z - (-0.001)) < 0.0001);
-                
-            if (borderMesh) {
-                // Subtle pulsing effect for selected screen's border
-                const time = Date.now() * 0.001;
-                const pulseIntensity = 0.1 * Math.sin(time * 2) + 0.9;
-                borderMesh.material.color.setRGB(0.3 * pulseIntensity, 0.8 * pulseIntensity, 0.3 * pulseIntensity);
-            }
+        // Add subtle hover/float effect to all screens
+        if (!screen.userData.lastHoverY) {
+            screen.userData.lastHoverY = screen.position.y;
+            screen.userData.hoverOffset = Math.random(); // Random offset for variation
         }
+        
+        // Very subtle floating motion (less than 1cm)
+        const floatAmount = 0.003; // Maximum float amount
+        const floatSpeed = 0.5; // Speed of float cycle
+        const newY = screen.userData.lastHoverY + 
+            Math.sin((time + screen.userData.hoverOffset) * floatSpeed) * floatAmount;
+        
+        // Apply with very slight lerp for smoothness
+        screen.position.y = screen.position.y * 0.97 + newY * 0.03;
+        
+        // Add screen-specific effects for selected screen
+        if (screen.userData.isSelected) {
+            // The main selection effects are now handled in the selectScreen function
+            
+            // Add subtle shadow pulsing if there's a glow border
+            const glowBorder = screen.userData.glowBorder;
+            if (glowBorder && !screen.userData.selectionAnimation) {
+                // Only apply this if the selectScreen animation isn't running
+                const pulseIntensity = (Math.sin(time * 2) * 0.1) + 0.9;
+                glowBorder.material.opacity = 0.2 * pulseIntensity;
+            }
+            
+            // Very subtle rotation sway for selected screen (less than 1 degree)
+            const rotAmount = 0.005; // About 0.3 degrees
+            screen.rotation.y = Math.sin(time * 0.8) * rotAmount;
+            screen.rotation.x = Math.sin(time * 0.5) * rotAmount * 0.5;
+        }
+        
+        // Add interaction feedback for buttons on hover
+        screen.children.forEach(child => {
+            if (child.userData && child.userData.type === 'button') {
+                // If the button is being hovered
+                if (child.userData.isHovered) {
+                    // Add subtle pulsing effect for hovered buttons
+                    const hoverPulse = (Math.sin(time * 5) * 0.1) + 0.95;
+                    child.scale.set(hoverPulse, hoverPulse, 1);
+                }
+            }
+        });
     });
 } 
