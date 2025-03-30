@@ -70,14 +70,44 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     const screenHeight = size.y;
     const topBarHeight = 0.06; // Thinner top bar
     
-    // Create a minimalist, elegant top bar that spans the entire width
+    // Content background - create this first so it's behind the top bar
+    const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    let backgroundMaterial;
+    
+    if (content && content.isVideoTexture) {
+        // Use video texture if provided
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: content,
+            side: THREE.DoubleSide,
+            depthTest: false
+        });
+    } else {
+        // Default subtle dark background
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            color: 0x121212,
+            side: THREE.DoubleSide,
+            depthTest: false
+        });
+        
+        // Create a fallback texture with loading indicator if needed
+        if (!content) {
+            const fallbackTexture = createFallbackTexture(title.split(' ').pop() || '1');
+            backgroundMaterial.map = fallbackTexture;
+        }
+    }
+    
+    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+    background.position.set(0, 0, 0.002);
+    background.renderOrder = 1;
+    screen.add(background);
+    
+    // Create a solid black top bar that spans the entire width
     const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
     const topBarMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.95, // Slightly more opaque for better visibility
+        color: 0x111111, // Solid black color
+        transparent: false, // No transparency
         side: THREE.DoubleSide,
-        depthTest: false
+        depthTest: true // Enable depth testing to prevent seeing through
     });
     const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
     topBar.position.set(0, screenHeight / 2 - topBarHeight / 2, 0.004);
@@ -96,11 +126,8 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     canvas.height = 64; // Reduced height for thinner top bar
     const ctx = canvas.getContext('2d');
     
-    // Create a refined subtle gradient background for the top bar
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#2a2a2a');
-    gradient.addColorStop(1, '#1e1e1e');
-    ctx.fillStyle = gradient;
+    // Create a solid black background for the top bar
+    ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Draw screen title with improved typography
@@ -142,51 +169,22 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     topBarMaterial.map = topBarTexture;
     topBarMaterial.needsUpdate = true;
     
-    // Content background
-    const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
-    let backgroundMaterial;
-    
+    // Add video control buttons with refined positioning
     if (content && content.isVideoTexture) {
-        // Use video texture if provided
-        backgroundMaterial = new THREE.MeshBasicMaterial({
-            map: content,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-    } else {
-        // Default subtle dark background
-        backgroundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x121212,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        
-        // Create a fallback texture with loading indicator if needed
-        if (!content) {
-            const fallbackTexture = createFallbackTexture(title.split(' ').pop() || '1');
-            backgroundMaterial.map = fallbackTexture;
-        }
-    }
-    
-    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-    background.position.set(0, 0, 0.002);
-    background.renderOrder = 1;
-    screen.add(background);
-    
-    // Add video control buttons with refined positioning (without progress bar)
-    if (content && content.isVideoTexture) {
-        const playButton = addControlButton(screen, 'play', -0.12, -screenHeight / 2 + 0.025, 0.03);
+        // Move play button to bottom left
+        const playButton = addControlButton(screen, 'play', -screenWidth/2 + 0.05, -screenHeight/2 + 0.05, 0.03);
         playButton.userData.videoControl = true;
         playButton.userData.videoAction = 'togglePlayback';
         
-        const volumeButton = addControlButton(screen, 'volume', 0.12, -screenHeight / 2 + 0.025, 0.03);
+        // Keep volume button on bottom right, but initialize with muted icon
+        const volumeButton = addControlButton(screen, 'muted', screenWidth/2 - 0.05, -screenHeight/2 + 0.05, 0.03);
         volumeButton.userData.videoControl = true;
         volumeButton.userData.videoAction = 'toggleMute';
         
         // Store controls in userData
         screen.userData.controls = {
             isPlaying: true,
-            isMuted: false,
+            isMuted: true,
             playButton: playButton,
             volumeButton: volumeButton
         };

@@ -55,6 +55,9 @@ export function loadVideoTexture() {
             console.log('Video loaded successfully');
             duration = videoElement.duration || 100;
             updateExistingScreensWithVideo();
+            
+            // Update the mute icon to reflect the default muted state
+            updateMuteIcons(true);
         });
         
         videoElement.addEventListener('timeupdate', () => {
