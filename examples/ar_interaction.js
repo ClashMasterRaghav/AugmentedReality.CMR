@@ -668,13 +668,17 @@ function onTouchStart(event) {
         const panelIntersects = raycaster.intersectObject(controlPanel, true);
         
         if (panelIntersects.length > 0) {
-            // IMPROVED: Make the entire top half of the panel draggable
+            // IMPROVED: Make the entire top portion of the panel draggable
             const hitPoint = panelIntersects[0].point.clone();
             const localPoint = controlPanel.worldToLocal(hitPoint.clone());
+            const hitObject = panelIntersects[0].object;
             
-            // Check if we're in the top half of the panel (more generous drag area)
-            if (localPoint.y > 0.0) {
-                console.log("Starting control panel drag");
+            // Check if we hit the drag handle explicitly
+            const isDragHandle = hitObject.userData && hitObject.userData.isDragArea;
+            
+            // Check if we're in the top 40% of the panel or hit the explicit drag area
+            if (localPoint.y > 0.0 || isDragHandle) {
+                console.log("Starting control panel drag - hit at local Y:", localPoint.y);
                 
                 // Store initial panel position and rotation
                 initialPanelPosition.copy(controlPanel.position);

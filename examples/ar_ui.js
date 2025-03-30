@@ -183,9 +183,10 @@ export function createControlPanel() {
     panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
     panelCtx.closePath();
     
-    // Modern gradient (dark mode style)
+    // Modern gradient (dark mode style) - DARKER TOP
     const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
-    gradient.addColorStop(0, '#2c3e50'); // Dark blue-gray at top
+    gradient.addColorStop(0, '#1a1a2e'); // Much darker blue at top
+    gradient.addColorStop(0.4, '#1e3048'); // Transition
     gradient.addColorStop(1, '#1a1a2e'); // Even darker at bottom
     panelCtx.fillStyle = gradient;
     panelCtx.fill();
@@ -197,9 +198,9 @@ export function createControlPanel() {
     panelCtx.shadowOffsetY = 5;
     panelCtx.fill();
     
-    // Add glossy highlight at top
+    // Add glossy highlight at top - REDUCED
     const highlightGradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height * 0.3);
-    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)'); // Reduced highlight
     highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     panelCtx.fillStyle = highlightGradient;
     panelCtx.fill();
@@ -209,31 +210,38 @@ export function createControlPanel() {
     panelCtx.lineWidth = 3;
     panelCtx.stroke();
     
-    // Add a distinctive drag handle at the top
+    // Create dedicated drag area at the top - LARGER, more obvious
+    // First draw a darker rectangle across the top
+    panelCtx.fillStyle = 'rgba(20, 20, 40, 0.9)'; // Very dark blue for drag area
+    panelCtx.beginPath();
+    panelCtx.roundRect(0, 0, panelCanvas.width, 80, { tl: cornerRadius, tr: cornerRadius, bl: 0, br: 0 });
+    panelCtx.fill();
+    
+    // Add a visible drag handle
     panelCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     panelCtx.beginPath();
-    panelCtx.roundRect(panelCanvas.width/2 - 40, 15, 80, 10, 5);
+    panelCtx.roundRect(panelCanvas.width/2 - 50, 20, 100, 10, 5);
     panelCtx.fill();
     
     // Add dotted pattern to drag handle for better visibility
     panelCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     for (let i = 0; i < 3; i++) {
         panelCtx.beginPath();
-        panelCtx.arc(panelCanvas.width/2 - 20 + i*20, 20, 3, 0, Math.PI * 2);
+        panelCtx.arc(panelCanvas.width/2 - 25 + i*25, 25, 3, 0, Math.PI * 2);
         panelCtx.fill();
     }
     
-    // Add title text to the control panel
+    // Add an explicit "DRAG HERE" text
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    panelCtx.font = 'bold 18px Arial';
+    panelCtx.textAlign = 'center';
+    panelCtx.fillText('DRAG HERE', panelCanvas.width/2, 50);
+    
+    // Add title text to the control panel - MOVED LOWER
     panelCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     panelCtx.font = 'bold 18px Arial';
     panelCtx.textAlign = 'center';
-    panelCtx.fillText('AR Controls', panelCanvas.width/2, 70);
-    
-    // Add a clear "Drag to move" text
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    panelCtx.font = 'bold 16px Arial';
-    panelCtx.textAlign = 'center';
-    panelCtx.fillText('Drag to move', panelCanvas.width/2, 45);
+    panelCtx.fillText('AR Controls', panelCanvas.width/2, 100);
     
     // Create texture from canvas
     const panelTexture = new THREE.CanvasTexture(panelCanvas);
@@ -259,13 +267,13 @@ export function createControlPanel() {
     glowMesh.position.z = -0.002;
     controlPanel.add(glowMesh);
     
-    // Create larger and more visible draggable indicator for better UX
-    const dragAreaHeight = 0.05; // Increased height for easier grabbing
+    // Create larger and more visible draggable indicator for better UX - EVEN LARGER
+    const dragAreaHeight = 0.06; // Increased height for easier grabbing (50% of panel height)
     const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width, dragAreaHeight);
     const dragIndicatorMaterial = new THREE.MeshBasicMaterial({
-        color: 0x90CAF9,
+        color: 0x203055, // Darker blue for drag area
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.5,
         side: THREE.DoubleSide
     });
     const dragIndicator = new THREE.Mesh(dragIndicatorGeometry, dragIndicatorMaterial);
@@ -276,22 +284,14 @@ export function createControlPanel() {
     };
     controlPanel.add(dragIndicator);
     
-    // Add interactive pulsing animation to drag area
-    const pulseDragArea = () => {
-        const time = Date.now() * 0.001;
-        dragIndicator.material.opacity = 0.2 + Math.sin(time * 2) * 0.2;
-        requestAnimationFrame(pulseDragArea);
-    };
-    requestAnimationFrame(pulseDragArea);
+    // Define button parameters - SMALLER buttons positioned lower and more compact
+    const buttonSize = 0.055; // Even smaller buttons
+    const buttonSpacing = 0.10; // Less space between buttons, moved closer together
     
-    // Define button parameters - larger, more touchable buttons
-    const buttonSize = 0.065; // Even larger buttons for easier interaction
-    const buttonSpacing = 0.12; // More space between buttons
-    
-    // Create buttons - Add Screen and Delete Screen
+    // Create buttons - Add Screen and Delete Screen - MOVED MUCH LOWER for larger drag area
     const buttonPositions = [
-        { x: -buttonSpacing/2, y: -0.02 },  // Left - Add Screen
-        { x: buttonSpacing/2, y: -0.02 }   // Right - Delete Screen
+        { x: -buttonSpacing/2, y: -0.05 },  // Left - Add Screen - MOVED FURTHER DOWN
+        { x: buttonSpacing/2, y: -0.05 }   // Right - Delete Screen - MOVED FURTHER DOWN
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];
@@ -362,8 +362,8 @@ export function createControlPanel() {
         buttonGlow.position.z = -0.001;
         button.add(buttonGlow);
         
-        // Add pulse animation effect to make buttons more noticeable
-        if (index === 1) { // Only for delete button
+        // Add pulse animation effect ONLY for delete button
+        if (index === 1) {
             const pulseAnimation = () => {
                 const time = Date.now() * 0.001;
                 const scale = 1 + Math.sin(time * 2) * 0.05;
@@ -423,15 +423,8 @@ export function createControlPanel() {
     // Make panel face user initially
     controlPanel.lookAt(camera.position);
     
-    // Add subtle floating animation
-    const floatAnimation = () => {
-        const time = Date.now() * 0.001;
-        controlPanel.position.y += Math.sin(time * 1.5) * 0.0003;
-        glowMesh.material.opacity = 0.15 + Math.sin(time * 1.2) * 0.05;
-        
-        requestAnimationFrame(floatAnimation);
-    };
-    requestAnimationFrame(floatAnimation);
+    // Add gentle floating animation to the control panel to make it look more interactive
+    floatAnimation();
     
     scene.add(controlPanel);
     
@@ -797,4 +790,26 @@ export function setupControlPanel() {
     controlPanel.quaternion.setFromEuler(euler);
     
     console.log("Control panel positioned in front of user");
+}
+
+// Add gentle floating animation to the control panel to make it look more interactive
+export function floatAnimation() {
+    if (!controlPanel) return;
+    
+    const time = Date.now(); // Get current time in milliseconds
+    
+    // SIGNIFICANTLY REDUCE the amplitude - make it barely noticeable
+    const amplitude = 0.00003; // Reduced from 0.0003 to 0.00003 (10x less)
+    
+    // Very slight floating motion effect
+    controlPanel.position.y += Math.sin(time * 0.001) * amplitude;
+    
+    // Update glow effect to match the reduced floating
+    const glowMesh = controlPanel.children.find(child => 
+        child.material && child.material.blending === THREE.AdditiveBlending);
+    
+    if (glowMesh) {
+        // Use a much more subtle glow
+        glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
+    }
 }
