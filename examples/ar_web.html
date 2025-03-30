@@ -7,8 +7,6 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, user-scalable=no"
 		/>
-		<meta name="apple-mobile-web-app-capable" content="yes">
-		<meta name="mobile-web-app-capable" content="yes">
 		<link type="text/css" rel="stylesheet" href="main.css" />
 		<style>
 			#info {
@@ -94,45 +92,20 @@
 				left: 50%;
 				transform: translate(-50%, -50%);
 				color: #fff;
-				background-color: rgba(180, 0, 0, 0.85);
+				background-color: rgba(255, 0, 0, 0.7);
 				padding: 20px 30px;
-				border-radius: 15px;
+				border-radius: 10px;
 				font-family: Arial, sans-serif;
 				font-size: 18px;
 				z-index: 300;
 				text-align: center;
 				display: none;
-				box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-				max-width: 85%;
-				width: 400px;
-				border: 2px solid rgba(255,255,255,0.1);
 			}
 			#errorMessage h2 {
 				margin-top: 0;
-				font-size: 24px;
-				margin-bottom: 15px;
-				border-bottom: 1px solid rgba(255,255,255,0.3);
-				padding-bottom: 10px;
 			}
 			#errorMessage p {
-				margin-bottom: 15px;
-				font-size: 16px;
-				line-height: 1.4;
-			}
-			#bypassButton {
-				background-color: #4488ff !important; 
-				color: white !important; 
-				border: none !important; 
-				padding: 12px 20px !important; 
-				border-radius: 5px !important; 
-				margin-top: 15px !important; 
-				cursor: pointer !important;
-				font-size: 16px !important;
-				font-weight: bold !important;
-				transition: background-color 0.2s !important;
-			}
-			#bypassButton:hover {
-				background-color: #5599ff !important;
+				margin-bottom: 20px;
 			}
 		</style>
 	</head>
@@ -164,24 +137,12 @@
 			<p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
 		</div>
 
-		<!-- Initial interaction helper for video playback on mobile devices -->
+		<!-- Initial interaction trigger for video playback on mobile devices -->
 		<div id="interactionHelper" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
 			background-color: rgba(0,0,0,0.8); z-index: 1000; color: white; text-align: center; padding-top: 40%;">
 			<h2>Tap to Enable Video</h2>
 			<p>Tap anywhere to start your AR experience with video and audio.</p>
 		</div>
-
-		<!-- WebXR Polyfill - Load this before other scripts -->
-		<script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
-		<script>
-			// Initialize the WebXR polyfill
-			if (typeof WebXRPolyfill !== 'undefined') {
-				console.log("Initializing WebXR polyfill");
-				const polyfill = new WebXRPolyfill();
-			} else {
-				console.warn("WebXR polyfill not loaded");
-			}
-		</script>
 
 		<script type="importmap">
 			{

@@ -24,12 +24,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         id: screens.length,
         isSelected: false,
         isInteractive: true,
-        originalScale: new THREE.Vector3(1, 1, 1), // Store original scale to prevent scaling issues
-        // Mark the top 2/3 of the screen as draggable (for use in touch detection)
-        draggableArea: {
-            top: screenHeight/2,
-            bottom: screenHeight/2 - (screenHeight * 2/3)
-        }
+        originalScale: new THREE.Vector3(1, 1, 1) // Store original scale to prevent scaling issues
     };
     
     // Add border for better visibility
@@ -68,11 +63,11 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     const bgPanel = new THREE.Mesh(bgGeometry, bgMaterial);
     browserWindow.add(bgPanel);
     
-    // Add thinner top bar - reduce height from 0.10 to 0.06
-    const topBarHeight = 0.06; // Reduced height for a slimmer look
+    // Add draggable top bar - spans the entire width of the screen
+    const topBarHeight = 0.10; // Increased height for easier grabbing in AR
     const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
     const topBarMaterial = new THREE.MeshBasicMaterial({
-        color: 0x2C3E50, // Darker color for better contrast
+        color: 0x333333, // Darker than the background
         transparent: true,
         opacity: 1.0,
         side: THREE.DoubleSide,
@@ -91,26 +86,22 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     // Add a grip pattern to indicate draggability
     const gripCanvas = document.createElement('canvas');
     gripCanvas.width = 512;
-    gripCanvas.height = 64; // Reduced height for thinner top bar
+    gripCanvas.height = 96; // Increased height
     const ctx = gripCanvas.getContext('2d');
     
     // Fill with gradient background for better visibility
-    const gradient = ctx.createLinearGradient(0, 0, 0, 64);
-    gradient.addColorStop(0, '#34495E'); // Top color - slightly lighter
-    gradient.addColorStop(1, '#2C3E50'); // Bottom color - darker
+    const gradient = ctx.createLinearGradient(0, 0, 0, 96);
+    gradient.addColorStop(0, '#555555');
+    gradient.addColorStop(1, '#333333');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 512, 64);
+    ctx.fillRect(0, 0, 512, 96);
     
-    // Add subtle line at the bottom for better definition
-    ctx.fillStyle = '#3498DB'; // Accent color for bottom line
-    ctx.fillRect(0, 62, 512, 2);
-    
-    // Draw grip pattern (smaller dots in a row)
-    ctx.fillStyle = '#ECF0F1'; // Light color for dots
-    for (let i = 0; i < 7; i++) {
-        const x = 256 + (i - 3) * 20; // Center aligned dots
+    // Draw grip pattern (larger dots)
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 9; i++) {
+        const x = 30 + i * 56; // Evenly spaced dots
         ctx.beginPath();
-        ctx.arc(x, 32, 2, 0, Math.PI * 2); // Smaller dots, centered vertically
+        ctx.arc(x, 48, 4, 0, Math.PI * 2); // Larger dots, centered vertically
         ctx.fill();
     }
     
@@ -120,10 +111,10 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px Arial'; // Smaller font for thinner bar
+    ctx.font = 'bold 28px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`Screen ${browserWindow.userData.id + 1}`, 256, 32);
+    ctx.fillText(`Screen ${browserWindow.userData.id + 1}`, 256, 48);
     
     const gripTexture = new THREE.CanvasTexture(gripCanvas);
     const gripGeometry = new THREE.PlaneGeometry(screenWidth * 0.95, topBarHeight * 0.9);
@@ -151,40 +142,6 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
     // Store reference to the drag handle on the screen object
     browserWindow.userData.dragHandle = topBar;
     
-    // Add visual indicator for draggable area (subtle gradient overlay)
-    const dragAreaGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight * 2/3);
-    const dragAreaCanvas = document.createElement('canvas');
-    dragAreaCanvas.width = 256;
-    dragAreaCanvas.height = 256;
-    const dragAreaCtx = dragAreaCanvas.getContext('2d');
-    
-    // Create subtle gradient
-    const dragAreaGradient = dragAreaCtx.createLinearGradient(0, 0, 0, 256);
-    dragAreaGradient.addColorStop(0, 'rgba(52, 152, 219, 0.05)'); // Blue with very low opacity at top
-    dragAreaGradient.addColorStop(1, 'rgba(52, 152, 219, 0)'); // Transparent at bottom
-    dragAreaCtx.fillStyle = dragAreaGradient;
-    dragAreaCtx.fillRect(0, 0, 256, 256);
-    
-    // Add texture to the drag area
-    const dragAreaTexture = new THREE.CanvasTexture(dragAreaCanvas);
-    const dragAreaMaterial = new THREE.MeshBasicMaterial({
-        map: dragAreaTexture,
-        transparent: true,
-        opacity: 0.5,
-        side: THREE.DoubleSide,
-        depthTest: false
-    });
-    
-    const dragAreaMesh = new THREE.Mesh(dragAreaGeometry, dragAreaMaterial);
-    dragAreaMesh.position.set(
-        0, 
-        screenHeight/2 - (screenHeight * 1/3), // Position for top 2/3 of screen
-        0.0005 // Just barely in front of background, behind content
-    );
-    dragAreaMesh.userData = { type: 'dragAreaIndicator' };
-    dragAreaMesh.renderOrder = 50; // Between background and content
-    browserWindow.add(dragAreaMesh);
-    
     // Add video controls at the bottom of the screen if video texture exists
     if (typeof videoTexture !== 'undefined' && videoTexture) {
         // Progress bar background - full width
@@ -202,42 +159,15 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
         // Progress bar (initially empty) - full width
         const progressGeometry = new THREE.PlaneGeometry(screenWidth * 0.96, 0.01);
         const progressMaterial = new THREE.MeshBasicMaterial({
-            color: 0xe74c3c, // Brighter red for better visibility
+            color: 0xff0000, // Red progress bar
             side: THREE.DoubleSide,
             depthTest: false
         });
         const progressBar = new THREE.Mesh(progressGeometry, progressMaterial);
-        // Position at the left center of the background initially (for 0% progress)
-        const halfWidth = screenWidth * 0.48;
-        progressBar.position.set(-halfWidth, -0.25, 0.006);
+        progressBar.position.set(-(screenWidth * 0.48), -0.25, 0.006); // Start at left edge
         progressBar.scale.set(0, 1, 1); // Initially 0 width
         progressBar.renderOrder = 91;
         browserWindow.add(progressBar);
-        
-        // Add time indicator text
-        const timeCanvas = document.createElement('canvas');
-        timeCanvas.width = 128;
-        timeCanvas.height = 32;
-        const timeCtx = timeCanvas.getContext('2d');
-        timeCtx.fillStyle = '#ffffff';
-        timeCtx.font = '14px Arial';
-        timeCtx.textAlign = 'center';
-        timeCtx.textBaseline = 'middle';
-        timeCtx.fillText('0:00 / 0:00', 64, 16);
-        
-        const timeTexture = new THREE.CanvasTexture(timeCanvas);
-        const timeGeometry = new THREE.PlaneGeometry(0.2, 0.04);
-        const timeMaterial = new THREE.MeshBasicMaterial({
-            map: timeTexture,
-            transparent: true,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        
-        const timeIndicator = new THREE.Mesh(timeGeometry, timeMaterial);
-        timeIndicator.position.set(0.3, -0.31, 0.006); // Position to the right of controls
-        timeIndicator.renderOrder = 91;
-        browserWindow.add(timeIndicator);
         
         // Position buttons below the progress bar
         // Add play/pause button
@@ -253,11 +183,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.2))
             isMuted: false,
             progressBar: progressBar,
             playButton: playButton,
-            volumeButton: volumeButton,
-            timeIndicator: timeIndicator,
-            timeTexture: timeTexture,
-            timeCanvas: timeCanvas,
-            timeContext: timeCtx
+            volumeButton: volumeButton
         };
     }
     
