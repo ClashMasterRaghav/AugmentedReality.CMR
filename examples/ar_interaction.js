@@ -632,14 +632,6 @@ function findScreenFromObject(object) {
     return null;
 }
 
-// Utility to find the screen object from a drag handle
-function findScreenFromDragHandle(handle) {
-    if (handle && handle.userData && handle.userData.screen) {
-        return handle.userData.screen;
-    }
-    return null;
-}
-
 // Handle touch move event
 export function onTouchMove(event) {
     // Prevent default behavior to avoid page scrolling
@@ -869,6 +861,16 @@ function createModeChangeIndicator(message) {
     requestAnimationFrame(fadeOut);
 }
 
+// Setup function to be called with imports
+export function setupVideoControls(mediaModule) {
+    if (mediaModule) {
+        // Store references to functions rather than redefining them
+        videoControlFunctions.togglePlayback = mediaModule.toggleVideoPlayback;
+        videoControlFunctions.toggleMute = mediaModule.toggleVideoMute;
+        console.log("Video controls setup complete");
+    }
+}
+
 // Helper function to find a screen from a drag handle
 function findScreenFromDragHandle(dragHandle) {
     // Direct reference in userData
@@ -905,14 +907,4 @@ function findScreenFromDragHandle(dragHandle) {
     
     console.warn("Could not find screen for drag handle:", dragHandle.uuid);
     return null;
-}
-
-// Setup function to be called with imports
-export function setupVideoControls(mediaModule) {
-    if (mediaModule) {
-        // Store references to functions rather than redefining them
-        videoControlFunctions.togglePlayback = mediaModule.toggleVideoPlayback;
-        videoControlFunctions.toggleMute = mediaModule.toggleVideoMute;
-        console.log("Video controls setup complete");
-    }
 } 
