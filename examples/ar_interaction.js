@@ -131,6 +131,7 @@ function onSelect(event) {
     if (screenIntersects.length > 0) {
         const screenObj = getScreenFromIntersect(screenIntersects[0].object);
         if (screenObj) {
+            // Select screen and update global selectedScreen
             selectScreen(screenObj);
             
             // If in move mode, start moving
@@ -642,7 +643,6 @@ function onTouchStart(event) {
         
         // Select this screen
         selectScreen(intersectedScreen);
-        selectedScreen = intersectedScreen;
         
         // Calculate offset - use a fixed offset for better positioning
         dragOffset.set(0, 0, 0);
@@ -670,7 +670,6 @@ function onTouchStart(event) {
         
         // Select the screen
         selectScreen(screen);
-        selectedScreen = screen;
         
         // Double tap to toggle resize
         if (doubleTapDetected) {
@@ -1128,15 +1127,22 @@ function deleteLastScreen() {
         return false;
     }
     
-    // Get the screen to delete - prioritize the selected (last interacted) screen
-    const screenToDelete = selectedScreen || screens[screens.length - 1];
-    
-    if (!screenToDelete) {
-        console.log("No screen selected for deletion");
-        return false;
+    // Verify we have a selected screen to delete
+    if (!selectedScreen) {
+        console.log("No screen selected for deletion, selecting most recent one");
+        // If there's no selected screen, select the last created one (as fallback)
+        if (screens.length > 0) {
+            selectedScreen = screens[screens.length - 1];
+            // Make sure it's visually marked as selected
+            selectScreen(selectedScreen);
+        } else {
+            return false;
+        }
     }
     
-    console.log("Deleting screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
+    // Log which screen is being deleted
+    const screenToDelete = selectedScreen;
+    console.log("Deleting selected screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
     
     // Create visual deletion effect
     createDeletionEffect(screenToDelete.position.clone());
@@ -1150,14 +1156,15 @@ function deleteLastScreen() {
         screens.splice(index, 1);
     }
     
-    // If the selected screen was deleted, reset selectedScreen
-    if (selectedScreen === screenToDelete) {
-        selectedScreen = screens.length > 0 ? screens[screens.length - 1] : null;
-        
-        // If we have a new selected screen, select it
-        if (selectedScreen) {
-            selectScreen(selectedScreen);
-        }
+    // After deleting the selected screen, select a new one if available
+    if (screens.length > 0) {
+        // Select the next available screen (last in array)
+        const newSelectedScreen = screens[screens.length - 1];
+        selectScreen(newSelectedScreen);
+        // Don't need to set selectedScreen as selectScreen does this
+    } else {
+        // No screens left
+        selectedScreen = null;
     }
     
     // Provide haptic feedback if available

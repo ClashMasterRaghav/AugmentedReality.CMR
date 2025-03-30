@@ -596,6 +596,9 @@ export function selectScreen(screen) {
     selectedScreen = screen; // Update the global selectedScreen variable
     screen.userData.isSelected = true;
     
+    // Log selection for debugging
+    console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
+    
     // Highlight border for selected screen
     const borderMesh = screen.children.find(child => 
         child.geometry && child.geometry.type === 'PlaneGeometry' && 
