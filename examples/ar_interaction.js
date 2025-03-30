@@ -987,82 +987,15 @@ function onTouchEnd(event) {
 
 // Handle progress bar touch for video seeking
 function handleProgressBarTouch(screen, point) {
-    if (!screen || !screen.userData || !screen.userData.controls) return false;
-    
-    // Find the progress bar background
-    const progressBar = screen.children.find(child => 
-        child.userData && 
-        child.userData.type === 'progressBar');
-    
-    if (!progressBar) return false;
-    
-    // Convert world point to local screen coordinates
-    let localPoint = point.clone();
-    if (screen.worldToLocal) {
-        localPoint = screen.worldToLocal(localPoint.clone());
-    }
-    
-    // Get screen height for position check
-    const screenHeight = 0.75; // Default height
-    
-    // Check if hit is within progress bar area (near bottom of screen)
-    if (Math.abs(localPoint.y - (-screenHeight / 2 + 0.025)) < 0.025) {
-        // Get progress bar width for calculation
-        const progressBarWidth = progressBar.geometry.parameters.width;
-        
-        // Calculate progress based on x position
-        // Clamp x position to progress bar bounds
-        const clampedX = Math.max(-progressBarWidth/2, Math.min(progressBarWidth/2, localPoint.x));
-        
-        // Convert to 0-1 range
-        const progress = (clampedX + progressBarWidth/2) / progressBarWidth;
-        
-        // Update video time
-        updateVideoTime(progress);
-        
-        // Update percentage text immediately for better feedback
-        if (screen.userData.controls.progressBar && 
-            screen.userData.controls.progressBar.userData && 
-            screen.userData.controls.progressBar.userData.percentText) {
-            
-            const percentData = screen.userData.controls.progressBar.userData.percentText;
-            const percentCtx = percentData.context;
-            
-            // Clear canvas
-            percentCtx.clearRect(0, 0, percentData.canvas.width, percentData.canvas.height);
-            
-            // Draw percentage text
-            percentCtx.fillStyle = '#ffffff';
-            percentCtx.font = '16px Arial';
-            percentCtx.textAlign = 'center';
-            percentCtx.textBaseline = 'middle';
-            percentCtx.fillText(`${Math.round(progress * 100)}%`, percentData.canvas.width / 2, percentData.canvas.height / 2);
-            
-            // Update texture
-            percentData.texture.needsUpdate = true;
-        }
-        
-        // Provide haptic feedback
-        if (navigator.vibrate) {
-            navigator.vibrate(15);
-        }
-        
-        return true;
-    }
-    
+    // Progress bar has been removed, so this function no longer needs to do anything
+    // Keeping the function to maintain code structure in case we need to reimplement
     return false;
 }
 
 // Update video time based on progress
 function updateVideoTime(progress) {
-    if (!videoElement) return;
-    
-    // Clamp progress to 0-1 range
-    progress = Math.max(0, Math.min(1, progress));
-    
-    // Set video time
-    const newTime = duration * progress;
-    videoElement.currentTime = newTime;
+    // Progress bar has been removed, so this function no longer needs to do anything
+    // Keeping the function to maintain code structure in case we need to reimplement
 }
 
 // Create a floating text indicator for mode changes

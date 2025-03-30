@@ -59,8 +59,7 @@ export function loadVideoTexture() {
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // Update progress bars on all screens
-            updateVideoProgress();
+            // No longer need to update progress bars since they've been removed
         });
         
         videoElement.addEventListener('error', (e) => {
@@ -84,83 +83,10 @@ export function loadVideoTexture() {
     }
 }
 
-// Update video progress on all screens
+// Update video progress on all screens - function simplified since progress bars are removed
 function updateVideoProgress() {
-    if (!videoElement || !screens) return;
-    
-    const progress = currentTime / duration;
-    
-    screens.forEach(screen => {
-        if (!screen.userData || !screen.userData.controls) return;
-        
-        // Find the progress indicator in the screen
-        const progressBar = screen.userData.controls.progressBar;
-        
-        if (progressBar) {
-            // Get parent progressBar background for measuring
-            const progressBarBg = progressBar.parent;
-            if (!progressBarBg) return;
-            
-            // Update progress bar width
-            const fullWidth = progressBarBg.geometry.parameters.width;
-            progressBar.scale.x = fullWidth * progress;
-            
-            // Update position to anchor from left edge (half the scaled width)
-            progressBar.position.x = -(fullWidth / 2) + (progressBar.scale.x / 2);
-            
-            // Update progress in userData
-            screen.userData.controls.progress = progress;
-            
-            // Add percentage text to the progress bar if not exists
-            if (!progressBar.userData.percentText) {
-                const percentCanvas = document.createElement('canvas');
-                percentCanvas.width = 64;
-                percentCanvas.height = 32;
-                const percentCtx = percentCanvas.getContext('2d');
-                
-                // Create a texture for percentage display
-                const percentTexture = new THREE.CanvasTexture(percentCanvas);
-                const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
-                const percentMaterial = new THREE.MeshBasicMaterial({
-                    map: percentTexture,
-                    transparent: true,
-                    depthTest: false
-                });
-                
-                const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
-                percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
-                percentMesh.renderOrder = 25; // Render on top
-                progressBarBg.add(percentMesh);
-                
-                // Store in userData for updates
-                progressBar.userData.percentText = {
-                    canvas: percentCanvas,
-                    context: percentCtx,
-                    mesh: percentMesh,
-                    texture: percentTexture
-                };
-            }
-            
-            // Update percentage text
-            if (progressBar.userData.percentText) {
-                const percentData = progressBar.userData.percentText;
-                const percentCtx = percentData.context;
-                
-                // Clear canvas
-                percentCtx.clearRect(0, 0, percentData.canvas.width, percentData.canvas.height);
-                
-                // Draw percentage text
-                percentCtx.fillStyle = '#ffffff';
-                percentCtx.font = '16px Arial';
-                percentCtx.textAlign = 'center';
-                percentCtx.textBaseline = 'middle';
-                percentCtx.fillText(`${Math.round(progress * 100)}%`, percentData.canvas.width / 2, percentData.canvas.height / 2);
-                
-                // Update texture
-                percentData.texture.needsUpdate = true;
-            }
-        }
-    });
+    // This function is now empty as progress bars have been removed
+    // Keeping the function to maintain code structure in case we need to reimplement
 }
 
 // Toggle video playback

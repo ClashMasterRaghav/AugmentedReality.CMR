@@ -173,78 +173,8 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     background.renderOrder = 1;
     screen.add(background);
     
-    // Add progress bar if we have video content
+    // Add video control buttons with refined positioning (without progress bar)
     if (content && content.isVideoTexture) {
-        // Progress bar background - full width, fits within screen bounds
-        const progressBarHeight = 0.015; // Thinner progress bar
-        const progressBarGeometry = new THREE.PlaneGeometry(screenWidth - 0.02, progressBarHeight);
-        const progressBarMaterial = new THREE.MeshBasicMaterial({
-            color: 0x333333,
-            transparent: true,
-            opacity: 0.7,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        const progressBar = new THREE.Mesh(progressBarGeometry, progressBarMaterial);
-        progressBar.position.set(0, -screenHeight / 2 + 0.025, 0.011);
-        progressBar.renderOrder = 15;
-        progressBar.userData = {
-            type: 'progressBar',
-            screen: screen
-        };
-        screen.add(progressBar);
-        
-        // Progress indicator - starts with zero width
-        const progressIndicatorGeometry = new THREE.PlaneGeometry(progressBarGeometry.parameters.width, progressBarHeight - 0.002);
-        const progressIndicatorMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4285f4, // Google blue for a modern look
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        const progressIndicator = new THREE.Mesh(progressIndicatorGeometry, progressIndicatorMaterial);
-        progressIndicator.position.set(-(progressBarGeometry.parameters.width / 2), 0, 0.001);
-        progressIndicator.scale.set(0, 1, 1); // Start with zero width
-        progressIndicator.userData = {
-            type: 'progressIndicator'
-        };
-        progressBar.add(progressIndicator);
-        
-        // Add percentage text display
-        const percentCanvas = document.createElement('canvas');
-        percentCanvas.width = 64;
-        percentCanvas.height = 32;
-        const percentCtx = percentCanvas.getContext('2d');
-        
-        // Draw initial "0%" text
-        percentCtx.fillStyle = '#ffffff';
-        percentCtx.font = '16px Arial';
-        percentCtx.textAlign = 'center';
-        percentCtx.textBaseline = 'middle';
-        percentCtx.fillText('0%', percentCanvas.width / 2, percentCanvas.height / 2);
-        
-        // Create percentage display
-        const percentTexture = new THREE.CanvasTexture(percentCanvas);
-        const percentGeometry = new THREE.PlaneGeometry(0.1, 0.02);
-        const percentMaterial = new THREE.MeshBasicMaterial({
-            map: percentTexture,
-            transparent: true,
-            depthTest: false
-        });
-        
-        const percentMesh = new THREE.Mesh(percentGeometry, percentMaterial);
-        percentMesh.position.set(0, 0.02, 0.001); // Position above progress bar
-        percentMesh.renderOrder = 25; // Render on top
-        progressBar.add(percentMesh);
-        
-        // Store reference in userData for updates
-        progressIndicator.userData.percentText = {
-            canvas: percentCanvas,
-            context: percentCtx,
-            mesh: percentMesh,
-            texture: percentTexture
-        };
-        
-        // Add control buttons with refined positioning
         const playButton = addControlButton(screen, 'play', -0.12, -screenHeight / 2 + 0.025, 0.03);
         playButton.userData.videoControl = true;
         playButton.userData.videoAction = 'togglePlayback';
@@ -255,10 +185,8 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         
         // Store controls in userData
         screen.userData.controls = {
-            progress: 0,
             isPlaying: true,
             isMuted: false,
-            progressBar: progressIndicator,
             playButton: playButton,
             volumeButton: volumeButton
         };
@@ -278,7 +206,7 @@ function addControlButton(screen, type, x, y, size) {
         transparent: true,
         opacity: 0.9,
         side: THREE.DoubleSide,
-        depthTest: false // Disable depth testing for buttons
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
     const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
     button.position.set(x, y, 0.010); // Increased z-position to be in front of everything
@@ -297,7 +225,7 @@ function addControlButton(screen, type, x, y, size) {
         map: iconTexture,
         transparent: true,
         side: THREE.DoubleSide,
-        depthTest: false // Disable depth testing for icons
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
     const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
     iconMesh.position.z = 0.001; // Slightly in front of button
@@ -311,7 +239,7 @@ function addControlButton(screen, type, x, y, size) {
         transparent: true,
         opacity: 0.2,
         side: THREE.DoubleSide,
-        depthTest: false
+        depthTest: true // Enable depth testing to prevent seeing through screens
     });
     const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
     highlightMesh.position.z = -0.001; // Slightly behind the button
