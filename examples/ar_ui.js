@@ -272,7 +272,7 @@ export function createControlPanel() {
     const dragIndicatorGeometry = new THREE.PlaneGeometry(panelSize.width, dragAreaHeight);
     const dragIndicatorMaterial = new THREE.MeshBasicMaterial({
         color: 0x203055, // Darker blue for drag area
-        transparent: true,
+        transparent: false,
         opacity: 0.5,
         side: THREE.DoubleSide
     });
@@ -286,12 +286,12 @@ export function createControlPanel() {
     
     // Define button parameters - SMALLER buttons positioned lower and more compact
     const buttonSize = 0.055; // Even smaller buttons
-    const buttonSpacing = 0.15; // Less space between buttons, moved closer together
+    const buttonSpacing = 0.14; // Less space between buttons, moved closer together
     
     // Create buttons - Add Screen and Delete Screen - MOVED MUCH LOWER for larger drag area
     const buttonPositions = [
-        { x: -buttonSpacing/2, y: -0.05 },  // Left - Add Screen - MOVED FURTHER DOWN
-        { x: buttonSpacing/2, y: -0.05 }   // Right - Delete Screen - MOVED FURTHER DOWN
+        { x: -buttonSpacing/2, y: -0.15 },  // Left - Add Screen - MOVED FURTHER DOWN
+        { x: buttonSpacing/2, y: -0.15 }   // Right - Delete Screen - MOVED FURTHER DOWN
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];
@@ -411,7 +411,7 @@ export function createControlPanel() {
     });
     
     // Position control panel - start at a fixed position in front of the user
-    controlPanel.position.set(0, 0, -1.5);
+    controlPanel.position.set(0, 0, -0.5);
     
     // Add this property so we can detect panel in interaction code
     controlPanel.userData = {
