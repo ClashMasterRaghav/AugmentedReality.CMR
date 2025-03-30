@@ -132,9 +132,6 @@ function initAREnvironment() {
     // Start animation loop
     renderer.setAnimationLoop(animate);
     
-    // Add a notification to let the user know the app is ready
-    createNotification('AR Experience Ready', 'success');
-    
     // Create initial screen
     createStartScreen();
 }

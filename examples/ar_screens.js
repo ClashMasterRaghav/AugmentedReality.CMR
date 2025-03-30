@@ -593,6 +593,7 @@ export function selectScreen(screen) {
     }
     
     // Select new screen
+    selectedScreen = screen; // Update the global selectedScreen variable
     screen.userData.isSelected = true;
     
     // Highlight border for selected screen

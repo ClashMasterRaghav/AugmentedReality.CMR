@@ -1128,7 +1128,7 @@ function deleteLastScreen() {
         return false;
     }
     
-    // Get the screen to delete (either the selected one or the last one in the array)
+    // Get the screen to delete - prioritize the selected (last interacted) screen
     const screenToDelete = selectedScreen || screens[screens.length - 1];
     
     if (!screenToDelete) {
@@ -1165,7 +1165,9 @@ function deleteLastScreen() {
         navigator.vibrate([30, 20, 40]); // Pattern for "delete" feel
     }
     
-    createModeChangeIndicator('Screen Deleted');
+    const screenId = screenToDelete.userData && screenToDelete.userData.id !== undefined ? 
+        screenToDelete.userData.id : 'unknown';
+    createModeChangeIndicator(`Screen ${screenId} Deleted`);
     return true;
 }
 
