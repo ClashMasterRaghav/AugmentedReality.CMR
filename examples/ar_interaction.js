@@ -24,17 +24,16 @@ let initialPinchDistance = 0;
 let initialScale = new THREE.Vector3(1, 1, 1);
 let isPinching = false;
 
+// Panel dragging variables
+let isPanelBeingDragged = false;
+let panelDragOffset = new THREE.Vector3();
+let initialPanelPosition = new THREE.Vector3();
+let initialPanelQuaternion = new THREE.Quaternion();
+
 // Variables for drag handle functionality
 let isDraggingHandle = false;
 let draggedScreen = null;
 let dragOffset = new THREE.Vector3();
-
-// Panel drag variables
-let isDraggingPanel = false;
-let draggedPanel = null;
-let panelDragOffset = new THREE.Vector3();
-let lastRayDirection = new THREE.Vector3();
-let lastRayOrigin = new THREE.Vector3();
 
 // Import necessary video functions
 let videoControlFunctions = {
@@ -62,45 +61,7 @@ function onSelectStart(event) {
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
-    // Save ray origin and direction for dragging calculations
-    lastRayOrigin.copy(raycaster.ray.origin);
-    lastRayDirection.copy(raycaster.ray.direction);
-    
-    // Check for panel drag handle intersections
-    const panelHandles = getPanelDragHandles();
-    const handleIntersects = raycaster.intersectObjects(panelHandles, true);
-    
-    if (handleIntersects.length > 0) {
-        const handle = handleIntersects[0].object;
-        const panel = handle.userData.panel;
-        
-        if (panel) {
-            console.log("Starting panel drag");
-            
-            // Set the dragging state
-            isDraggingPanel = true;
-            draggedPanel = panel;
-            draggedPanel.userData.isBeingDragged = true;
-            
-            // Store the panel's current position
-            draggedPanel.userData.originalDragPosition = draggedPanel.position.clone();
-            
-            // Calculate the drag offset - where on the panel we grabbed
-            panelDragOffset.copy(handleIntersects[0].point).sub(draggedPanel.position);
-            
-            // Visual feedback - highlight the drag handle
-            handle.material.opacity = 0.2;
-            
-            // Haptic feedback
-            if (navigator.vibrate) {
-                navigator.vibrate(30);
-            }
-            
-            return;
-        }
-    }
-    
-    // Check for button intersections (if not dragging panel)
+    // Check for button intersections
     const buttons = findAllButtons();
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
@@ -179,29 +140,6 @@ function getButtonFromIntersect(object) {
 
 // Handle controller selection end
 function onSelectEnd(event) {
-    // Reset panel dragging
-    if (isDraggingPanel && draggedPanel) {
-        console.log("Ending panel drag");
-        
-        // Reset opacity of drag handle
-        const handle = draggedPanel.children.find(child => 
-            child.userData && child.userData.type === 'dragHandle');
-        
-        if (handle) {
-            handle.material.opacity = 0.01;
-        }
-        
-        // Save the current position as the new default position
-        draggedPanel.userData.originalPosition = draggedPanel.position.clone();
-        
-        // Reset dragging state
-        draggedPanel.userData.isBeingDragged = false;
-        isDraggingPanel = false;
-        draggedPanel = null;
-        
-        return;
-    }
-    
     if (isPlacingScreen && newScreen) {
         // Finalize the placement of the new screen
         isPlacingScreen = false;
@@ -213,27 +151,13 @@ function onSelectEnd(event) {
 
 // Handle controller selection
 function onSelect(event) {
-    // If we're currently dragging the panel, don't process other selections
-    if (isDraggingPanel) {
-        return;
-    }
-    
     // Raycast to detect interactive elements
     const tempMatrix = new THREE.Matrix4();
     tempMatrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
     
-    // First, check for panel drag handle interactions
-    const panelHandles = getPanelDragHandles();
-    const handleIntersects = raycaster.intersectObjects(panelHandles, true);
-    
-    if (handleIntersects.length > 0) {
-        // Don't process further interactions if we're clicking on the panel drag area
-        return;
-    }
-    
-    // Next, check for button interactions
+    // First, check for button interactions
     const buttons = findAllButtons();
     console.log(`Checking for interactions with ${buttons.length} buttons`);
     
@@ -340,125 +264,122 @@ function getScreenFromIntersect(object) {
     return null;
 }
 
-// Handle button actions
+// Handle different button actions
 function handleButtonAction(button) {
-    if (!button || !button.userData) return;
+    if (!button || !button.userData) {
+        console.log("Invalid button object");
+        return;
+    }
     
-    console.log("Button action triggered:", button.userData.action);
+    console.log("Handling button action:", button.userData.action);
     
+    // Extract the button action
     const action = button.userData.action;
-    let screen = null;
     
-    // Find associated screen
-    if (button.userData.screen) {
-        screen = button.userData.screen;
-    } else if (selectedScreen) {
-        screen = selectedScreen;
+    // Provide haptic feedback for button press
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
     }
     
-    // Play/pause button
-    if (action === 'playButton' && screen) {
-        // Check if video control function exists
-        if (videoControlFunctions.togglePlayback) {
-            // Toggle playback
-            videoControlFunctions.togglePlayback();
-            console.log("Toggle video playback");
+    // Handle different button actions
+    switch (action) {
+        case 'newScreen':
+            console.log("New screen button pressed");
+            // Create a new screen positioned in front of the camera
+            createNewScreenInFrontOfCamera();
+            break;
             
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
-            }
+        case 'deleteScreen':
+            console.log("Delete screen button pressed - calling deleteLastScreen()");
+            // Delete the last interacted screen
+            deleteLastScreen();
             
-            // Haptic feedback if available
+            // Add haptic feedback for destructive action
             if (navigator.vibrate) {
-                navigator.vibrate(20);
-            }
-        } else {
-            console.error("Video playback function not found");
-        }
-    }
-    // Volume/mute button
-    else if (action === 'volumeButton' && screen) {
-        // Check if mute function exists
-        if (videoControlFunctions.toggleMute) {
-            // Toggle mute
-            videoControlFunctions.toggleMute();
-            console.log("Toggle video mute");
-            
-            // Visual feedback
-            const iconMesh = button.children[0];
-            if (iconMesh) {
-                // Apply a quick scale animation
-                iconMesh.scale.set(1.2, 1.2, 1.2);
-                setTimeout(() => {
-                    iconMesh.scale.set(1, 1, 1);
-                }, 150);
+                navigator.vibrate([30, 20, 80]);
             }
             
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(20);
+            // Create visual indicator
+            createModeChangeIndicator('Screen Deleted');
+            break;
+            
+        case 'moveMode':
+            console.log("Move mode button pressed");
+            // Toggle move mode
+            isMoveModeActive = !isMoveModeActive;
+            isRotateModeActive = false; // Disable rotate mode
+            
+            // Update button state
+            button.material.color.set(isMoveModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
+            break;
+            
+        case 'rotateMode':
+            console.log("Rotate mode button pressed");
+            // Toggle rotate mode
+            isRotateModeActive = !isRotateModeActive;
+            isMoveModeActive = false; // Disable move mode
+            
+            // Update button state
+            button.material.color.set(isRotateModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
+            break;
+            
+        case 'play':
+        case 'pause':
+            console.log("Play/pause button pressed");
+            // Toggle video playback
+            if (videoControlFunctions.togglePlayback) {
+                videoControlFunctions.togglePlayback();
             }
-        } else {
-            console.error("Video mute function not found");
-        }
-    }
-    
-    // Original functionality for other buttons
-    else if (action === 'createScreen') {
-        createNewScreen();
-    } else if (action === 'moveScreen') {
-        toggleMoveMode(button);
-    } else if (action === 'rotateScreen') {
-        toggleRotateMode(button);
-    } else if (action === 'newScreen') {
-        createNewScreen();
-    } else if (action === 'deleteScreen') {
-        console.log("Delete screen button pressed - calling deleteLastScreen()");
-        // Delete the last interacted screen
-        deleteLastScreen();
-        
-        // Visual feedback
-        const iconMesh = button.children[0];
-        if (iconMesh) {
-            // Apply a quick scale animation
-            iconMesh.scale.set(1.2, 1.2, 1.2);
-            setTimeout(() => {
-                iconMesh.scale.set(1, 1, 1);
-            }, 150);
-        }
-        
-        // Additional haptic feedback
-        if (navigator.vibrate) {
-            navigator.vibrate([30, 20, 30]);
-        }
-    } else {
-        console.log("Unknown button action:", action);
+            break;
+            
+        case 'mute':
+        case 'unmute':
+            console.log("Mute/unmute button pressed");
+            // Toggle video mute
+            if (videoControlFunctions.toggleMute) {
+                videoControlFunctions.toggleMute();
+            }
+            break;
+            
+        default:
+            console.log("Unknown button action:", action);
+            break;
     }
 }
 
-// Create a new screen
-function createNewScreen() {
-    // Create a new screen in front of the user's view
-    const matrix = new THREE.Matrix4();
-    matrix.makeRotationFromQuaternion(camera.quaternion);
+// Create a new screen in front of camera - helper for button action
+function createNewScreenInFrontOfCamera() {
+    // Get camera position and direction
+    const cameraPosition = new THREE.Vector3();
+    camera.getWorldPosition(cameraPosition);
     
-    // Use -1.5 to match the default screen distance (instead of -1.0)
-    const position = new THREE.Vector3(0, 0, -1.5);
-    position.applyMatrix4(matrix);
-    position.add(camera.position);
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(camera.quaternion);
     
-    // Create the new screen
-    const newScreen = createNewBrowserScreen(position);
-    console.log("New screen created!");
+    // Position screen in front of camera
+    const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1));
     
-    // Make it face the user
+    // Create new screen at this position
+    const newScreen = createNewBrowserScreen(screenPosition);
+    
+    // Make it face the camera
     newScreen.lookAt(camera.position);
+    
+    // Add visual feedback
+    createModeChangeIndicator('New Screen Created');
+    
+    // Select this screen
+    selectScreen(newScreen);
+    
+    console.log("Created new screen in front of camera");
+    
+    return newScreen;
 }
 
 // Toggle move mode
@@ -686,42 +607,206 @@ function onTouchStart(event) {
     // Update raycaster
     raycaster.setFromCamera(initialTouchPosition, camera);
     
-    // PRIORITY 0: Check for panel drag handle interactions
-    const panelHandles = getPanelDragHandles();
-    const handleIntersects = raycaster.intersectObjects(panelHandles, true);
+    // Double tap detection
+    const now = performance.now();
+    const doubleTapDetected = (now - lastTapTime) < 300;
+    lastTapTime = now;
     
-    if (handleIntersects.length > 0) {
-        const handle = handleIntersects[0].object;
-        const panel = handle.userData.panel;
+    // PRIORITY 0: Check for control panel dragging
+    if (controlPanel) {
+        const panelIntersects = raycaster.intersectObject(controlPanel, true);
         
-        if (panel) {
-            console.log("Starting panel drag via touch");
+        if (panelIntersects.length > 0) {
+            // Check if we hit the top drag area (y > 0.04 in panel local space)
+            const hitPoint = panelIntersects[0].point.clone();
+            const localPoint = controlPanel.worldToLocal(hitPoint.clone());
             
-            // Set the dragging state
-            isDraggingPanel = true;
-            draggedPanel = panel;
-            draggedPanel.userData.isBeingDragged = true;
+            // Check if we're in the top portion of the panel (the drag handle area)
+            if (localPoint.y > 0.04) {
+                console.log("Starting control panel drag");
+                
+                // Store initial panel position and rotation
+                initialPanelPosition.copy(controlPanel.position);
+                initialPanelQuaternion.copy(controlPanel.quaternion);
+                
+                // Calculate offset for more natural dragging
+                panelDragOffset.copy(hitPoint).sub(controlPanel.position);
+                
+                // Set flag to indicate panel is being dragged
+                isPanelBeingDragged = true;
+                controlPanel.userData.isDragging = true;
+                
+                // Add visual feedback
+                createModeChangeIndicator('Panel Unlocked - Drag to Reposition');
+                
+                // Provide haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(30);
+                }
+                
+                return;
+            }
+        }
+    }
+    
+    // Identify all screens close to our touch ray
+    const screenIntersections = [];
+    
+    // Cast ray against all screens to find potential candidates
+    screens.forEach(screen => {
+        // Use a more generous ray for each screen
+        const intersects = raycaster.intersectObject(screen, true);
+        if (intersects.length > 0) {
+            // Store information about the hit including distance
+            screenIntersections.push({
+                screen: screen,
+                distance: intersects[0].distance,
+                object: intersects[0].object,
+                point: intersects[0].point // Store intersection point
+            });
+        }
+    });
+    
+    // Sort by distance so we prioritize closer screens
+    screenIntersections.sort((a, b) => a.distance - b.distance);
+    
+    // PRIORITY 1: Check for button interactions
+    const buttons = findAllButtons();
+    console.log("Checking", buttons.length, "buttons for intersection");
+    const buttonIntersects = raycaster.intersectObjects(buttons, true);
+    
+    if (buttonIntersects.length > 0) {
+        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
+        if (buttonObj) {
+            console.log("Button touched:", buttonObj.userData.action);
             
-            // Store the panel's current position
-            draggedPanel.userData.originalDragPosition = draggedPanel.position.clone();
+            // Visual feedback
+            const originalColor = buttonObj.material.color.clone();
+            buttonObj.material.color.set(0x4FC3F7);
             
-            // Calculate the drag offset - where on the panel we grabbed
-            panelDragOffset.copy(handleIntersects[0].point).sub(draggedPanel.position);
+            // Scale up and back for button press effect
+            const originalScale = buttonObj.scale.clone();
+            buttonObj.scale.multiplyScalar(1.2);
             
-            // Visual feedback - highlight the drag handle
-            handle.material.opacity = 0.2;
+            setTimeout(() => {
+                buttonObj.material.color.copy(originalColor);
+                buttonObj.scale.copy(originalScale);
+            }, 200);
             
-            // Haptic feedback
+            // Provide haptic feedback if available
             if (navigator.vibrate) {
-                navigator.vibrate(30);
+                navigator.vibrate(40);
             }
             
+            // Handle the button action
+            handleButtonAction(buttonObj);
             return;
         }
     }
     
-    // Continue with the rest of the touch handling...
-    // [rest of the existing onTouchStart function]
+    // PRIORITY 2: Check closest screen for progress bar interaction
+    if (screenIntersections.length > 0) {
+        const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
+        
+        // Check if we hit the progress bar
+        if (handleProgressBarTouch(screen, closestHit.point)) {
+            console.log("Progress bar touched on screen:", screen.userData.id);
+            return;
+        }
+    }
+    
+    // PRIORITY 3: Check for draggable areas on screens
+    let draggableAreaHit = false;
+    let intersectedScreen = null;
+    
+    // Check for draggable area hits on the closest screens first
+    for (const hit of screenIntersections) {
+        const screen = hit.screen;
+        // Get position relative to the screen
+        let localPoint = hit.point.clone();
+        if (screen.worldToLocal) {
+            localPoint = screen.worldToLocal(localPoint.clone());
+        }
+        
+        // Screen dimensions
+        const screenHeight = 0.75; // Standard screen height
+        
+        // Check if we're in the top 2/3 of the screen
+        // The top of the screen is at y = screenHeight/2
+        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
+        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+            // We hit the draggable area
+            intersectedScreen = screen;
+            draggableAreaHit = true;
+            break;
+        }
+    }
+    
+    // If we found a draggable area, set up for dragging
+    if (draggableAreaHit && intersectedScreen) {
+        console.log("Starting drag on screen:", intersectedScreen.userData.id, "via draggable area");
+        
+        // Set up drag state
+        isDraggingHandle = true;
+        draggedScreen = intersectedScreen;
+        
+        // Preserve original scale
+        if (!intersectedScreen.userData.originalScale) {
+            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
+        } else {
+            // Restore original scale when starting drag
+            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
+        }
+        
+        // Select this screen
+        selectScreen(intersectedScreen);
+        
+        // Calculate offset - use a fixed offset for better positioning
+        dragOffset.set(0, 0, 0);
+        
+        // Visual feedback - highlight the top bar if available
+        if (intersectedScreen.userData.dragHandle) {
+            intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
+        }
+        
+        // Strong haptic feedback to confirm grab
+        if (navigator.vibrate) {
+            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
+        }
+        
+        createModeChangeIndicator('Dragging Screen');
+        return;
+    }
+    
+    // PRIORITY 4: Regular screen selection - use the closest screen from our sorted list
+    if (screenIntersections.length > 0) {
+        const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
+        
+        console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
+        
+        // Select the screen
+        selectScreen(screen);
+        
+        // Double tap to toggle resize
+        if (doubleTapDetected) {
+            console.log("Double tap detected, toggling resize");
+            toggleResize(screen);
+            
+            // Provide haptic feedback
+            if (navigator.vibrate) {
+                navigator.vibrate([30, 20, 30]);
+            }
+            
+            createModeChangeIndicator('Size Changed');
+            return;
+        }
+        
+        // Flash highlight around selected screen
+        flashScreenHighlight(screen);
+        createModeChangeIndicator('Screen Selected');
+    }
 }
 
 // Flash a highlight effect around a selected screen
@@ -789,7 +874,7 @@ function flashScreenHighlight(screen) {
     requestAnimationFrame(fadeIn);
 }
 
-// Touch move handler - update to support panel dragging
+// Touch move handler - make the movement more responsive and direct
 function onTouchMove(event) {
     // Always prevent default to avoid browser gestures
     event.preventDefault();
@@ -805,32 +890,90 @@ function onTouchMove(event) {
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Handle panel dragging
-    if (isDraggingPanel && draggedPanel) {
+    // Handle control panel dragging
+    if (isPanelBeingDragged && controlPanel) {
+        // Update raycaster with current touch position
         raycaster.setFromCamera(currentTouchPosition, camera);
         
-        // Get ray direction and position
-        const rayOrigin = raycaster.ray.origin.clone();
-        const rayDirection = raycaster.ray.direction.clone();
+        // Get camera direction and up vectors
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        forward.y = 0; // Keep panel at a constant height
+        forward.normalize();
         
-        // Calculate drag position at a fixed distance
-        const rayLength = 0.8; // Fixed distance for dragging
-        const dragPoint = rayOrigin.clone().add(rayDirection.multiplyScalar(rayLength));
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0);
         
-        // Update panel position, with smooth transition
-        draggedPanel.position.lerp(dragPoint, 0.5);
+        // Create a plane perpendicular to the camera's view direction
+        const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+            forward, 
+            initialPanelPosition.clone()
+        );
         
-        // Keep panel facing the user
-        draggedPanel.lookAt(camera.position);
+        // Raycast to the drag plane
+        const intersection = new THREE.Vector3();
+        raycaster.ray.intersectPlane(dragPlane, intersection);
+        
+        // Calculate new position, accounting for the original offset
+        const newPosition = intersection.clone().sub(panelDragOffset);
+        
+        // Keep the y position within reasonable bounds
+        newPosition.y = THREE.MathUtils.clamp(newPosition.y, -0.5, 0.5);
+        
+        // Smoothly move panel to new position
+        controlPanel.position.lerp(newPosition, 0.7);
+        
+        // Make panel always face the camera (only horizontally)
+        controlPanel.lookAt(camera.position);
         
         return;
     }
     
-    // Handle screen dragging
+    // Handle dragging via the drag handle - even more direct approach
     if (isDraggingHandle && draggedScreen) {
-        // Continue with existing screen dragging logic
-        // [existing dragging code]
+        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
+        
+        try {
+            // Preserve original scale
+            if (draggedScreen.userData && draggedScreen.userData.originalScale) {
+                // Ensure scale doesn't change during movement
+                draggedScreen.scale.copy(draggedScreen.userData.originalScale);
+            }
+            
+            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
+            // Calculate movement delta from touch
+            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+            
+            // Get camera's right and up vectors for moving in screen space
+            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+            
+            // Scale for more noticeable movement in AR - INCREASED for faster movement
+            const moveScale = 0.75; // Significantly increased for better AR response
+            
+            // Create movement vector
+            const movement = new THREE.Vector3()
+                .addScaledVector(cameraRight, deltaX * moveScale)
+                .addScaledVector(cameraUp, deltaY * moveScale);
+            
+            // Apply movement directly
+            draggedScreen.position.add(movement);
+            
+            // Make screen face the camera
+            draggedScreen.lookAt(camera.position);
+            
+            // Optional visual feedback
+            createMoveIndicator(draggedScreen.position.clone(), 0.03);
+            
+        } catch (error) {
+            console.error("Error in drag movement:", error);
+        }
+        
+        return;
     }
+    
+    // We're not handling other forms of movement to simplify the interaction model
+    // This keeps the drag handle as the primary way to move screens, which improves reliability
 }
 
 // Move screen based on touch movement
@@ -940,33 +1083,35 @@ function rotateScreenWithTouch() {
     selectedScreen.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, selectedScreen.rotation.x));
 }
 
-// Touch end handler - update to support panel dragging
+// Touch end handler
 function onTouchEnd(event) {
-    // Handle panel dragging end
-    if (isDraggingPanel && draggedPanel) {
-        console.log("Ending panel drag via touch");
+    // Handle end of control panel dragging
+    if (isPanelBeingDragged && controlPanel) {
+        console.log("Finished dragging control panel");
         
-        // Reset opacity of drag handle
-        const handle = draggedPanel.children.find(child => 
-            child.userData && child.userData.type === 'dragHandle');
+        // Save the current position
+        controlPanel.userData.isDragging = false;
+        isPanelBeingDragged = false;
         
-        if (handle) {
-            handle.material.opacity = 0.01;
-        }
+        // Create visual feedback
+        createModeChangeIndicator('Panel Position Locked');
         
-        // Save the current position as the new default position
-        draggedPanel.userData.originalPosition = draggedPanel.position.clone();
-        
-        // Reset dragging state
-        draggedPanel.userData.isBeingDragged = false;
-        isDraggingPanel = false;
-        draggedPanel = null;
-        
-        // Provide haptic feedback for completing the drag
+        // Provide haptic feedback
         if (navigator.vibrate) {
             navigator.vibrate(20);
         }
         
+        // Slight bounce animation
+        const finalPosition = controlPanel.position.clone();
+        
+        const bounceAnimation = () => {
+            controlPanel.position.y += 0.01;
+            setTimeout(() => {
+                controlPanel.position.lerp(finalPosition, 0.3);
+            }, 80);
+        };
+        
+        bounceAnimation();
         return;
     }
     
@@ -1304,41 +1449,9 @@ function createDeletionEffect(position) {
     requestAnimationFrame(animateParticles);
 }
 
-// Get all panel drag handles in the scene
-function getPanelDragHandles() {
-    const handles = [];
-    
-    // Find control panel drag handles
-    scene.traverse(object => {
-        if (object.userData && object.userData.type === 'dragHandle' && object.userData.isDraggable) {
-            handles.push(object);
-        }
-    });
-    
-    return handles;
-}
-
-// Update in render loop - add this to the end of your existing render function in ar_core.js
-export function updatePanelDragging() {
-    if (isDraggingPanel && draggedPanel) {
-        // Get controller position and direction
-        const tempMatrix = new THREE.Matrix4();
-        tempMatrix.identity().extractRotation(controller.matrixWorld);
-        const position = new THREE.Vector3();
-        position.setFromMatrixPosition(controller.matrixWorld);
-        const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
-        
-        // Calculate drag position
-        const rayLength = 0.8; // Fixed distance for dragging
-        const dragPoint = position.clone().addScaledVector(direction, rayLength);
-        
-        // Update panel position, accounting for the initial grab offset
-        const targetPosition = dragPoint.clone().sub(panelDragOffset);
-        
-        // Smoothly move to target position
-        draggedPanel.position.lerp(targetPosition, 0.3);
-        
-        // Keep panel facing the user
-        draggedPanel.lookAt(camera.position);
-    }
+// Show onboarding instruction about draggable panel
+export function showControlPanelInstructions() {
+    setTimeout(() => {
+        createModeChangeIndicator('Drag the blue panel to reposition controls');
+    }, 3000); // Show after a delay to let the user get oriented
 } 

@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createVirtualKeyboard } from './ar_ui.js';
+import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
-import { setupEventListeners, setupVideoControls, updatePanelDragging } from './ar_interaction.js';
+import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
 
@@ -24,6 +24,8 @@ export let selectedScreen = null;
 export let selectedKey = null;
 export let container;
 export let isARMode = false;
+export let lastCameraPosition = new THREE.Vector3();
+export let lastCameraRotation = new THREE.Euler();
 
 // Function to safely update the selected screen reference globally
 export function setSelectedScreen(screen) {
@@ -72,6 +74,13 @@ function initAREnvironment() {
     });
     
     document.body.appendChild(arButton);
+    
+    // Add event listener for session start
+    renderer.xr.addEventListener('sessionstart', function() {
+        console.log("AR session started - showing panel instructions");
+        // Show instructions for draggable panel after a short delay
+        showControlPanelInstructions();
+    });
     
     // Add event listener for session end
     renderer.xr.addEventListener('sessionend', function() {
@@ -238,12 +247,32 @@ export function render() {
             
             // Set position with slight lag for smoother movement
             const targetPosition = position.clone().addScaledVector(direction, 0.8);
-            selectedScreen.position.lerp(targetPosition, 0.95); // Increased lerp speed for more responsive movement
+            selectedScreen.position.lerp(targetPosition, 0.85);
         }
     }
     
-    // Update panel dragging if needed
-    updatePanelDragging();
+    // Check if camera has moved significantly and update control panel
+    const currentCameraPosition = camera.position.clone();
+    const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
+    
+    // Calculate movement thresholds
+    const positionThreshold = 0.5; // Units of movement
+    const rotationThreshold = 0.3; // Radians (about 17 degrees)
+    
+    // Check for significant camera movement
+    const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
+    const hasRotated = 
+        Math.abs(currentCameraRotation.x - lastCameraRotation.x) > rotationThreshold ||
+        Math.abs(currentCameraRotation.y - lastCameraRotation.y) > rotationThreshold;
+    
+    // If camera has moved significantly, update the control panel position
+    if (hasMoved || hasRotated) {
+        setupControlPanel();
+        
+        // Update last known position and rotation
+        lastCameraPosition.copy(currentCameraPosition);
+        lastCameraRotation.copy(currentCameraRotation);
+    }
     
     // Update screen visual effects
     updateScreenEffects();
@@ -255,4 +284,7 @@ export function render() {
 // Create a welcome screen at the start
 function createStartScreen() {
     const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    
+    // Set up control panel initial position
+    setTimeout(setupControlPanel, 500);
 }
