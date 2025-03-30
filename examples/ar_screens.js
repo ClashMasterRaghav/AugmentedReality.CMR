@@ -180,6 +180,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         const volumeButton = addControlButton(screen, 'muted', screenWidth/2 - 0.05, -screenHeight/2 + 0.05, 0.03);
         volumeButton.userData.videoControl = true;
         volumeButton.userData.videoAction = 'toggleMute';
+        volumeButton.userData.action = 'volumeButton'; // Set the action name to what ar_media.js expects
         
         // Store controls in userData
         screen.userData.controls = {
@@ -263,6 +264,16 @@ function createControlIcon(type) {
     
     switch(type) {
         case 'play':
+            // Draw play icon (triangle)
+            ctx.beginPath();
+            ctx.moveTo(22, 16);
+            ctx.lineTo(22, 48);
+            ctx.lineTo(48, 32);
+            ctx.closePath();
+            ctx.fill();
+            break;
+        
+        case 'pause': 
             // Draw pause icon (two vertical bars)
             ctx.fillRect(22, 18, 6, 28);
             ctx.fillRect(36, 18, 6, 28);
@@ -291,6 +302,39 @@ function createControlIcon(type) {
             ctx.moveTo(44, 20);
             ctx.bezierCurveTo(50, 28, 50, 36, 44, 44);
             ctx.stroke();
+            break;
+            
+        case 'muted':
+            // Draw muted icon - speaker with X
+            // Speaker base
+            ctx.beginPath();
+            ctx.moveTo(18, 26);
+            ctx.lineTo(24, 26);
+            ctx.lineTo(32, 18);
+            ctx.lineTo(32, 46);
+            ctx.lineTo(24, 38);
+            ctx.lineTo(18, 38);
+            ctx.closePath();
+            ctx.fill();
+            
+            // X mark for mute - make it more visible
+            ctx.lineWidth = 3.5; // Thicker line for better visibility
+            ctx.strokeStyle = '#ff5555'; // Red color for emphasis
+            
+            // Draw a slightly larger X
+            ctx.beginPath();
+            ctx.moveTo(36, 20);
+            ctx.lineTo(54, 44);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(36, 44);
+            ctx.lineTo(54, 20);
+            ctx.stroke();
+            
+            // Reset styles for next elements
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#ffffff';
             break;
             
         case 'resize':
@@ -337,6 +381,15 @@ function createControlIcon(type) {
             ctx.lineTo(18, 46);
             ctx.lineTo(18, 38);
             ctx.stroke();
+            break;
+            
+        default:
+            // For any unrecognized type, draw a question mark
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', canvas.width/2, canvas.height/2);
+            console.warn('Unknown icon type:', type);
             break;
     }
     
