@@ -158,12 +158,14 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     let backgroundMaterial;
     
     if (content && content.isVideoTexture) {
-        // Use video texture if provided
+        // Use video texture if provided with correct aspect ratio handling
         backgroundMaterial = new THREE.MeshBasicMaterial({
             map: content,
             side: THREE.DoubleSide,
             depthTest: false
         });
+        
+        // Video aspect ratio is handled in ar_media.js, so we don't need to duplicate it here
     } else {
         // Default subtle dark background
         backgroundMaterial = new THREE.MeshBasicMaterial({

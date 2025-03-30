@@ -8,6 +8,7 @@ import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } fr
 import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
+import Stats from 'three/addons/libs/stats.module.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
@@ -146,15 +147,24 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Animation loop
-export function animate() {
-    renderer.setAnimationLoop(render);
+// Core animation loop
+function animate() {
+    requestAnimationFrame(animate);
     
-    // Update video textures in every frame
-    updateVideoTextures();
+    // Update controller
+    updateXRController();
     
-    // Check if in AR mode
-    isARMode = renderer.xr.isPresenting;
+    // Update screen effects such as hover animations
+    updateScreenEffects();
+    
+    // Update video textures
+    if (typeof updateVideoTextures === 'function') {
+        updateVideoTextures();
+    }
+    
+    // Render the scene
+    renderer.render(scene, camera);
+    stats.update();
 }
 
 // Render function
@@ -241,6 +251,11 @@ export function render() {
     
     // Update screen visual effects
     updateScreenEffects();
+    
+    // Update video textures in every frame
+    if (typeof updateVideoTextures === 'function') {
+        updateVideoTextures();
+    }
     
     // Render the scene
     renderer.render(scene, camera);
