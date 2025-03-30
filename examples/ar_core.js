@@ -183,7 +183,14 @@ export function animate() {
     }
     
     // Render the scene
-    renderer.render(scene, camera);
+    render();
+}
+
+// Render function to be exported
+export function render() {
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
 }
 
 // Initialize the AR experience
