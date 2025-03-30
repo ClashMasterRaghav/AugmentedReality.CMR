@@ -160,7 +160,7 @@ export function createControlPanel() {
     controlPanel = new THREE.Group();
     
     // Panel background - sleek modern design with rounded corners
-    const panelSize = { width: 0.18, height: 0.08 };
+    const panelSize = { width: 0.24, height: 0.10 }; // Wider panel for easier interaction
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
     
     // Create rounded panel texture
@@ -219,8 +219,8 @@ export function createControlPanel() {
     controlPanel.add(glowMesh);
     
     // Define button parameters
-    const buttonSize = 0.04; // Smaller, more subtle buttons
-    const buttonSpacing = 0.06;
+    const buttonSize = 0.055; // LARGER buttons for easier interaction
+    const buttonSpacing = 0.08;
     
     // Create buttons - only 2 buttons: Add Screen and Delete Screen
     const buttonPositions = [
@@ -241,7 +241,8 @@ export function createControlPanel() {
             side: THREE.DoubleSide
         });
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.set(position.x, position.y, 0.001);
+        button.position.set(position.x, position.y, 0.002); // Moved forward for better interaction
+        button.renderOrder = 100; // Very high render order to ensure visibility
         button.userData = {
             type: 'button',
             action: buttonActions[index],
@@ -265,7 +266,8 @@ export function createControlPanel() {
             side: THREE.DoubleSide
         });
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.position.z = 0.002;
+        iconMesh.position.z = 0.003; // Moved further forward
+        iconMesh.renderOrder = 101; // Even higher render order
         button.add(iconMesh);
         
         // Add subtle shadow/depth effect
@@ -279,10 +281,25 @@ export function createControlPanel() {
         const buttonShadow = new THREE.Mesh(buttonShadowGeometry, buttonShadowMaterial);
         buttonShadow.position.z = -0.001;
         button.add(buttonShadow);
+        
+        // Add a pulse animation effect to make buttons more noticeable
+        if (index === 1) { // Only for delete button
+            const pulseAnimation = () => {
+                const time = Date.now() * 0.001;
+                const scale = 1 + Math.sin(time * 2) * 0.05;
+                button.scale.set(scale, scale, 1);
+                
+                // Keep animating
+                requestAnimationFrame(pulseAnimation);
+            };
+            
+            // Start the animation
+            pulseAnimation();
+        }
     });
     
     // Add control panel to scene
-    controlPanel.position.set(0, -0.25, -0.5);
+    controlPanel.position.set(0, -0.23, -0.5);
     controlPanel.userData = { 
         type: 'controlPanel',
         // Store references to button states for easy access
@@ -308,6 +325,8 @@ export function createControlPanel() {
     };
     
     scene.add(controlPanel);
+    
+    console.log("Control panel created with buttons:", buttonActions);
 }
 
 // Create button icons using canvas textures

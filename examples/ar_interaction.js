@@ -74,13 +74,17 @@ function onSelectStart(event) {
 
 // Get button object from potentially nested mesh
 function getButtonFromIntersect(object) {
+    console.log("Finding button from intersect object:", object.uuid.substring(0, 8));
+    
     // If we hit the button directly
     if (object.userData && object.userData.type === 'button') {
+        console.log("→ Direct button hit:", object.userData.action);
         return object;
     }
     
     // If we hit a child of a button (like the icon)
     if (object.parent && object.parent.userData && object.parent.userData.type === 'button') {
+        console.log("→ Button parent hit:", object.parent.userData.action);
         return object.parent;
     }
     
@@ -88,9 +92,43 @@ function getButtonFromIntersect(object) {
     if (object.parent && object.parent.parent && 
         object.parent.parent.userData && 
         object.parent.parent.userData.type === 'button') {
+        console.log("→ Button grandparent hit:", object.parent.parent.userData.action);
         return object.parent.parent;
     }
     
+    // Deeper search up to 5 levels up
+    let current = object;
+    let depth = 0;
+    const maxDepth = 5;
+    
+    while (current && depth < maxDepth) {
+        if (current.userData && current.userData.type === 'button') {
+            console.log(`→ Button found at depth ${depth}:`, current.userData.action);
+            return current;
+        }
+        current = current.parent;
+        depth++;
+    }
+    
+    // Search by traversing children of control panel
+    const controlPanels = scene.children.filter(obj => 
+        obj.userData && obj.userData.type === 'controlPanel');
+    
+    if (controlPanels.length > 0) {
+        const panel = controlPanels[0];
+        const buttonChildren = panel.children.filter(child => 
+            child.userData && child.userData.type === 'button');
+        
+        // Check if any of these buttons contain our object
+        for (const btn of buttonChildren) {
+            if (btn === object || btn.children.some(child => child === object)) {
+                console.log("→ Button found via panel traversal:", btn.userData.action);
+                return btn;
+            }
+        }
+    }
+    
+    console.log("→ No button found from intersect");
     return null;
 }
 
@@ -115,14 +153,31 @@ function onSelect(event) {
     
     // First, check for button interactions
     const buttons = findAllButtons();
+    console.log(`Checking for interactions with ${buttons.length} buttons`);
+    
+    // Use a larger threshold for better button detection
+    raycaster.params.Line.threshold = 0.1;
+    raycaster.params.Points.threshold = 0.1;
+    
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
+        console.log(`Ray intersected with ${buttonIntersects.length} button objects`);
+        
+        // Get closest intersection
+        const intersection = buttonIntersects[0];
+        console.log(`Closest intersection: distance=${intersection.distance.toFixed(3)}, object=${intersection.object.uuid.substring(0,8)}`);
+        
+        const buttonObj = getButtonFromIntersect(intersection.object);
         if (buttonObj) {
+            console.log(`Found button: action=${buttonObj.userData.action}`);
             handleButtonAction(buttonObj);
             return;
+        } else {
+            console.log("Button parent not found from intersection");
         }
+    } else {
+        console.log("No button intersections found");
     }
     
     // Then check for screen selection
@@ -131,6 +186,7 @@ function onSelect(event) {
     if (screenIntersects.length > 0) {
         const screenObj = getScreenFromIntersect(screenIntersects[0].object);
         if (screenObj) {
+            console.log(`Selected screen: ID=${screenObj.userData.id}`);
             // Select screen and update global selectedScreen
             selectScreen(screenObj);
             
@@ -206,7 +262,7 @@ function getScreenFromIntersect(object) {
 function handleButtonAction(button) {
     if (!button || !button.userData) return;
     
-    console.log("Button action:", button.userData.action);
+    console.log("Button action triggered:", button.userData.action);
     
     const action = button.userData.action;
     let screen = null;
@@ -281,6 +337,7 @@ function handleButtonAction(button) {
     } else if (action === 'newScreen') {
         createNewScreen();
     } else if (action === 'deleteScreen') {
+        console.log("Delete screen button pressed - calling deleteLastScreen()");
         // Delete the last interacted screen
         deleteLastScreen();
         
@@ -293,6 +350,13 @@ function handleButtonAction(button) {
                 iconMesh.scale.set(1, 1, 1);
             }, 150);
         }
+        
+        // Additional haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate([30, 20, 30]);
+        }
+    } else {
+        console.log("Unknown button action:", action);
     }
 }
 
@@ -475,29 +539,43 @@ function findButtonByAction(action) {
 function findAllButtons() {
     let buttons = [];
     
-    // Get control panel buttons
+    // Get control panel buttons more explicitly
     const controlPanels = scene.children.filter(obj => 
         obj.userData && obj.userData.type === 'controlPanel');
     
-    controlPanels.forEach(panel => {
+    console.log(`Found ${controlPanels.length} control panels`);
+    
+    controlPanels.forEach((panel, panelIndex) => {
+        const panelButtons = [];
         panel.children.forEach(child => {
             if (child.userData && child.userData.type === 'button') {
+                panelButtons.push(child);
                 buttons.push(child);
             }
         });
+        console.log(`Panel ${panelIndex}: Found ${panelButtons.length} buttons`);
     });
     
     // Get screen buttons
-    screens.forEach(screen => {
+    const screenButtons = [];
+    screens.forEach((screen, screenIndex) => {
+        const buttonsForThisScreen = [];
         screen.children.forEach(child => {
             if (child.userData && child.userData.type === 'button') {
+                buttonsForThisScreen.push(child);
                 buttons.push(child);
+                screenButtons.push(child);
                 
                 // Ensure button is always interactive by setting renderOrder
                 child.renderOrder = 10; // Higher renderOrder ensures it renders on top
             }
         });
+        if (buttonsForThisScreen.length > 0) {
+            console.log(`Screen ${screenIndex}: Found ${buttonsForThisScreen.length} buttons`);
+        }
     });
+    
+    console.log(`Found total ${buttons.length} buttons (${buttons.length - screenButtons.length} panel + ${screenButtons.length} screen)`);
     
     return buttons;
 }
@@ -1120,6 +1198,8 @@ export function setupVideoControls(mediaModule) {
 
 // Function to delete the last interacted screen (most recently selected)
 export function deleteLastScreen() {
+    console.log("deleteLastScreen function called");
+    
     // If no screens, do nothing
     if (!screens || screens.length === 0) {
         console.log("No screens to delete");
@@ -1130,12 +1210,17 @@ export function deleteLastScreen() {
     // Get the current selected screen from the imported module variable
     let screenToDelete = selectedScreen;
     
+    console.log("Current selectedScreen:", screenToDelete ? 
+                (screenToDelete.userData ? screenToDelete.userData.id : "unknown") : 
+                "null");
+    
     // Verify we have a selected screen to delete
     if (!screenToDelete) {
         console.log("No screen selected for deletion, selecting most recent one");
         // If there's no selected screen, select the last created one (as fallback)
         if (screens.length > 0) {
             screenToDelete = screens[screens.length - 1];
+            console.log("Selected most recent screen:", screenToDelete.userData.id);
             // Make sure it's visually marked as selected
             selectScreen(screenToDelete);
         } else {
@@ -1156,16 +1241,19 @@ export function deleteLastScreen() {
     const index = screens.indexOf(screenToDelete);
     if (index > -1) {
         screens.splice(index, 1);
+        console.log("Screen removed from screens array. Remaining screens:", screens.length);
     }
     
     // After deleting the selected screen, select a new one if available
     if (screens.length > 0) {
         // Select the next available screen (last in array)
         const newSelectedScreen = screens[screens.length - 1];
+        console.log("Selecting new screen:", newSelectedScreen.userData.id);
         selectScreen(newSelectedScreen);
         // Don't need to set selectedScreen as selectScreen does this
     } else {
         // No screens left
+        console.log("No screens left, clearing selection");
         selectScreen(null);
     }
     
