@@ -983,7 +983,7 @@ function handleProgressBarTouch(screen, point) {
     const progressBg = screen.children.find(child => 
         child.geometry && 
         child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.y - (-0.25)) < 0.01 &&
+        Math.abs(child.position.y - (-0.28)) < 0.01 &&
         child.material.color.getHex() === 0x333333);
     
     if (!progressBg) return false;
@@ -995,11 +995,11 @@ function handleProgressBarTouch(screen, point) {
     }
     
     // Check if hit is within progress bar area
-    if (Math.abs(localPoint.y - (-0.25)) < 0.02 && 
-        Math.abs(localPoint.x) < screenWidth * 0.48) {
+    if (Math.abs(localPoint.y - (-0.28)) < 0.02 && 
+        Math.abs(localPoint.x) < screenWidth * 0.45) {
         
         // Calculate progress based on x position
-        const progress = (localPoint.x + (screenWidth * 0.48)) / (screenWidth * 0.96);
+        const progress = (localPoint.x + (screenWidth * 0.45)) / (screenWidth * 0.9);
         updateVideoTime(Math.max(0, Math.min(1, progress)));
         return true;
     }
