@@ -8,6 +8,8 @@ import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } fr
 import { setupEventListeners, setupVideoControls } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures, updateVideoProgress } from './ar_media.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { XREstimatedLight } from 'three/addons/webxr/XREstimatedLight.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
@@ -25,33 +27,35 @@ export let selectedKey = null;
 export let container;
 export let isARMode = false;
 
+// Additional globals
+const clock = new THREE.Clock();
+let controls;
+let light;
+let hasInitialized = false;
+let welcomeScreen;
+
 // Main initialization function called from ar_main.js
-export function initAR() {
-    try {
-        console.log("Initializing AR application...");
-        initAREnvironment();
-        return true;
-    } catch (error) {
-        console.error("Error initializing AR:", error);
-        // Show error in console only to avoid circular dependencies
-        console.error("Error initializing AR: " + error.message);
-        return false;
+export function initAR(containerElement, existingScene) {
+    console.log("Initializing AR core");
+    
+    if (hasInitialized) {
+        console.warn("AR has already been initialized");
+        return;
     }
-}
-
-// Initialize the AR environment
-function initAREnvironment() {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-
-    scene = new THREE.Scene();
+    
+    hasInitialized = true;
+    container = containerElement;
+    
+    // Create or use existing scene
+    scene = existingScene || new THREE.Scene();
+    
+    // Camera
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-    // Lighting
-    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-    light.position.set(0.5, 1, 0.25);
-    scene.add(light);
-
+    
+    // Raycaster for interactions
+    raycaster = new THREE.Raycaster();
+    tempMatrix = new THREE.Matrix4();
+    
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -59,138 +63,128 @@ function initAREnvironment() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // AR Button with session end event handling
+    // AR Button with enhanced session options for better compatibility
     const arButton = ARButton.createButton(renderer, {
-        optionalFeatures: ['dom-overlay'],
-        domOverlay: { root: document.body }
+        optionalFeatures: [
+            'dom-overlay', 
+            'hit-test', 
+            'anchors',
+            'light-estimation'
+        ],
+        domOverlay: { root: document.body },
+        requiredFeatures: [], // Don't require any specific features to increase compatibility
+        sessionInit: {
+            requiredFeatures: [], // Don't make anything required to improve device compatibility
+            optionalFeatures: [
+                'dom-overlay',
+                'light-estimation',
+                'hit-test',
+                'anchors'
+            ]
+        },
+        onSessionStarted: (session) => {
+            console.log("AR session started successfully");
+            isARMode = true;
+            createNotification('AR session started. Look around to place screens.', 'success');
+        },
+        onSessionEnded: () => {
+            console.log("AR session ended");
+            isARMode = false;
+        }
     });
     
     document.body.appendChild(arButton);
     
-    // Add event listener for session end
-    renderer.xr.addEventListener('sessionend', function() {
-        console.log("AR session ended");
-        // Reload the page to return to initial state
-        window.location.reload();
-    });
-
-    // Load font for text
-    const fontLoader = new FontLoader();
-    fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
-        font = loadedFont;
-        // Create UI controls once font is loaded
-        createControlPanel();
-        createVirtualKeyboard();
-    });
-
-    // Controller setup
-    controller = renderer.xr.getController(0);
+    // Add error handling for AR session
+    try {
+        // Add event listener for session start (useful for debugging)
+        renderer.xr.addEventListener('sessionstart', function() {
+            console.log("AR session started successfully");
+            console.log("XR session:", renderer.xr.getSession());
+            
+            // Set flag for AR mode
+            isARMode = true;
+            
+            // Create notification for user
+            createNotification('AR session started. Look around to place screens.', 'success');
+        });
+        
+        // Add event listener for session end
+        renderer.xr.addEventListener('sessionend', function() {
+            console.log("AR session ended");
+            // Reset AR mode flag
+            isARMode = false;
+            
+            // Reset any AR-specific states
+            
+            // Reload the page to return to initial state
+            // window.location.reload(); // Comment this out for better debugging
+        });
+    } catch (error) {
+        console.error("Error setting up XR session event listeners:", error);
+    }
     
-    // Add controller event listeners
-    controller.addEventListener('selectstart', function() {
-        controller.userData.isSelecting = true;
-    });
+    // Add basic lighting
+    light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    light.position.set(0.5, 1, 0.25);
+    scene.add(light);
     
-    controller.addEventListener('selectend', function() {
-        controller.userData.isSelecting = false;
-    });
+    // Add XR estimated light
+    try {
+        const xrLight = new XREstimatedLight(renderer);
+        xrLight.addEventListener('estimationstart', () => {
+            console.log('Light estimation started');
+            scene.add(xrLight);
+            scene.remove(light); // Remove basic light when estimation starts
+        });
+    } catch (error) {
+        console.warn('XREstimatedLight not supported, using fallback lighting', error);
+    }
     
-    scene.add(controller);
-
-    // Controller model
-    const controllerModelFactory = new XRControllerModelFactory();
-    controllerGrip = renderer.xr.getControllerGrip(0);
-    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-    scene.add(controllerGrip);
-
-    // Pointer for interaction - SMALLER SIZE
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-    const pointer = new THREE.Mesh(geometry, material);
-    pointer.position.z = -0.1;
-    controller.add(pointer);
-
+    // Create a welcome screen on startup
+    welcomeScreen = createNewBrowserScreen();
+    welcomeScreen.position.set(0, 0, -1);
+    scene.add(welcomeScreen);
+    
+    // Setup interaction handlers
+    setupInteractions(renderer, camera, scene);
+    
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
-
-    // Initialize UI elements
-    initUI();
     
-    // Preload video texture right after scene setup
-    console.log("Initializing video functionality");
-    const videoTexture = loadVideoTexture();
-    
-    // Connect video controls to the interaction module
-    setupVideoControls({
-        toggleVideoPlayback,
-        toggleVideoMute
-    });
-    
-    // Setup event listeners
-    setupEventListeners();
-    
-    // Start animation loop
-    renderer.setAnimationLoop(animate);
-    
-    // Add a notification to let the user know the app is ready
-    createNotification('AR Experience Ready', 'success');
-    
-    // Create initial screen
-    createStartScreen();
+    console.log("AR core initialized successfully");
+    return true;
 }
 
-// Handle window resize
+// Function to handle window resize
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Main update loop
-export function animate() {
-    requestAnimationFrame(animate);
-    
-    // Update controller
-    controller.update();
-    
-    // Update screens if needed
-    if (selectedScreen && typeof updateKeyboardPosition === 'function') {
-        updateKeyboardPosition(selectedScreen);
-    }
-    
-    // Update video progress if available
-    if (typeof videoElement !== 'undefined' && videoElement && typeof updateVideoProgress === 'function') {
-        // Find screens with video controls
-        screens.forEach(screen => {
-            if (screen.userData.controls && screen.userData.controls.progressBar) {
-                // Calculate progress (0-1)
-                const duration = videoElement.duration;
-                const currentTime = videoElement.currentTime;
-                
-                if (isFinite(duration) && duration > 0) {
-                    const progress = currentTime / duration;
-                    screen.userData.controls.progress = progress;
-                    
-                    // Update progress bar
-                    updateVideoProgress(
-                        screen.userData.controls.progressBar,
-                        progress,
-                        screen
-                    );
-                }
-            }
-        });
-    }
-    
-    // Render the scene
-    render();
-}
-
-// Render function to be exported
+// Render function - called each frame
 export function render() {
     if (renderer && scene && camera) {
+        // Update video textures every frame
+        if (typeof updateVideoTextures === 'function') {
+            updateVideoTextures();
+        }
+        
+        // Update progress bar for video if needed
+        if (typeof updateVideoProgress === 'function') {
+            updateVideoProgress();
+        }
+        
+        // Render the scene
         renderer.render(scene, camera);
     }
+}
+
+// Animation loop - called by the renderer
+export function animate() {
+    // Set up animation loop for WebXR
+    renderer.setAnimationLoop(render);
 }
 
 // Initialize the AR experience
@@ -229,7 +223,11 @@ export async function init() {
     }
 }
 
-// Create a welcome screen at the start
+// Create a start screen as the first content
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    const startScreen = createNewBrowserScreen();
+    startScreen.position.set(0, 0, -1); // Position in front of user
+    scene.add(startScreen);
+    
+    createNotification('Screen created! Look around and tap to place more screens.', 'success');
 }
