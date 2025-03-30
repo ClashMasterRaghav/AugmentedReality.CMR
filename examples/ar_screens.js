@@ -283,8 +283,8 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     
     // Add video control buttons with refined positioning
     if (content && content.isVideoTexture) {
-        // Move play button to bottom left
-        const playButton = addControlButton(screen, 'play', -screenWidth/2 + 0.05, -screenHeight/2 + 0.05, 0.03);
+        // Move play button to bottom left with pause icon since video is initially playing
+        const playButton = addControlButton(screen, 'pause', -screenWidth/2 + 0.05, -screenHeight/2 + 0.05, 0.03);
         playButton.userData.videoControl = true;
         playButton.userData.videoAction = 'togglePlayback';
         
