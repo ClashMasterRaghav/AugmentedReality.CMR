@@ -88,10 +88,10 @@ function addDropShadow(screen, width, height) {
     
     screen.add(shadowMesh);
     
-    // Add a subtle glow
+    // Add a subtle glow with darker blue color
     const glowGeometry = new THREE.PlaneGeometry(width + 0.01, height + 0.01);
     const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x3498db, // Blue glow
+        color: 0x1a237e, // Dark blue glow (indigo 900)
         transparent: true,
         opacity: 0.0, // Start invisible, will show when selected
         side: THREE.DoubleSide,
@@ -162,7 +162,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         backgroundMaterial = new THREE.MeshBasicMaterial({
             map: content,
             side: THREE.DoubleSide,
-            depthTest: false
+            depthTest: true // Enable depth testing to prevent see-through effect
         });
     } else {
         // Default subtle dark background with gradient
@@ -206,8 +206,8 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     }
     
     const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-    background.position.set(0, 0, 0.002);
-    background.renderOrder = 1;
+    background.position.set(0, 0, 0.003); // Increased z-position to be more visible
+    background.renderOrder = 10; // Higher render order to ensure it's visible
     screen.add(background);
     
     // Create a solid black top bar that spans the entire width
@@ -600,7 +600,7 @@ export function selectScreen(screen) {
         Math.abs(child.position.z - (-0.001)) < 0.0001);
         
     if (borderMesh) {
-        borderMesh.material.color.set(0x4CAF50); // Green border
+        borderMesh.material.color.set(0x1a237e); // Dark blue border (indigo 900)
         borderMesh.material.opacity = 1.0; // More visible
     }
     
@@ -694,17 +694,21 @@ export function updateScreenEffects() {
                 Math.abs(child.position.z - (-0.001)) < 0.0001);
                 
             if (borderMesh) {
-                // Subtle pulsing effect for selected screen's border
+                // Subtle pulsing effect for selected screen's border (dark blue colors)
                 const time = Date.now() * 0.001;
                 const pulseIntensity = 0.15 * Math.sin(time * 2) + 0.85;
-                borderMesh.material.color.setRGB(0.2 * pulseIntensity, 0.8 * pulseIntensity, 0.3 * pulseIntensity);
+                borderMesh.material.color.setRGB(
+                    0.1 * pulseIntensity,  // R (low for blue)
+                    0.1 * pulseIntensity,  // G (low for blue)
+                    0.5 * pulseIntensity   // B (higher for blue)
+                );
             }
             
             // Update glow effect for selected screen
             const glowMesh = screen.userData.glowMesh;
             if (glowMesh) {
                 const time = Date.now() * 0.001;
-                const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.3;
+                const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.25; // Reduced max intensity
                 glowMesh.material.opacity = glowIntensity;
             }
             
