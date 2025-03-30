@@ -284,6 +284,5 @@ function createStartScreen() {
 // Make sure all required functions are exported
 export { 
     initAR,     // Initialize AR environment
-    animate,    // Set up animation loop
-    render      // Render function called each frame
+    animate     // Set up animation loop
 };
