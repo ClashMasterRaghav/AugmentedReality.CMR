@@ -258,7 +258,7 @@ export function createControlPanel() {
     
     // Define button parameters - preserve original functionality
     const buttonSize = 0.055;
-    const buttonSpacing = 0.10;
+    const buttonSpacing = 0.15;
     
     // Create buttons - MOVED INSIDE THE PANEL
     const buttonPositions = [
