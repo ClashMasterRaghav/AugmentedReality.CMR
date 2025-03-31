@@ -413,14 +413,17 @@ function createNewScreenInFrontOfCamera() {
     const cameraDirection = new THREE.Vector3(0, 0, -1);
     cameraDirection.applyQuaternion(camera.quaternion);
     
-    // Position screen in front of camera
-    const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1));
+    // Position screen in front of camera at a consistent distance of 1.5m (same as initial screen)
+    const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
     
     // Create new screen at this position
     const newScreen = createNewBrowserScreen(screenPosition);
     
     // Make it face the camera
     newScreen.lookAt(camera.position);
+    
+    // Ensure consistent scale
+    newScreen.scale.set(1.0, 1.0, 1.0);
     
     // Add visual feedback
     createModeChangeIndicator('New Screen Created');
@@ -1196,8 +1199,9 @@ function onTouchEnd(event) {
             dragHandle.scale.set(1.0, 1.0, 1.0);
         }
         
-        // Save the current position
+        // Save the current position and mark panel as manually positioned
         controlPanel.userData.isDragging = false;
+        controlPanel.userData.manuallyPositioned = true; // Mark as manually positioned to prevent auto repositioning
         isPanelBeingDragged = false;
         
         // Create visual feedback

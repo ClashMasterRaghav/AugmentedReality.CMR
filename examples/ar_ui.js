@@ -220,6 +220,8 @@ export function createControlPanel() {
         side: THREE.DoubleSide
     });
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    // Set high renderOrder to ensure panel renders on top of other elements
+    panelMesh.renderOrder = 1000;
     controlPanel.add(panelMesh);
     
     // Create an edge highlight for depth
@@ -232,6 +234,7 @@ export function createControlPanel() {
     });
     const edgeMesh = new THREE.Mesh(edgeGeometry, edgeMaterial);
     edgeMesh.position.z = -0.001;
+    edgeMesh.renderOrder = 999;
     controlPanel.add(edgeMesh);
     
     // Make the entire panel draggable by attaching a hidden drag area
@@ -244,6 +247,7 @@ export function createControlPanel() {
     });
     const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
     fullPanelDrag.position.z = 0.0005; // Between panel and buttons
+    fullPanelDrag.renderOrder = 1001; // Above panel for interaction
     fullPanelDrag.userData = {
         type: 'dragHandle',
         isDragArea: true,
@@ -275,7 +279,7 @@ export function createControlPanel() {
         });
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
         button.position.set(position.x, position.y, 0.003);
-        button.renderOrder = 100;
+        button.renderOrder = 1002; // Even higher render order to ensure visibility and interaction
         button.userData = {
             type: 'button',
             action: buttonActions[index],
@@ -300,7 +304,7 @@ export function createControlPanel() {
         });
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
         iconMesh.position.z = 0.004;
-        iconMesh.renderOrder = 101;
+        iconMesh.renderOrder = 1003;
         button.add(iconMesh);
         
         // Add button shadow for depth
@@ -313,6 +317,7 @@ export function createControlPanel() {
         });
         const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
         shadowMesh.position.z = -0.001;
+        shadowMesh.renderOrder = 1001;
         button.add(shadowMesh);
         
         // Add subtle highlight on top edge of button for 3D effect
@@ -326,6 +331,7 @@ export function createControlPanel() {
         const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
         highlightMesh.rotation.z = Math.PI;
         highlightMesh.position.z = 0.0015;
+        highlightMesh.renderOrder = 1002;
         button.add(highlightMesh);
         
         // Add label below each button - same as before
@@ -351,10 +357,8 @@ export function createControlPanel() {
         });
         const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
         labelMesh.position.set(0, -buttonSize * 0.8, 0.003);
-        labelMesh.renderOrder = 100;
+        labelMesh.renderOrder = 1002;
         button.add(labelMesh);
-        
-        // Remove pulse animation for delete button
     });
     
     // Position control panel
@@ -363,13 +367,26 @@ export function createControlPanel() {
     // Add user data for interactivity
     controlPanel.userData = {
         type: 'controlPanel',
-        isDragging: false
+        isDragging: false,
+        manuallyPositioned: false // Flag to track if user has moved the panel
     };
     
     // Make panel face user initially
     controlPanel.lookAt(camera.position);
     
-    // No floating animation - solid and stable appearance
+    // Add a solid background plane to block raycasts through the panel
+    const blockingGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    const blockingMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: false,
+        opacity: 1.0,
+        side: THREE.DoubleSide
+    });
+    const blockingMesh = new THREE.Mesh(blockingGeometry, blockingMaterial);
+    blockingMesh.position.z = -0.002;
+    blockingMesh.renderOrder = 998; // Behind everything else in the panel
+    blockingMesh.visible = false; // Invisible but still blocks raycasts
+    controlPanel.add(blockingMesh);
     
     scene.add(controlPanel);
     
@@ -711,18 +728,18 @@ export function setButtonPressed(button, isPressed) {
 export function setupControlPanel() {
     if (!controlPanel) return;
     
-    // Only reposition if not being dragged
-    if (controlPanel.userData.isDragging) return;
+    // Only reposition if not being dragged AND not previously manually positioned
+    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
     
     // Position in front and below the user
     const cameraDirection = new THREE.Vector3(0, 0, -1);
     cameraDirection.applyQuaternion(camera.quaternion);
     
     const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.4)); // Closer to user (0.4m instead of 0.5m)
+    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
     
-    // Position below the camera view at a comfortable height
-    position.y -= 0.15;
+    // Position BELOW the default screen position
+    position.y -= 0.4; // Position it much lower to appear below the screen
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
@@ -734,7 +751,7 @@ export function setupControlPanel() {
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
-    console.log("Control panel positioned in front of user");
+    console.log("Control panel positioned below screen");
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive
