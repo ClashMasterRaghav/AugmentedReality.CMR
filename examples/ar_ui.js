@@ -212,14 +212,6 @@ export function createControlPanel() {
     panelCtx.textAlign = 'center';
     panelCtx.fillText('AR CONTROLS', panelCanvas.width/2, 50);
     
-    // Add accent line under title
-    panelCtx.beginPath();
-    panelCtx.moveTo(panelCanvas.width/2 - 100, 65);
-    panelCtx.lineTo(panelCanvas.width/2 + 100, 65);
-    panelCtx.strokeStyle = 'rgba(138, 43, 226, 0.7)'; // Brighter purple accent
-    panelCtx.lineWidth = 2;
-    panelCtx.stroke();
-    
     // Create texture from canvas
     const panelTexture = new THREE.CanvasTexture(panelCanvas);
     const panelMaterial = new THREE.MeshBasicMaterial({
@@ -242,34 +234,32 @@ export function createControlPanel() {
     edgeMesh.position.z = -0.001;
     controlPanel.add(edgeMesh);
     
-    // Create drag handle with modern pill shape
-    const dragBarWidth = panelSize.width * 0.4;
-    const dragBarHeight = 0.01;
-    const dragIndicatorGeometry = new THREE.PlaneGeometry(dragBarWidth, dragBarHeight);
-    const dragIndicatorMaterial = new THREE.MeshBasicMaterial({
-        color: 0xBB86FC, // Purple accent
+    // Make the entire panel draggable by attaching a hidden drag area
+    const fullPanelDragGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    const fullPanelDragMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.001, // Nearly invisible
         side: THREE.DoubleSide
     });
-    const dragIndicator = new THREE.Mesh(dragIndicatorGeometry, dragIndicatorMaterial);
-    dragIndicator.position.set(0, panelSize.height/2 - 0.02, 0.001);
-    dragIndicator.userData = {
+    const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
+    fullPanelDrag.position.z = 0.0005; // Between panel and buttons
+    fullPanelDrag.userData = {
         type: 'dragHandle',
         isDragArea: true,
-        originalColor: 0xBB86FC,
-        hoverColor: 0xE0B0FF
+        originalColor: 0xffffff,
+        hoverColor: 0xffffff
     };
-    controlPanel.add(dragIndicator);
+    controlPanel.add(fullPanelDrag);
     
     // Define button parameters - preserve original functionality
     const buttonSize = 0.055;
     const buttonSpacing = 0.10;
     
-    // Create buttons - same positions as before
+    // Create buttons - MOVED INSIDE THE PANEL
     const buttonPositions = [
-        { x: -buttonSpacing/2, y: -0.055 },  // Left - Add Screen
-        { x: buttonSpacing/2, y: -0.055 }    // Right - Delete Screen
+        { x: -buttonSpacing/2, y: 0.01 },  // Left - Add Screen - moved up
+        { x: buttonSpacing/2, y: 0.01 }    // Right - Delete Screen - moved up
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];
@@ -364,21 +354,7 @@ export function createControlPanel() {
         labelMesh.renderOrder = 100;
         button.add(labelMesh);
         
-        // Add pulse animation for delete button only
-        if (index === 1) {
-            const pulseAnimation = () => {
-                const time = Date.now() * 0.001;
-                const scale = 1 + Math.sin(time * 2) * 0.05;
-                button.scale.set(scale, scale, 1);
-                shadowMesh.scale.set(1/scale, 1/scale, 1); // Keep shadow consistent
-                
-                // Keep animating
-                requestAnimationFrame(pulseAnimation);
-            };
-            
-            // Start the animation
-            pulseAnimation();
-        }
+        // Remove pulse animation for delete button
     });
     
     // Position control panel
