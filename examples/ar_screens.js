@@ -26,7 +26,8 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
         id: screens.length,
         isSelected: false,
         isInteractive: true,
-        originalScale: new THREE.Vector3(1, 1, 1) // Store original scale to prevent scaling issues
+        originalScale: new THREE.Vector3(1, 1, 1), // Store original scale to prevent scaling issues
+        contentType: 'video'
     };
     
     // Add drop shadow for depth and better visual appearance
@@ -66,6 +67,492 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     selectScreen(browserWindow);
     
     return browserWindow;
+}
+
+// Create a new YouTube screen
+export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `YouTube ${screens.length + 1}`;
+    
+    console.log("Creating YouTube screen with iframe");
+    
+    // Create iframe content texture
+    const iframeTexture = createIframeTexture("https://www.youtube.com/embed?enablejsapi=1", 1024, 768);
+    
+    // Create the screen container
+    const youtubeScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    
+    // Add basic identification data
+    youtubeScreen.userData = { 
+        type: 'screen', 
+        id: screens.length,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1),
+        contentType: 'youtube'
+    };
+    
+    // Add shadow and border
+    addDropShadow(youtubeScreen, screenWidth, screenHeight);
+    
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xE62117, // YouTube red color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    youtubeScreen.add(borderPanel);
+    
+    // Update drag handle reference
+    const topBar = youtubeScreen.children.find(child => 
+        child.userData && child.userData.type === 'dragHandle');
+    
+    if (topBar) {
+        topBar.userData.screen = youtubeScreen;
+        youtubeScreen.userData.dragHandle = topBar;
+    }
+    
+    // Add to scene and screens array
+    scene.add(youtubeScreen);
+    screens.push(youtubeScreen);
+    
+    // Add entrance animation
+    animateScreenEntrance(youtubeScreen);
+    
+    console.log("Created YouTube screen with ID:", youtubeScreen.userData.id);
+    
+    // Select this as the current screen
+    selectScreen(youtubeScreen);
+    
+    return youtubeScreen;
+}
+
+// Create a new DuckDuckGo search screen
+export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `DuckDuckGo ${screens.length + 1}`;
+    
+    console.log("Creating DuckDuckGo screen with iframe");
+    
+    // Create iframe content texture
+    const iframeTexture = createIframeTexture("https://duckduckgo.com/", 1024, 768);
+    
+    // Create the screen container
+    const duckduckgoScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    
+    // Add basic identification data
+    duckduckgoScreen.userData = { 
+        type: 'screen', 
+        id: screens.length,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1),
+        contentType: 'duckduckgo'
+    };
+    
+    // Add shadow and border
+    addDropShadow(duckduckgoScreen, screenWidth, screenHeight);
+    
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xDE5833, // DuckDuckGo orange color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    duckduckgoScreen.add(borderPanel);
+    
+    // Update drag handle reference
+    const topBar = duckduckgoScreen.children.find(child => 
+        child.userData && child.userData.type === 'dragHandle');
+    
+    if (topBar) {
+        topBar.userData.screen = duckduckgoScreen;
+        duckduckgoScreen.userData.dragHandle = topBar;
+    }
+    
+    // Add to scene and screens array
+    scene.add(duckduckgoScreen);
+    screens.push(duckduckgoScreen);
+    
+    // Add entrance animation
+    animateScreenEntrance(duckduckgoScreen);
+    
+    console.log("Created DuckDuckGo screen with ID:", duckduckgoScreen.userData.id);
+    
+    // Select this as the current screen
+    selectScreen(duckduckgoScreen);
+    
+    return duckduckgoScreen;
+}
+
+// Create a new Google Maps screen
+export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `Google Maps ${screens.length + 1}`;
+    
+    console.log("Creating Google Maps screen with iframe");
+    
+    // Create iframe content texture
+    const iframeTexture = createIframeTexture("https://www.google.com/maps/embed", 1024, 768);
+    
+    // Create the screen container
+    const mapsScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    
+    // Add basic identification data
+    mapsScreen.userData = { 
+        type: 'screen', 
+        id: screens.length,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1),
+        contentType: 'maps'
+    };
+    
+    // Add shadow and border
+    addDropShadow(mapsScreen, screenWidth, screenHeight);
+    
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x4285F4, // Google blue color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    mapsScreen.add(borderPanel);
+    
+    // Update drag handle reference
+    const topBar = mapsScreen.children.find(child => 
+        child.userData && child.userData.type === 'dragHandle');
+    
+    if (topBar) {
+        topBar.userData.screen = mapsScreen;
+        mapsScreen.userData.dragHandle = topBar;
+    }
+    
+    // Add to scene and screens array
+    scene.add(mapsScreen);
+    screens.push(mapsScreen);
+    
+    // Add entrance animation
+    animateScreenEntrance(mapsScreen);
+    
+    console.log("Created Google Maps screen with ID:", mapsScreen.userData.id);
+    
+    // Select this as the current screen
+    selectScreen(mapsScreen);
+    
+    return mapsScreen;
+}
+
+// Create a new Electron app screen
+export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `Electron App ${screens.length + 1}`;
+    
+    console.log("Creating Electron App simulation screen");
+    
+    // Create a placeholder texture for Electron (we can't actually run Electron in the browser)
+    const electronTexture = createElectronPlaceholderTexture();
+    
+    // Create the screen container
+    const electronScreen = enhancedCreateScreen(position, size, title, electronTexture);
+    
+    // Add basic identification data
+    electronScreen.userData = { 
+        type: 'screen', 
+        id: screens.length,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1),
+        contentType: 'electron'
+    };
+    
+    // Add shadow and border
+    addDropShadow(electronScreen, screenWidth, screenHeight);
+    
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x47848F, // Electron teal color
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    electronScreen.add(borderPanel);
+    
+    // Update drag handle reference
+    const topBar = electronScreen.children.find(child => 
+        child.userData && child.userData.type === 'dragHandle');
+    
+    if (topBar) {
+        topBar.userData.screen = electronScreen;
+        electronScreen.userData.dragHandle = topBar;
+    }
+    
+    // Add to scene and screens array
+    scene.add(electronScreen);
+    screens.push(electronScreen);
+    
+    // Add entrance animation
+    animateScreenEntrance(electronScreen);
+    
+    console.log("Created Electron App screen with ID:", electronScreen.userData.id);
+    
+    // Select this as the current screen
+    selectScreen(electronScreen);
+    
+    return electronScreen;
+}
+
+// Create an iframe-based texture (simulated, won't actually load iframes in WebXR)
+function createIframeTexture(url, width = 1024, height = 768) {
+    // Create a canvas to simulate iframe content
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with a light background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw a border
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    
+    // Draw the URL bar
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(10, 10, canvas.width - 20, 30);
+    
+    // Draw the URL text
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    
+    // Truncate URL if too long
+    let displayUrl = url;
+    if (url.length > 40) {
+        displayUrl = url.substring(0, 37) + '...';
+    }
+    ctx.fillText(displayUrl, 20, 25);
+    
+    // Draw loading indicator or content placeholder
+    ctx.fillStyle = '#f8f8f8';
+    ctx.fillRect(10, 50, canvas.width - 20, height - 60);
+    
+    // Draw content based on URL type
+    if (url.includes('youtube')) {
+        // Draw YouTube style content
+        // Red header
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(10, 50, canvas.width - 20, 50);
+        
+        // YouTube logo
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('YouTube', 30, 75);
+        
+        // Video player area
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(100, 120, width - 200, height - 240);
+        
+        // Play button
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(width/2 - 25, height/2 - 30);
+        ctx.lineTo(width/2 + 35, height/2);
+        ctx.lineTo(width/2 - 25, height/2 + 30);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Video title
+        ctx.fillStyle = '#333333';
+        ctx.font = '18px Arial';
+        ctx.fillText('AR Experience Video', 100, height - 90);
+        
+    } else if (url.includes('duckduckgo')) {
+        // Draw DuckDuckGo style content
+        // Logo area
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(10, 50, canvas.width - 20, 150);
+        
+        // DuckDuckGo logo (simplified)
+        ctx.fillStyle = '#de5833';
+        ctx.beginPath();
+        ctx.arc(width/2, 120, 50, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Search bar
+        ctx.fillStyle = '#f7f7f7';
+        ctx.fillRect(width/2 - 200, 190, 400, 40);
+        ctx.strokeStyle = '#de5833';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(width/2 - 200, 190, 400, 40);
+        
+        // Search text
+        ctx.fillStyle = '#888888';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Search the web without being tracked...', width/2 - 190, 210);
+        
+    } else if (url.includes('maps')) {
+        // Draw Google Maps style content
+        // Sky
+        ctx.fillStyle = '#a5d6ff';
+        ctx.fillRect(10, 50, canvas.width - 20, height - 60);
+        
+        // Land
+        ctx.fillStyle = '#e8e8e8';
+        ctx.fillRect(10, height - 300, canvas.width - 20, 250);
+        
+        // Roads
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(10, height - 200);
+        ctx.lineTo(canvas.width - 10, height - 150);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(width/2, 50);
+        ctx.lineTo(width/2, height - 60);
+        ctx.stroke();
+        
+        // Buildings
+        ctx.fillStyle = '#cccccc';
+        for (let i = 0; i < 10; i++) {
+            const bw = Math.random() * 60 + 40;
+            const bh = Math.random() * 80 + 40;
+            const bx = Math.random() * (width - bw - 40) + 20;
+            const by = Math.random() * (height - 350) + 70;
+            ctx.fillRect(bx, by, bw, bh);
+        }
+        
+        // Location pin
+        ctx.fillStyle = '#EA4335';
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(width/2, height/2);
+        ctx.lineTo(width/2, height/2 + 25);
+        ctx.lineTo(width/2 - 10, height/2 + 15);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    return texture;
+}
+
+// Create a placeholder texture for Electron apps
+function createElectronPlaceholderTexture(width = 1024, height = 768) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw window with title bar (Electron style)
+    // Background
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, '#2b2e3b');
+    gradient.addColorStop(1, '#1e2028');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    
+    // Title bar
+    ctx.fillStyle = '#121317';
+    ctx.fillRect(0, 0, width, 30);
+    
+    // Window controls (macOS style)
+    const controlColors = ['#FF5F56', '#FFBD2E', '#27C93F'];
+    controlColors.forEach((color, i) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(20 + i * 25, 15, 8, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    
+    // Title
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Electron YouTube App', width/2, 20);
+    
+    // Electron logo
+    ctx.fillStyle = '#47848F';
+    ctx.beginPath();
+    ctx.arc(width/2, height/2 - 50, 80, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(width/2, height/2 - 50, 40, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Electron name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Electron', width/2, height/2 + 80);
+    
+    // YouTube placeholder
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(width/2 - 200, height/2 + 120, 400, 225);
+    
+    // YouTube logo
+    ctx.fillStyle = '#FF0000';
+    ctx.fillRect(width/2 - 150, height/2 + 140, 50, 35);
+    
+    // Play button
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(width/2 - 15, height/2 + 220);
+    ctx.lineTo(width/2 + 25, height/2 + 245);
+    ctx.lineTo(width/2 - 15, height/2 + 270);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Status bar with info
+    ctx.fillStyle = '#121317';
+    ctx.fillRect(0, height - 25, width, 25);
+    
+    ctx.fillStyle = '#77787a';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Electron v24.0.0', 10, height - 8);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    return texture;
 }
 
 // Add a drop shadow for better depth perception

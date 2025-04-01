@@ -361,6 +361,9 @@ export function createControlPanel() {
         button.add(labelMesh);
     });
     
+    // Create a content type selector panel
+    createScreenTypeSelector(controlPanel, -0.05, -0.05, buttonSize);
+    
     // Position control panel
     controlPanel.position.set(0, 0, -0.5);
     
@@ -406,84 +409,309 @@ function createButtonIcon(buttonIndex) {
     // Set up shared styling - more modern look
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 12; // Thicker lines for better visibility
+    ctx.lineWidth = 10;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
-    // Draw different icons based on button index
-    switch(buttonIndex) {
-        case 0: // New Screen icon - Plus symbol with circle
-            // Draw circle
-            ctx.beginPath();
-            ctx.arc(128, 128, 90, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.stroke();
-            
-            // Draw plus
-            ctx.beginPath();
-            ctx.moveTo(80, 128);
-            ctx.lineTo(176, 128);
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(128, 80);
-            ctx.lineTo(128, 176);
-            ctx.stroke();
-            break;
-            
-        case 1: // Delete Screen icon - Modern trash can
-            // Draw trash can body with rounded corners
-            ctx.beginPath();
-            ctx.moveTo(90, 90);
-            ctx.lineTo(90, 190);
-            ctx.quadraticCurveTo(90, 200, 100, 200);
-            ctx.lineTo(156, 200);
-            ctx.quadraticCurveTo(166, 200, 166, 190);
-            ctx.lineTo(166, 90);
-            ctx.strokeStyle = '#ffffff';
-            ctx.stroke();
-            
-            // Draw lid
-            ctx.beginPath();
-            ctx.moveTo(80, 90);
-            ctx.lineTo(176, 90);
-            ctx.stroke();
-            
-            // Draw handle
-            ctx.beginPath();
-            ctx.moveTo(110, 90);
-            ctx.lineTo(110, 70);
-            ctx.quadraticCurveTo(110, 60, 120, 60);
-            ctx.lineTo(136, 60);
-            ctx.quadraticCurveTo(146, 60, 146, 70);
-            ctx.lineTo(146, 90);
-            ctx.stroke();
-            
-            // Draw lines inside trash can
-            ctx.lineWidth = 8; // Thinner lines for interior
-            ctx.beginPath();
-            ctx.moveTo(110, 110);
-            ctx.lineTo(110, 175);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(128, 110);
-            ctx.lineTo(128, 175);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(146, 110);
-            ctx.lineTo(146, 175);
-            ctx.stroke();
-            break;
+    // Determine which icon to draw
+    if (buttonIndex === 0) { // New Screen button
+        // Draw a modern plus sign
+        ctx.beginPath();
+        ctx.moveTo(64, 128);
+        ctx.lineTo(192, 128);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(128, 64);
+        ctx.lineTo(128, 192);
+        ctx.stroke();
+    } else if (buttonIndex === 1) { // Delete button
+        // Draw a modern 'X'
+        ctx.beginPath();
+        ctx.moveTo(80, 80);
+        ctx.lineTo(176, 176);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(176, 80);
+        ctx.lineTo(80, 176);
+        ctx.stroke();
+    } else if (buttonIndex === 2) { // YouTube icon
+        // Red circle with play button
+        ctx.fillStyle = '#FF0000';
+        ctx.beginPath();
+        ctx.arc(128, 128, 90, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // White play button
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(100, 90);
+        ctx.lineTo(180, 128);
+        ctx.lineTo(100, 166);
+        ctx.closePath();
+        ctx.fill();
+    } else if (buttonIndex === 3) { // DuckDuckGo icon
+        // Orange circle
+        ctx.fillStyle = '#DE5833';
+        ctx.beginPath();
+        ctx.arc(128, 128, 90, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Duck silhouette (simplified)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(148, 108, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#DE5833';
+        ctx.beginPath();
+        ctx.arc(158, 98, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(130, 130);
+        ctx.lineTo(180, 170);
+        ctx.lineTo(130, 170);
+        ctx.closePath();
+        ctx.fill();
+    } else if (buttonIndex === 4) { // Google Maps icon
+        // Blue-ish background
+        ctx.fillStyle = '#4285F4';
+        ctx.beginPath();
+        ctx.arc(128, 128, 90, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Maps pin
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(128, 108, 40, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#EA4335';
+        ctx.beginPath();
+        ctx.moveTo(128, 108);
+        ctx.lineTo(128, 188);
+        ctx.lineTo(108, 168);
+        ctx.closePath();
+        ctx.fill();
+    } else if (buttonIndex === 5) { // Electron icon
+        // Teal background
+        ctx.fillStyle = '#47848F';
+        ctx.beginPath();
+        ctx.arc(128, 128, 90, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Electron orbits and nucleus
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 8;
+        
+        // Orbit 1
+        ctx.beginPath();
+        ctx.ellipse(128, 128, 70, 30, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Orbit 2
+        ctx.beginPath();
+        ctx.ellipse(128, 128, 70, 30, Math.PI/3, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Orbit 3
+        ctx.beginPath();
+        ctx.ellipse(128, 128, 70, 30, -Math.PI/3, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Nucleus
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(128, 128, 20, 0, Math.PI * 2);
+        ctx.fill();
     }
     
-    // Create texture from canvas
+    // Create a texture from the canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     
     return texture;
+}
+
+// Create a screen type selector with buttons for different content types
+function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
+    // Create a panel for content type selection
+    const selectorGroup = new THREE.Group();
+    
+    // Create a background panel for the selector
+    const panelWidth = 0.24;
+    const panelHeight = 0.08;
+    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+    
+    // Create a texture for the selector panel
+    const panelCanvas = document.createElement('canvas');
+    panelCanvas.width = 512;
+    panelCanvas.height = 128;
+    const panelCtx = panelCanvas.getContext('2d');
+    
+    // Draw panel background with subtle gradient
+    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+    gradient.addColorStop(0, 'rgba(40, 40, 60, 0.9)');
+    gradient.addColorStop(1, 'rgba(30, 30, 45, 0.9)');
+    panelCtx.fillStyle = gradient;
+    
+    // Draw rounded rectangle
+    const cornerRadius = 20;
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+    panelCtx.lineTo(cornerRadius, panelCanvas.height);
+    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    panelCtx.fill();
+    
+    // Add title
+    panelCtx.fillStyle = '#ffffff';
+    panelCtx.font = 'bold 16px Arial';
+    panelCtx.textAlign = 'center';
+    panelCtx.fillText('SCREEN TYPES', panelCanvas.width/2, 20);
+    
+    // Add subtle border
+    panelCtx.strokeStyle = 'rgba(120, 120, 200, 0.3)';
+    panelCtx.lineWidth = 2;
+    panelCtx.stroke();
+    
+    // Create texture for panel
+    const panelTexture = new THREE.CanvasTexture(panelCanvas);
+    panelTexture.needsUpdate = true;
+    
+    const panelMaterial = new THREE.MeshBasicMaterial({
+        map: panelTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    panelMesh.renderOrder = 1004;
+    selectorGroup.add(panelMesh);
+    
+    // Create type selection buttons (4 buttons in a row)
+    const buttonTypes = ['youtube', 'duckduckgo', 'maps', 'electron'];
+    const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
+    const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
+    
+    const smallButtonSize = buttonSize * 0.7; // Make buttons smaller than main buttons
+    const spacing = smallButtonSize * 2.2; // Space between buttons
+    const startX = -spacing * 1.5; // Starting position for first button
+    
+    buttonTypes.forEach((type, index) => {
+        // Create the button
+        const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
+        const buttonMaterial = new THREE.MeshBasicMaterial({
+            color: buttonColors[index],
+            transparent: false,
+            side: THREE.DoubleSide
+        });
+        
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.position.set(startX + spacing * index, 0, 0.003);
+        button.renderOrder = 1005;
+        button.userData = {
+            type: 'button',
+            action: 'selectScreenType',
+            screenType: buttonTypes[index],
+            hoverColor: new THREE.Color(buttonColors[index]).lerp(new THREE.Color(0xFFFFFF), 0.3), // Lighter version for hover
+            activeColor: buttonColors[index],
+            inactiveColor: buttonColors[index],
+            originalColor: buttonColors[index],
+            isToggle: false,
+            isActive: true
+        };
+        
+        // Add icon to button
+        const iconTexture = createButtonIcon(buttonIcons[index]);
+        const iconSize = smallButtonSize * 0.75;
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            map: iconTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.z = 0.004;
+        iconMesh.renderOrder = 1006;
+        button.add(iconMesh);
+        
+        // Add button shadow
+        const shadowGeometry = new THREE.CircleGeometry(smallButtonSize / 2 * 1.1, 32);
+        const shadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        
+        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+        shadowMesh.position.z = -0.001;
+        shadowMesh.renderOrder = 1004;
+        button.add(shadowMesh);
+        
+        // Add button highlight
+        const highlightGeometry = new THREE.RingGeometry(smallButtonSize/2 * 0.7, smallButtonSize/2, 32, 1, 0, Math.PI);
+        const highlightMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        
+        const highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+        highlightMesh.rotation.z = Math.PI;
+        highlightMesh.position.z = 0.0015;
+        highlightMesh.renderOrder = 1005;
+        button.add(highlightMesh);
+        
+        // Add tiny labels below buttons
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 64;
+        labelCanvas.height = 16;
+        const labelCtx = labelCanvas.getContext('2d');
+        
+        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = 'bold 10px Arial';
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        
+        // Customize label based on type
+        let label = type.charAt(0).toUpperCase() + type.slice(1);
+        labelCtx.fillText(label, labelCanvas.width / 2, labelCanvas.height / 2);
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.3, smallButtonSize * 0.4);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(0, -smallButtonSize * 0.8, 0.003);
+        labelMesh.renderOrder = 1005;
+        button.add(labelMesh);
+        
+        selectorGroup.add(button);
+    });
+    
+    // Position the selector below the main buttons
+    selectorGroup.position.set(offsetX, offsetY, 0.001);
+    parent.add(selectorGroup);
+    
+    return selectorGroup;
 }
 
 // Create a virtual keyboard

@@ -5,7 +5,10 @@ import {
     isPlacingScreen, newScreen, isMoveModeActive,
     isRotateModeActive, selectedScreen, selectedKey
 } from './ar_core.js';
-import { screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen } from './ar_screens.js';
+import { 
+    screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
+    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
+} from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
@@ -336,6 +339,50 @@ function handleButtonAction(button) {
             
             // Create visual indicator
             createModeChangeIndicator('Screen Deleted');
+            break;
+            
+        case 'selectScreenType':
+            console.log("Screen type button pressed:", button.userData.screenType);
+            // Get camera position and direction
+            const cameraPosition = new THREE.Vector3();
+            camera.getWorldPosition(cameraPosition);
+            
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(camera.quaternion);
+            
+            // Position screen in front of camera
+            const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
+            
+            // Create the appropriate screen type
+            let newScreen;
+            const screenType = button.userData.screenType;
+            
+            switch(screenType) {
+                case 'youtube':
+                    newScreen = createYouTubeScreen(screenPosition);
+                    break;
+                case 'duckduckgo':
+                    newScreen = createDuckDuckGoScreen(screenPosition);
+                    break;
+                case 'maps':
+                    newScreen = createGoogleMapsScreen(screenPosition);
+                    break;
+                case 'electron':
+                    newScreen = createElectronAppScreen(screenPosition);
+                    break;
+                default:
+                    newScreen = createNewBrowserScreen(screenPosition);
+                    break;
+            }
+            
+            // Make it face the camera
+            newScreen.lookAt(camera.position);
+            
+            // Add visual feedback
+            createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
+            
+            // Select this screen
+            selectScreen(newScreen);
             break;
             
         case 'moveMode':
