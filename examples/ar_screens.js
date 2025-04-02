@@ -648,7 +648,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     // Define screen dimensions
     const screenWidth = size.x;
     const screenHeight = size.y;
-    const topBarHeight = 0.04; // Reduced from 0.06 to match the 1/6 proportion better
+    const topBarHeight = 0.06; // Thinner top bar
     
     // Content background - create this first so it's behind the top bar
     const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
@@ -730,7 +730,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     // Create a modern grip pattern to indicate draggability with improved styling
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
-    canvas.height = 48; // Reduced height for thinner top bar (from 64 to 48)
+    canvas.height = 64; // Reduced height for thinner top bar
     const ctx = canvas.getContext('2d');
     
     // Create a gradient background for the top bar
@@ -744,9 +744,9 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
     
-    // Draw screen title with improved typography - smaller font for thinner bar
+    // Draw screen title with improved typography
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px Inter, Arial, sans-serif'; // Reduced from 26px to 22px
+    ctx.font = 'bold 26px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
