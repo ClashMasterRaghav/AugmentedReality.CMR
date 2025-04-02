@@ -8,7 +8,7 @@ import { videoTexture } from './ar_media.js';
 // Array to store screen objects
 export let screens = [];
 let css3dRenderer;
-let css3dScene;
+export let css3dScene;
 
 // Initialize CSS3D renderer for real web content
 export function initCSS3DRenderer() {

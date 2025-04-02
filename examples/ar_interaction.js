@@ -8,10 +8,23 @@ import {
 import { 
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
     createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, 
-    createElectronAppScreen, createScreenFromButton
+    createElectronAppScreen, createScreenFromButton, css3dScene
 } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
+import { camera, scene, renderer, raycaster, hoverLabel, lastIntersected, 
+         buttons, screenIndicator, controlPanel, glowMaterials } from './ar_setup.js';
+import { Vector3, Quaternion, Matrix4, Clock, Color, AudioListener, 
+         Group, CylinderGeometry, MeshStandardMaterial, Mesh, 
+         SphereGeometry, Euler, MeshBasicMaterial, Object3D,
+         LoadingManager, FrontSide, PlaneGeometry } from 'three';
+import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+import { addHapticFeedback, setVirtualDragPlane, worldToScreenPosition } from './ar_utils.js';
+import { screens, createNewScreen, updateScreenPosition, screenHeight, screenWidth, 
+         createScreenFromButton, useScreenColor } from './ar_screens.js';
+import { css3dScene } from './ar_screens.js';
+import { createHint, showGrabHandsHint, showTouchScreenHint, hideHint } from './ar_tutorial.js';
+import { showTooltip, hideTooltip } from './ar_ui.js';
 
 // Touch interaction variables
 let touchEnabled = true;
@@ -1435,7 +1448,7 @@ export function deleteLastScreen() {
     if (!screens || screens.length === 0) {
         console.log("No screens to delete");
         createModeChangeIndicator('No Screens to Delete');
-        return false;
+        return null;
     }
     
     // Get the current selected screen from the imported module variable
@@ -1455,12 +1468,58 @@ export function deleteLastScreen() {
             // Make sure it's visually marked as selected
             selectScreen(screenToDelete);
         } else {
-            return false;
+            return null;
         }
     }
     
     // Log which screen is being deleted
     console.log("Deleting selected screen with ID:", screenToDelete.userData ? screenToDelete.userData.id : "unknown");
+    
+    // IMPORTANT: Clean up CSS3D object if this screen has one
+    if (screenToDelete.userData && screenToDelete.userData.hasRealContent && screenToDelete.userData.css3dObject) {
+        console.log("Removing CSS3D object for screen:", screenToDelete.userData.id);
+        
+        // Remove the CSS3D object from the css3dScene
+        // We import css3dScene directly from ar_screens.js
+        if (css3dScene) {
+            css3dScene.remove(screenToDelete.userData.css3dObject);
+        }
+        
+        // If the screen contains an iframe element, remove it from the DOM to prevent memory leaks
+        if (screenToDelete.userData.css3dObject.element) {
+            // Check if it's an iframe
+            if (screenToDelete.userData.css3dObject.element.tagName === 'IFRAME') {
+                console.log("Cleaning up iframe for screen:", screenToDelete.userData.id);
+                // Stop any media playback
+                screenToDelete.userData.css3dObject.element.src = 'about:blank';
+                
+                // Remove from DOM when safe to do so
+                setTimeout(() => {
+                    if (screenToDelete.userData.css3dObject.element.parentNode) {
+                        screenToDelete.userData.css3dObject.element.parentNode.removeChild(
+                            screenToDelete.userData.css3dObject.element
+                        );
+                    }
+                }, 100);
+            }
+        }
+        
+        // Dispose of any textures on the screen
+        screenToDelete.traverse(child => {
+            if (child.material && child.material.map) {
+                child.material.map.dispose();
+            }
+            if (child.geometry) {
+                child.geometry.dispose();
+            }
+            if (child.material) {
+                child.material.dispose();
+            }
+        });
+        
+        // Clear references
+        screenToDelete.userData.css3dObject = null;
+    }
     
     // Create visual deletion effect
     createDeletionEffect(screenToDelete.position.clone());
@@ -1496,7 +1555,7 @@ export function deleteLastScreen() {
     const screenId = screenToDelete.userData && screenToDelete.userData.id !== undefined ? 
         screenToDelete.userData.id : 'unknown';
     createModeChangeIndicator(`Screen ${screenId} Deleted`);
-    return true;
+    return screenToDelete;
 }
 
 // Create deletion visual effect
