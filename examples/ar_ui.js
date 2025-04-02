@@ -585,7 +585,10 @@ export function createControlPanel() {
     // Add panel to scene - don't add the screen type selector since it's now integrated
     scene.add(controlPanel);
     
-    // Position the panel
+    // Initial position (make sure it's visible)
+    controlPanel.position.set(0, 0, -0.5);
+    
+    // Position the panel properly
     setupControlPanel();
     
     return controlPanel;
@@ -981,7 +984,7 @@ export function setupControlPanel() {
     if (!controlPanel) return;
     
     // Only reposition if not being dragged AND not previously manually positioned
-    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
+    if (controlPanel.userData && (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned)) return;
     
     // Position in front and below the user
     const cameraDirection = new THREE.Vector3(0, 0, -1);
@@ -990,8 +993,8 @@ export function setupControlPanel() {
     const position = new THREE.Vector3();
     position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
     
-    // Position BELOW the default screen position
-    position.y -= 0.4; // Position it much lower to appear below the screen
+    // Position lower to account for taller panel
+    position.y -= 0.35; // Adjusted for new taller panel
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
@@ -999,7 +1002,7 @@ export function setupControlPanel() {
     
     // Keep panel facing the user but upright
     const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-    euler.x = 0; // Keep panel upright (no tilt)
+    euler.x = -0.2; // Slight tilt for better visibility (changed from 0)
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
