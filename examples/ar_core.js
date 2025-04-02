@@ -139,7 +139,7 @@ function initAREnvironment() {
 
     // Initialize UI elements - make sure scene exists first
     if (scene) {
-        initUI();
+        initUI(scene);
     } else {
         console.error("Cannot initialize UI - scene is undefined");
     }

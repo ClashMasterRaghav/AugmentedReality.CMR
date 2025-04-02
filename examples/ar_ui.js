@@ -29,9 +29,28 @@ export function createNotification(message, type = 'info') {
 export const showNotification = createNotification;
 
 // Initialize UI elements
-export function initUI() {
-    createControlPanel();
-    createVirtualKeyboard();
+export function initUI(sceneRef) {
+    try {
+        // Use a scene reference passed directly, from window, or from the module
+        const sceneToUse = sceneRef || window.arScene || scene;
+        
+        if (!sceneToUse) {
+            console.error("Cannot initialize UI: no scene reference available");
+            return false;
+        }
+        
+        // Set module-level scene for components that need it
+        window.arScene = sceneToUse;
+        
+        // Initialize UI components with explicit scene reference
+        createControlPanel(sceneToUse);
+        createVirtualKeyboard();
+        
+        return true;
+    } catch (error) {
+        console.error("Error initializing UI:", error);
+        return false;
+    }
 }
 
 // Create a notification in the DOM
@@ -73,6 +92,14 @@ function createDOMNotification(message, type = 'info') {
 // Create a 3D notification in space
 function create3DNotification(message, type = 'info') {
     if (!camera) return;
+    
+    // Get a valid scene reference
+    const sceneToUse = window.arScene || scene;
+    
+    if (!sceneToUse) {
+        console.error("Cannot create 3D notification: no scene reference available");
+        return;
+    }
     
     // Create canvas for the notification
     const canvas = document.createElement('canvas');
@@ -143,11 +170,11 @@ function create3DNotification(message, type = 'info') {
     notificationMesh.quaternion.copy(camera.quaternion);
     
     // Add to scene
-    scene.add(notificationMesh);
+    sceneToUse.add(notificationMesh);
     
     // Remove after timeout
     setTimeout(() => {
-        scene.remove(notificationMesh);
+        sceneToUse.remove(notificationMesh);
         material.dispose();
         geometry.dispose();
         texture.dispose();

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { initAR, render, animate } from './ar_core.js?v=4';
+import { initAR, render, animate, scene } from './ar_core.js?v=4';
 import { setupEventListeners } from './ar_interaction.js?v=4';
 import { loadVideoTexture } from './ar_media.js?v=4';
 import { createButton, createControlPanel, updateControlPanel } from './ar_ui_wrapper.js?v=4';
@@ -171,17 +171,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // AR Main - Interactive Web Content Demo
 async function init() {
-    // Initialize AR
-    await initAR();
-    
-    // Add demo controls
-    createDemoControls();
-    
-    // Start AR
-    await startAR();
-    
-    // Animation loop
-    renderer.setAnimationLoop(update);
+    try {
+        // Initialize AR
+        await initAR();
+        
+        // Make sure global scene is set for UI components
+        window.arScene = scene;
+        
+        // Add demo controls
+        createDemoControls();
+        
+        // Start AR
+        await startAR();
+        
+        // Animation loop
+        renderer.setAnimationLoop(update);
+    } catch (error) {
+        console.error("Failed to initialize AR:", error);
+    }
 }
 
 // Function to create demo controls for different web content approaches

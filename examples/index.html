@@ -76,6 +76,22 @@
             display: none;
             z-index: 100;
         }
+
+        #errorDisplay {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(255, 0, 0, 0.7);
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 90%;
+            max-height: 150px;
+            overflow: auto;
+            z-index: 1000;
+        }
         
         @keyframes spin {
             0% { transform: translate(-50%, -50%) rotate(0deg); }
@@ -99,6 +115,7 @@
     </div>
     
     <div id="loadingIndicator"></div>
+    <div id="errorDisplay" style="display: none;"></div>
     
     <!-- Load Three.js -->
     <script type="importmap">
@@ -113,7 +130,7 @@
     <!-- Main application -->
     <script type="module">
         // Add a cache busting random value to prevent browser caching
-        const cacheBuster = Math.random().toString(36).substring(2, 15);
+        const cacheBuster = Math.random().toString(36).substring(2, 15) + Date.now();
         
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
@@ -124,7 +141,17 @@
         window.CSS3DRenderer = CSS3DRenderer;
         window.CSS3DObject = CSS3DObject;
         
-        // Import our application modules with cache busting
+        // Set up error tracking
+        window.addEventListener('error', function(event) {
+            const errorDisplay = document.getElementById('errorDisplay');
+            if (errorDisplay) {
+                errorDisplay.style.display = 'block';
+                errorDisplay.innerHTML += `<div>${event.message} at ${event.filename}:${event.lineno}</div>`;
+                console.error("Caught error:", event);
+            }
+        });
+        
+        // Import our application modules with aggressive cache busting
         import { checkXRSupport } from `./ar_core.js?v=${cacheBuster}`;
         import { initAR, startAR, updateAR, scene, camera, renderer } from `./ar_core.js?v=${cacheBuster}`;
         
@@ -143,18 +170,24 @@
                         startButton.style.display = 'none';
                         loadingIndicator.style.display = 'block';
                         
-                        // Load the demo module dynamically with cache busting
-                        import(`./ar_main.js?v=${cacheBuster}`).then(module => {
-                            // Module loaded, the init function will be called automatically
-                            loadingIndicator.style.display = 'none';
-                            setTimeout(() => {
-                                infoElement.style.display = 'none';
-                            }, 5000);
-                        }).catch(error => {
-                            console.error('Failed to load AR module:', error);
-                            loadingIndicator.style.display = 'none';
-                            displayError('Failed to load AR module. Please try again.');
-                        });
+                        // Set global scene reference for modules that need it
+                        window.startARApp = function() {
+                            // Load the demo module dynamically with aggressive cache busting
+                            import(`./ar_main.js?v=${cacheBuster}`).then(module => {
+                                // Module loaded, the init function will be called automatically
+                                loadingIndicator.style.display = 'none';
+                                setTimeout(() => {
+                                    infoElement.style.display = 'none';
+                                }, 5000);
+                            }).catch(error => {
+                                console.error('Failed to load AR module:', error);
+                                loadingIndicator.style.display = 'none';
+                                displayError('Failed to load AR module. Please try again. Error: ' + error.message);
+                            });
+                        };
+                        
+                        // Start with a slight delay to ensure DOM is ready
+                        setTimeout(window.startARApp, 100);
                     });
                 } else {
                     // WebXR is not supported
