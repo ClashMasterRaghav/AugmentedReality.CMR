@@ -198,79 +198,100 @@ async function init() {
 }
 
 // Function to create demo controls for different web content approaches
-function createDemoControls() {
+export function createDemoControls() {
+    console.log("Creating demo controls...");
     try {
-        // Create the main control panel first to hold our buttons
-        const controlPanel = createControlPanel(scene);
+        // Create control panel
+        const controlPanel = createControlPanel({
+            width: 0.5,
+            height: 0.25,
+            position: new THREE.Vector3(0, -0.3, -0.7),
+            title: 'Web Experience',
+            transparent: true
+        });
         
         if (!controlPanel) {
-            console.error("Failed to create control panel for demo");
+            console.error("Failed to create control panel");
             return null;
         }
         
-        // Check if controlPanel.mesh exists - it's needed for buttons
-        if (!controlPanel.mesh) {
-            console.warn("Control panel created but has no mesh property for buttons");
-            // Try to use the controlPanel itself as the parent
-            controlPanel.mesh = controlPanel;
+        console.log("Control panel created:", controlPanel);
+        
+        // Ensure controlPanel has a mesh property for button parent
+        let buttonParent = controlPanel;
+        if (controlPanel.mesh) {
+            buttonParent = controlPanel.mesh;
+        } else if (controlPanel.children && controlPanel.children.length > 0) {
+            // Try to find a suitable mesh in children
+            const possibleMesh = controlPanel.children.find(child => 
+                child instanceof THREE.Mesh && 
+                child.geometry instanceof THREE.PlaneGeometry);
+            
+            if (possibleMesh) {
+                buttonParent = possibleMesh;
+                console.log("Using child mesh as button parent");
+            } else {
+                console.warn("No suitable mesh found in control panel children");
+            }
+        } else {
+            console.warn("Control panel does not have a mesh property or children");
         }
         
-        // Create a safe parent reference
-        const buttonParent = controlPanel.mesh || controlPanel;
+        // Shared button configuration
+        const buttonConfig = {
+            parent: buttonParent,
+            height: 0.06,
+            width: 0.35,
+            color: 0x2196F3
+        };
         
-        // Add buttons for each approach, with error handling
+        // Create buttons
+        let buttonsCreated = 0;
+        const totalButtons = 3;
+        
         try {
-            createButton({
-                parent: buttonParent,
-                position: new THREE.Vector3(-0.15, 0.05, 0.01),
-                width: 0.25,
-                height: 0.07,
-                label: "DOM Injection",
-                onClick: () => createDOMDemo()
+            const fixedButton = createButton({
+                ...buttonConfig,
+                position: new THREE.Vector3(0, 0.07, 0.01),
+                label: 'Fixed Content',
+                onClick: () => loadWebContent('fixed')
             });
             
-            createButton({
-                parent: buttonParent,
-                position: new THREE.Vector3(0.15, 0.05, 0.01),
-                width: 0.25,
-                height: 0.07,
-                label: "HTML Texture",
-                onClick: () => createTextureDemo()
-            });
-            
-            createButton({
-                parent: buttonParent,
-                position: new THREE.Vector3(-0.15, -0.05, 0.01),
-                width: 0.25,
-                height: 0.07,
-                label: "DOM Overlay",
-                onClick: () => createOverlayDemo()
-            });
-            
-            createButton({
-                parent: buttonParent,
-                position: new THREE.Vector3(0.15, -0.05, 0.01),
-                width: 0.25,
-                height: 0.07,
-                label: "Web Messaging",
-                onClick: () => createMessagingDemo()
-            });
-            
-            createButton({
-                parent: buttonParent,
-                position: new THREE.Vector3(0, -0.15, 0.01),
-                width: 0.5,
-                height: 0.07,
-                label: "Reset All Demos",
-                onClick: resetAllDemos
-            });
+            if (fixedButton) buttonsCreated++;
         } catch (error) {
-            console.error("Error creating control panel buttons:", error);
+            console.error("Failed to create Fixed Content button:", error);
         }
         
+        try {
+            const responsiveButton = createButton({
+                ...buttonConfig,
+                position: new THREE.Vector3(0, 0, 0.01),
+                label: 'Responsive Content',
+                onClick: () => loadWebContent('responsive')
+            });
+            
+            if (responsiveButton) buttonsCreated++;
+        } catch (error) {
+            console.error("Failed to create Responsive Content button:", error);
+        }
+        
+        try {
+            const virtualButton = createButton({
+                ...buttonConfig,
+                position: new THREE.Vector3(0, -0.07, 0.01),
+                label: 'VR Optimized Content',
+                onClick: () => loadWebContent('vr-optimized')
+            });
+            
+            if (virtualButton) buttonsCreated++;
+        } catch (error) {
+            console.error("Failed to create VR Optimized Content button:", error);
+        }
+        
+        console.log(`Created ${buttonsCreated}/${totalButtons} buttons successfully`);
         return controlPanel;
     } catch (error) {
-        console.error("Error in createDemoControls:", error);
+        console.error("Error creating demo controls:", error);
         return null;
     }
 }

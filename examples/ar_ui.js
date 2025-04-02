@@ -1278,6 +1278,12 @@ export function createButton(options = {}) {
             return null;
         }
         
+        // Verify parent is a valid THREE.Object3D
+        if (!(parent instanceof THREE.Object3D)) {
+            console.error("Parent must be a THREE.Object3D", parent);
+            return null;
+        }
+        
         // Create button group
         const button = new THREE.Group();
         button.position.copy(position);
@@ -1352,8 +1358,19 @@ export function createButton(options = {}) {
             onClick: onClick
         };
         
-        // Add to parent
-        parent.add(button);
+        // Try to safely add to parent
+        try {
+            if (parent.add && typeof parent.add === 'function') {
+                parent.add(button);
+                console.log("Button added successfully:", label);
+            } else {
+                console.error("Parent object doesn't have an add method");
+                return null;
+            }
+        } catch (error) {
+            console.error("Failed to add button to parent:", error);
+            return null;
+        }
         
         return button;
     } catch (error) {

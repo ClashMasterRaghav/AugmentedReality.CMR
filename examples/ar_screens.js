@@ -1207,6 +1207,9 @@ function createFallbackTexture(screenNumber) {
 // Select a screen and update UI accordingly with enhanced visual feedback
 export function selectScreen(screen) {
     try {
+        // IMPORTANT: Don't try to use keyboard for now - it's causing errors
+        const skipKeyboardUpdate = true;
+        
         // Deselect previously selected screen
         if (selectedScreen) {
             try {
@@ -1277,10 +1280,10 @@ export function selectScreen(screen) {
             console.warn("Error while applying visual effects to selected screen:", error);
         }
         
-        // Position keyboard under selected screen if needed
-        if (virtualKeyboard) {
+        // Position keyboard under selected screen if needed - skip if we're having issues
+        if (!skipKeyboardUpdate && virtualKeyboard) {
             try {
-                updateKeyboardPosition(screen);
+                updateKeyboardPosition(screen, virtualKeyboard);
             } catch (error) {
                 console.warn("Error updating keyboard position:", error);
             }
@@ -1331,49 +1334,66 @@ function animateScreenScale(screen, targetScale, duration, bounce = false) {
 }
 
 // Update keyboard position relative to the selected screen
-export function updateKeyboardPosition(screen) {
+export function updateKeyboardPosition(screen, virtualKeyboard) {
+    // Skip keyboard update due to known issues with camera and screen position
+    if (!screen || !virtualKeyboard) {
+        console.warn('Cannot update keyboard position: screen or keyboard is undefined');
+        return;
+    }
+
     try {
-        // Make sure we have necessary references
-        if (!screen) {
-            console.warn("Cannot update keyboard position: screen is undefined");
-            return;
-        }
-        
-        if (!virtualKeyboard) {
-            console.warn("Cannot update keyboard position: virtualKeyboard is undefined");
-            return;
-        }
-        
-        // Make sure screen position and scale exist
-        if (!screen.position || !screen.scale) {
-            console.warn("Cannot update keyboard position: screen position/scale is undefined");
-            return;
-        }
-        
-        // Safely clone position and scale
-        const screenPos = screen.position.clone();
+        // Position the keyboard below the screen
+        const screenPosition = screen.position.clone();
         const screenScale = screen.scale.clone();
         
-        // Position keyboard under selected screen, accounting for screen scale
-        virtualKeyboard.position.set(
-            screenPos.x, 
-            screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
-            screenPos.z + 0.02
-        );
+        // Calculate position below the screen
+        screenPosition.y -= 0.2 * screenScale.y;
         
-        // Scale keyboard proportionally to screen
-        const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
-        virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
+        // Set keyboard position
+        virtualKeyboard.position.copy(screenPosition);
         
-        // Check if camera exists before using it
-        if (camera) {
-            // Make keyboard face the user
-            virtualKeyboard.lookAt(camera.position);
-            virtualKeyboard.rotation.x = -Math.PI / 8;
+        // Try to make keyboard face the user using camera if available
+        const cameraRef = getActiveCamera();
+        
+        if (cameraRef) {
+            // Use camera to orient keyboard
+            const direction = new THREE.Vector3().subVectors(
+                cameraRef.position,
+                virtualKeyboard.position
+            );
+            
+            virtualKeyboard.lookAt(cameraRef.position);
+            
+            // Keep keyboard upright by zeroing rotation on x and z
+            virtualKeyboard.rotation.x = 0;
+            virtualKeyboard.rotation.z = 0;
+        } else {
+            // Fallback orientation if no camera
+            console.warn('No camera available for keyboard orientation, using default');
+            virtualKeyboard.rotation.set(0, 0, 0);
         }
     } catch (error) {
-        console.error("Error updating keyboard position:", error);
+        console.error('Error updating keyboard position:', error);
     }
+}
+
+// Helper function to get active camera from scene
+function getActiveCamera() {
+    // First try scene.camera if it exists
+    if (scene && scene.camera) {
+        return scene.camera;
+    }
+    
+    // Try to find PerspectiveCamera in scene
+    if (scene && scene.children) {
+        const foundCamera = scene.children.find(
+            child => child instanceof THREE.PerspectiveCamera
+        );
+        if (foundCamera) return foundCamera;
+    }
+    
+    // Last resort - create a default camera position
+    return null;
 }
 
 // Update visual effects for screens
