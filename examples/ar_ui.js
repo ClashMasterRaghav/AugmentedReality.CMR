@@ -499,7 +499,11 @@ export function createControlPanel(sceneRef) {
         }
         
         // Add screen type selector below the main panel
-        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
+        try {
+            createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
+        } catch (error) {
+            console.error("Error creating screen type selector:", error);
+        }
         
         return controlPanel;
     } catch (error) {
@@ -999,6 +1003,9 @@ export function createVirtualKeyboard(sceneRef) {
         const background = new THREE.Mesh(bgGeometry, bgMaterial);
         virtualKeyboard.add(background);
         
+        // Store the last created key mesh for the output display
+        let lastKeyMesh = null;
+        
         // Create keys
         layout.forEach((row, rowIndex) => {
             const rowWidth = row.length * keyWidth + (row.length + 1) * keyPadding;
@@ -1058,20 +1065,23 @@ export function createVirtualKeyboard(sceneRef) {
                 };
                 
                 virtualKeyboard.add(keyMesh);
+                lastKeyMesh = keyMesh;
             });
         });
         
-        // Create a simple label for the output display
-        const labelGeometry = new THREE.PlaneGeometry(keyboardWidth - keyPadding * 2, keyHeight);
-        const labelTexture = createOutputDisplay(keyboardWidth * 500 - keyPadding * 2 * 500, keyHeight * 300);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
-            transparent: true
-        });
-        
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.z = 0.001;
-        keyMesh.add(labelMesh);
+        // Create a simple label for the output display - add to keyboard background instead of last key
+        if (background) {
+            const labelGeometry = new THREE.PlaneGeometry(keyboardWidth - keyPadding * 2, keyHeight);
+            const labelTexture = createOutputDisplay(keyboardWidth * 500 - keyPadding * 2 * 500, keyHeight * 300);
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: labelTexture,
+                transparent: true
+            });
+            
+            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+            labelMesh.position.set(0, keyboardHeight/2 + keyHeight/2, 0.001);
+            virtualKeyboard.add(labelMesh);
+        }
         
         // Hide keyboard initially
         virtualKeyboard.visible = false;

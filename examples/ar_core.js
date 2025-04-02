@@ -108,31 +108,47 @@ function initAREnvironment() {
     });
 
     // Controller setup
-    controller = renderer.xr.getController(0);
+    if (!renderer || !renderer.xr) {
+        console.error("Cannot create controller: renderer or renderer.xr is undefined");
+        return false;
+    }
     
-    // Add controller event listeners
-    controller.addEventListener('selectstart', function() {
-        controller.userData.isSelecting = true;
-    });
-    
-    controller.addEventListener('selectend', function() {
-        controller.userData.isSelecting = false;
-    });
-    
-    scene.add(controller);
+    try {
+        // Try to get the controller but check if it exists
+        controller = renderer.xr.getController(0);
+        
+        if (!controller) {
+            console.error("Failed to get XR controller");
+            return false;
+        }
+        
+        // Add controller event listeners
+        controller.addEventListener('selectstart', function() {
+            controller.userData.isSelecting = true;
+        });
+        
+        controller.addEventListener('selectend', function() {
+            controller.userData.isSelecting = false;
+        });
+        
+        scene.add(controller);
 
-    // Controller model
-    const controllerModelFactory = new XRControllerModelFactory();
-    controllerGrip = renderer.xr.getControllerGrip(0);
-    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-    scene.add(controllerGrip);
+        // Controller model
+        const controllerModelFactory = new XRControllerModelFactory();
+        controllerGrip = renderer.xr.getControllerGrip(0);
+        controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+        scene.add(controllerGrip);
 
-    // Pointer for interaction - SMALLER SIZE
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-    const pointer = new THREE.Mesh(geometry, material);
-    pointer.position.z = -0.1;
-    controller.add(pointer);
+        // Pointer for interaction - SMALLER SIZE
+        const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+        const pointer = new THREE.Mesh(geometry, material);
+        pointer.position.z = -0.1;
+        controller.add(pointer);
+    } catch (error) {
+        console.error("Error setting up controller:", error);
+        return false;
+    }
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);

@@ -215,8 +215,9 @@ function createDemoControls() {
         // Add buttons for each approach - check if controlPanel exists first
         const addButton = (position, label, onClick) => {
             try {
+                // In our implementation, controlPanel itself is the parent (not controlPanel.mesh)
                 return createButton({
-                    parent: controlPanel.mesh || controlPanel,
+                    parent: controlPanel,
                     position: position,
                     width: 0.25,
                     height: 0.07,
