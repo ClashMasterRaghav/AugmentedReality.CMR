@@ -103,10 +103,12 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
         color: 0xE62117, // YouTube red color
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        depthTest: true
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
+    borderPanel.renderOrder = 990; // Ensure it's behind the content
     youtubeScreen.add(borderPanel);
     
     // Update drag handle reference
@@ -167,10 +169,12 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
         color: 0xDE5833, // DuckDuckGo orange color
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        depthTest: true
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
+    borderPanel.renderOrder = 990; // Ensure it's behind the content
     duckduckgoScreen.add(borderPanel);
     
     // Update drag handle reference
@@ -231,10 +235,12 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
         color: 0x4285F4, // Google blue color
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        depthTest: true
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
+    borderPanel.renderOrder = 990; // Ensure it's behind the content
     mapsScreen.add(borderPanel);
     
     // Update drag handle reference
@@ -295,10 +301,12 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
         color: 0x47848F, // Electron teal color
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        depthTest: true
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
+    borderPanel.renderOrder = 990; // Ensure it's behind the content
     electronScreen.add(borderPanel);
     
     // Update drag handle reference
@@ -571,6 +579,7 @@ function addDropShadow(screen, width, height) {
     
     const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
     shadowMesh.position.z = -0.005; // Behind the screen
+    shadowMesh.renderOrder = 980; // Even lower render order
     shadowMesh.userData.type = 'shadow';
     
     screen.add(shadowMesh);
@@ -588,6 +597,7 @@ function addDropShadow(screen, width, height) {
     
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     glowMesh.position.z = -0.003; // Between screen and shadow
+    glowMesh.renderOrder = 985; // Between shadow and border
     glowMesh.userData.type = 'glow';
     
     screen.add(glowMesh);
@@ -651,6 +661,13 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
             side: THREE.DoubleSide,
             depthTest: true // Enable depth testing to prevent see-through effect
         });
+    } else if (content) {
+        // Use provided texture (e.g., from createIframeTexture)
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: content,
+            side: THREE.DoubleSide,
+            depthTest: true // Enable depth testing
+        });
     } else {
         // Default subtle dark background with gradient
         const canvas = document.createElement('canvas');
@@ -682,19 +699,13 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
         backgroundMaterial = new THREE.MeshBasicMaterial({
             map: texture,
             side: THREE.DoubleSide,
-            depthTest: false
+            depthTest: true
         });
-        
-        // Create a fallback texture with loading indicator if needed
-        if (!content) {
-            const fallbackTexture = createFallbackTexture(title.split(' ').pop() || '1');
-            backgroundMaterial.map = fallbackTexture;
-        }
     }
     
     const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-    background.position.set(0, 0, 0.003); // Increased z-position to be more visible
-    background.renderOrder = 10; // Higher render order to ensure it's visible
+    background.position.z = 0.003; // Increased z-position to be more visible
+    background.renderOrder = 1010; // Higher render order to ensure it's visible
     screen.add(background);
     
     // Create a solid black top bar that spans the entire width
