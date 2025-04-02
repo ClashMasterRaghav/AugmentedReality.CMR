@@ -640,7 +640,7 @@ function animateScreenEntrance(screen) {
     requestAnimationFrame(animate);
 }
 
-// Function to create an enhanced screen with all needed features
+// Enhanced screen creation function with modern UI
 function enhancedCreateScreen(position, size, title = 'Screen', content = null) {
     // Create the screen container
     const screen = new THREE.Group();
@@ -708,140 +708,102 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     background.renderOrder = 1010; // Higher render order to ensure it's visible
     screen.add(background);
     
-    // Create the content interaction layer (invisible but blocks raycast)
-    const contentInteractionGeometry = new THREE.PlaneGeometry(
-        screenWidth, 
-        screenHeight - topBarHeight
-    );
-    const contentInteractionMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.001, // Nearly invisible
-        side: THREE.DoubleSide
-    });
-    const contentInteraction = new THREE.Mesh(contentInteractionGeometry, contentInteractionMaterial);
-    contentInteraction.position.y = -topBarHeight/2;
-    contentInteraction.position.z = 0.004; // In front of content but behind UI
-    contentInteraction.renderOrder = 1020; // Higher than background
-    contentInteraction.userData = {
-        type: 'contentArea',
-        isContentInteraction: true
-    };
-    screen.add(contentInteraction);
-    
-    // Create the top bar (header) for dragging and title
+    // Create a solid black top bar that spans the entire width
     const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
-    
-    // Create a fancy top bar with canvas
-    const topBarCanvas = document.createElement('canvas');
-    topBarCanvas.width = 512;
-    topBarCanvas.height = 64;
-    const topBarCtx = topBarCanvas.getContext('2d');
-    
-    // Create gradient for top bar
-    const topBarGradient = topBarCtx.createLinearGradient(0, 0, 0, topBarCanvas.height);
-    topBarGradient.addColorStop(0, '#343a40');
-    topBarGradient.addColorStop(1, '#212529');
-    topBarCtx.fillStyle = topBarGradient;
-    topBarCtx.fillRect(0, 0, topBarCanvas.width, topBarCanvas.height);
-    
-    // Draw title
-    topBarCtx.fillStyle = '#f8f9fa';
-    topBarCtx.font = '24px Arial';
-    topBarCtx.textAlign = 'center';
-    topBarCtx.textBaseline = 'middle';
-    topBarCtx.fillText(title, topBarCanvas.width / 2, topBarCanvas.height / 2);
-    
-    const topBarTexture = new THREE.CanvasTexture(topBarCanvas);
     const topBarMaterial = new THREE.MeshBasicMaterial({
-        map: topBarTexture,
+        color: 0x111111, // Solid black color
+        transparent: false, // No transparency
         side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.9
+        depthTest: true // Enable depth testing to prevent seeing through
     });
-    
-    // Visible top bar (showing the title)
     const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
-    topBar.position.set(0, screenHeight/2 - topBarHeight/2, 0.004);
-    topBar.renderOrder = 1012; // Higher than background
+    topBar.position.set(0, screenHeight / 2 - topBarHeight / 2, 0.004);
+    topBar.renderOrder = 10;
+    topBar.userData = {
+        type: 'dragHandle',
+        isTopBar: true,
+        screen: screen,
+        originalColor: topBarMaterial.color.getHex()
+    };
     screen.add(topBar);
     
-    // Create invisible drag handle covering the entire screen
-    const fullScreenDragGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
-    const fullScreenDragMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.001, // Nearly invisible
-        side: THREE.DoubleSide
-    });
-    const fullScreenDrag = new THREE.Mesh(fullScreenDragGeometry, fullScreenDragMaterial);
-    fullScreenDrag.position.z = -0.001; // Behind content by default (will be moved in front when drag mode is active)
-    fullScreenDrag.renderOrder = 900; // Behind content by default
-    fullScreenDrag.userData = {
-        type: 'dragHandle',
-        screen: screen,
-        isFullScreenDrag: true,
-        isPartOfDragHandle: true,
-        originalColor: 0xffffff,
-        hoverColor: 0xffffff
-    };
-    screen.add(fullScreenDrag);
+    // Create a modern grip pattern to indicate draggability with improved styling
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 64; // Reduced height for thinner top bar
+    const ctx = canvas.getContext('2d');
     
-    // Create a visible drag handle for the top bar
-    const topBarDragGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
-    const topBarDragMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.001, // Nearly invisible
-        side: THREE.DoubleSide
-    });
-    const topBarDrag = new THREE.Mesh(topBarDragGeometry, topBarDragMaterial);
-    topBarDrag.position.set(0, screenHeight/2 - topBarHeight/2, 0.005);
-    topBarDrag.renderOrder = 1015; // Above the visible top bar
-    topBarDrag.userData = {
-        type: 'dragHandle',
-        isDragArea: true,
-        isVisibleHandle: true,
-        isPartOfDragHandle: true,
-        screen: screen,
-        originalColor: 0xffffff,
-        hoverColor: 0xffffff
-    };
-    screen.add(topBarDrag);
+    // Create a gradient background for the top bar
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#0f3460');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Add control buttons for video/screen functionality
-    const buttonSize = 0.035;
-    const buttonSpacing = 0.04;
-    const buttonY = screenHeight/2 - topBarHeight/2;
+    // Add a subtle border at the bottom
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
     
-    // Button positions
-    const buttonPositions = [
-        { x: -screenWidth/2 + buttonSize * 1.5, y: buttonY, type: 'playButton' }, // Play/pause button at left
-        { x: -screenWidth/2 + buttonSize * 1.5 + buttonSpacing, y: buttonY, type: 'volumeButton' }, // Volume button next to play
-        { x: screenWidth/2 - buttonSize * 1.5, y: buttonY, type: 'fullscreen' } // Fullscreen at far right
-    ];
+    // Draw screen title with improved typography
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px Inter, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     
-    // Add buttons
-    buttonPositions.forEach(pos => {
-        addControlButton(screen, pos.type, pos.x, pos.y, buttonSize);
-    });
+    // Add text shadow for better readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2);
+    ctx.shadowColor = 'transparent';
     
-    // Position the screen
+    // Add modern grip indicator
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    const dotRadius = 1.5;
+    const dotSpacing = 12;
+    const dotsStartX = canvas.width - 100;
+    const dotsY = canvas.height / 2;
+    
+    // Draw the dots with a more modern arrangement
+    for (let i = 0; i < 3; i++) {
+        const x = dotsStartX + (i * dotSpacing);
+        ctx.beginPath();
+        ctx.arc(x, dotsY, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Apply the canvas as a texture to the top bar
+    const topBarTexture = new THREE.CanvasTexture(canvas);
+    topBarTexture.anisotropy = 4;
+    topBarMaterial.map = topBarTexture;
+    topBarMaterial.needsUpdate = true;
+    
+    // Add video control buttons with refined positioning
+    if (content && content.isVideoTexture) {
+        // Move play button to bottom left with pause icon since video is initially playing
+        const playButton = addControlButton(screen, 'pause', -screenWidth/2 + 0.05, -screenHeight/2 + 0.05, 0.03);
+        playButton.userData.videoControl = true;
+        playButton.userData.videoAction = 'togglePlayback';
+        playButton.userData.action = 'playButton'; // Set the action name to match what ar_interaction.js expects
+        
+        // Keep volume button on bottom right, but initialize with muted icon
+        const volumeButton = addControlButton(screen, 'muted', screenWidth/2 - 0.05, -screenHeight/2 + 0.05, 0.03);
+        volumeButton.userData.videoControl = true;
+        volumeButton.userData.videoAction = 'toggleMute';
+        volumeButton.userData.action = 'volumeButton'; // Set the action name to what ar_media.js expects
+        
+        // Store controls in userData
+        screen.userData.controls = {
+            isPlaying: true,
+            isMuted: true,
+            playButton: playButton,
+            volumeButton: volumeButton
+        };
+    }
+    
+    // Position the entire screen
     screen.position.copy(position);
-    
-    // Add user data
-    screen.userData = {
-        type: 'screen',
-        title: title,
-        isSelected: false,
-        width: screenWidth,
-        height: screenHeight,
-        originalScale: new THREE.Vector3(1, 1, 1),
-        dragModeActive: false, // Default to interaction mode
-        fullScreenDragHandle: fullScreenDrag, // Store reference to full-screen drag handle
-        topBarDragHandle: topBarDrag, // Store reference to top-bar drag handle
-        contentInteractionLayer: contentInteraction // Store reference to content interaction layer
-    };
     
     return screen;
 }
@@ -1265,60 +1227,4 @@ export function updateScreenEffects() {
             screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
         }
     });
-}
-
-// Update drag mode for all screens
-function updateScreenDragMode(isDragModeActive) {
-    screens.forEach(screen => {
-        if (!screen.userData) screen.userData = {};
-        screen.userData.dragModeActive = isDragModeActive;
-        
-        // Get references to drag handles
-        const fullScreenDrag = screen.userData.fullScreenDragHandle;
-        const topBarDrag = screen.userData.topBarDragHandle;
-        const contentInteraction = screen.userData.contentInteractionLayer;
-        
-        if (isDragModeActive) {
-            // Drag mode ON - make full screen drag handle active
-            if (fullScreenDrag) {
-                fullScreenDrag.position.z = 0.01; // Move in front of everything
-                fullScreenDrag.renderOrder = 1500; // Higher than all other elements
-                fullScreenDrag.material.opacity = 0.1; // Slightly visible for feedback
-            }
-            
-            // Keep the top bar drag handle active too
-            if (topBarDrag) {
-                topBarDrag.position.z = 0.011; // Slightly in front of full screen drag
-                topBarDrag.renderOrder = 1501;
-            }
-            
-            // Disable content interaction
-            if (contentInteraction) {
-                contentInteraction.position.z = -0.01; // Move behind everything
-                contentInteraction.renderOrder = 500;
-            }
-        } else {
-            // Interact mode ON - hide full screen drag handle
-            if (fullScreenDrag) {
-                fullScreenDrag.position.z = -0.001; // Move behind content
-                fullScreenDrag.renderOrder = 900;
-                fullScreenDrag.material.opacity = 0.001; // Nearly invisible
-            }
-            
-            // Keep top bar drag handle in front
-            if (topBarDrag) {
-                topBarDrag.position.z = 0.005; // In front of content
-                topBarDrag.renderOrder = 1015;
-            }
-            
-            // Enable content interaction
-            if (contentInteraction) {
-                contentInteraction.position.z = 0.004; // In front of content
-                contentInteraction.renderOrder = 1020;
-            }
-        }
-    });
-    
-    // Store global state for reference in touch handlers
-    window.screenDragModeActive = isDragModeActive;
 } 
