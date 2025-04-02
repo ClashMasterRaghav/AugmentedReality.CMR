@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>WebXR Interactive Web Content Demo</title>
     <style>
         body {
@@ -109,6 +112,9 @@
     
     <!-- Main application -->
     <script type="module">
+        // Add a cache busting random value to prevent browser caching
+        const cacheBuster = Math.random().toString(36).substring(2, 15);
+        
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
         import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
@@ -118,9 +124,9 @@
         window.CSS3DRenderer = CSS3DRenderer;
         window.CSS3DObject = CSS3DObject;
         
-        // Import our application modules
-        import { checkXRSupport } from './ar_core.js';
-        import { initAR, startAR, updateAR, scene, camera, renderer } from './ar_core.js';
+        // Import our application modules with cache busting
+        import { checkXRSupport } from `./ar_core.js?v=${cacheBuster}`;
+        import { initAR, startAR, updateAR, scene, camera, renderer } from `./ar_core.js?v=${cacheBuster}`;
         
         // Initialize the application
         document.addEventListener('DOMContentLoaded', () => {
@@ -137,10 +143,8 @@
                         startButton.style.display = 'none';
                         loadingIndicator.style.display = 'block';
                         
-                        // Add timestamp to force cache refresh
-                        const timestamp = Date.now();
-                        // Load the demo module dynamically
-                        import(`./ar_main.js?v=${timestamp}`).then(module => {
+                        // Load the demo module dynamically with cache busting
+                        import(`./ar_main.js?v=${cacheBuster}`).then(module => {
                             // Module loaded, the init function will be called automatically
                             loadingIndicator.style.display = 'none';
                             setTimeout(() => {
