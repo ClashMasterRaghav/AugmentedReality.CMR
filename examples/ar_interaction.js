@@ -903,10 +903,10 @@ function onTouchStart(event) {
         // Screen dimensions
         const screenHeight = 0.75; // Standard screen height
         
-        // Check if we're in the top 2/3 of the screen
+        // Check if we're in the top 1/6 of the screen (changed from 2/3)
         // The top of the screen is at y = screenHeight/2
-        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 1/6)
+        if (localPoint.y > screenHeight/2 - (screenHeight * 1/6)) {
             // We hit the draggable area
             intersectedScreen = screen;
             draggableAreaHit = true;
