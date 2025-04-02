@@ -181,18 +181,7 @@ async function init() {
         // Add demo controls
         createDemoControls();
         
-        // Create global no-op function for startAR if not defined
-        const startARFunc = typeof startAR === 'function' ? startAR : () => {
-            console.log("startAR function not available - continuing without it");
-            return Promise.resolve();
-        };
-        
-        // Start AR if function is available
-        try {
-            await startARFunc();
-        } catch (error) {
-            console.warn("Error in startAR:", error);
-        }
+        await startAR();
         
         // Animation loop
         renderer.setAnimationLoop(update);
