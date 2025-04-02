@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Interactive Web Content Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+        
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 12px 24px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        
+        #startButton:hover {
+            background-color: #3367d6;
+        }
+        
+        #noXRMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            padding: 20px;
+            background-color: #f44336;
+            color: white;
+            text-align: center;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 100;
+        }
+        
+        #loadingIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: 8px solid #3498db;
+            border-top: 8px solid #f3f3f3;
+            animation: spin 1s linear infinite;
+            display: none;
+            z-index: 100;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        WebXR Interactive Web Content Demo
+        <br>
+        <small>Select a demo method from the control panel to test different web content approaches.</small>
+    </div>
+    
+    <button id="startButton">Start AR Experience</button>
+    
+    <div id="noXRMessage">
+        <h3>WebXR Not Available</h3>
+        <p>Your browser does not support WebXR or it is not enabled.</p>
+        <p>Please try using a compatible browser or device.</p>
+    </div>
+    
+    <div id="loadingIndicator"></div>
+    
+    <!-- Load Three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <!-- Main application -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+        
+        // Make these globally available for our demos
+        window.THREE = THREE;
+        window.CSS3DRenderer = CSS3DRenderer;
+        window.CSS3DObject = CSS3DObject;
+        
+        // Import our application modules
+        import { checkXRSupport } from './ar_core.js';
+        import { initAR, startAR, updateAR, scene, camera, renderer } from './ar_core.js';
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            const startButton = document.getElementById('startButton');
+            const noXRMessage = document.getElementById('noXRMessage');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const infoElement = document.getElementById('info');
+            
+            // Check if WebXR is supported
+            checkXRSupport().then(supported => {
+                if (supported) {
+                    // WebXR is supported
+                    startButton.addEventListener('click', () => {
+                        startButton.style.display = 'none';
+                        loadingIndicator.style.display = 'block';
+                        
+                        // Load the demo module dynamically
+                        import('./ar_main.js').then(module => {
+                            // Module loaded, the init function will be called automatically
+                            loadingIndicator.style.display = 'none';
+                            setTimeout(() => {
+                                infoElement.style.display = 'none';
+                            }, 5000);
+                        }).catch(error => {
+                            console.error('Failed to load AR module:', error);
+                            loadingIndicator.style.display = 'none';
+                            displayError('Failed to load AR module. Please try again.');
+                        });
+                    });
+                } else {
+                    // WebXR is not supported
+                    startButton.style.display = 'none';
+                    noXRMessage.style.display = 'block';
+                }
+            });
+        });
+        
+        // Display error message
+        function displayError(message) {
+            const errorElement = document.createElement('div');
+            errorElement.style.position = 'absolute';
+            errorElement.style.top = '50%';
+            errorElement.style.left = '50%';
+            errorElement.style.transform = 'translate(-50%, -50%)';
+            errorElement.style.padding = '20px';
+            errorElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+            errorElement.style.color = 'white';
+            errorElement.style.borderRadius = '5px';
+            errorElement.style.zIndex = '1000';
+            errorElement.textContent = message;
+            document.body.appendChild(errorElement);
+            
+            setTimeout(() => {
+                document.body.removeChild(errorElement);
+                document.getElementById('startButton').style.display = 'block';
+            }, 5000);
+        }
+    </script>
+</body>
+</html> 
