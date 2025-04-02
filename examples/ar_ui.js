@@ -181,105 +181,356 @@ function create3DNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Create a control panel with options
+// Create a minimalist control panel with modern design
 export function createControlPanel(options = {}) {
     try {
-        console.log("Creating control panel");
-        
-        // Handle passing scene directly or as options.parent
-        let parent;
-        if (options instanceof THREE.Scene || options instanceof THREE.Object3D) {
-            // Direct scene object was passed
-            parent = options;
-            options = {}; // Reset options to default
-            console.log("Using direct scene reference for control panel");
-        } else if (options.parent) {
-            // Options object with parent property
-            parent = options.parent;
-            console.log("Using options.parent for control panel");
-        } else {
-            // No parent specified
-            console.error("Control panel creation failed: No parent object provided");
-            return null;
-        }
-        
-        // Extract configured options with defaults
+        console.log("Creating control panel with options:", options);
         const {
             width = 0.5,
             height = 0.3,
-            position = new THREE.Vector3(0, 0, -0.5),
+            position = new THREE.Vector3(0, 0, -1),
+            rotation = new THREE.Euler(-0.2, 0, 0),
             title = 'Control Panel',
-            transparent = true,
-            color = 0x2c3e50
+            transparent = false,
+            scene: customScene = null  // Add explicit scene parameter
         } = options;
         
-        // Create panel container
-        const panel = new THREE.Group();
-        panel.position.copy(position);
+        // Determine which scene to use
+        let sceneToUse = customScene;
         
-        // Create background plane
-        const geometry = new THREE.PlaneGeometry(width, height);
-        
-        // Create panel background with canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, 'rgba(52, 73, 94, 0.9)');  // Dark blue-gray
-        gradient.addColorStop(1, 'rgba(44, 62, 80, 0.9)');  // Slightly darker
-        
-        // Fill background
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add border
-        ctx.strokeStyle = 'rgba(100, 120, 255, 0.6)';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(2, 2, canvas.width-4, canvas.height-4);
-        
-        // Add title text
-        if (title) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 28px Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(title, canvas.width/2, 40);
-            
-            // Add divider line
-            ctx.strokeStyle = 'rgba(100, 120, 255, 0.4)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(50, 50);
-            ctx.lineTo(canvas.width-50, 50);
-            ctx.stroke();
+        // Fallback options for scene
+        if (!sceneToUse) {
+            sceneToUse = window.arScene || window.scene;
+            console.log("Using fallback scene reference");
         }
         
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(canvas);
-        const material = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: true
+        if (!sceneToUse) {
+            console.warn("No scene available for control panel - will create without adding to scene");
+        } else {
+            // Validate that sceneToUse has an add method
+            if (typeof sceneToUse.add !== 'function') {
+                console.error("Invalid scene provided - missing add method:", sceneToUse);
+                sceneToUse = null;
+            }
+        }
+        
+        // Create panel group
+        const controlPanel = new THREE.Group();
+        
+        // Add userData with necessary properties
+        controlPanel.userData = {
+            type: 'controlPanel',
+            isDragging: false,
+            manuallyPositioned: false,
+            smoothPositioning: false // Initialize smoothPositioning property
+        };
+    
+    // Modern, sleek panel design with solid appearance
+    const panelSize = { width: 0.28, height: 0.13 };
+    const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    
+    // Create rounded panel texture with high-quality design
+    const panelCanvas = document.createElement('canvas');
+    panelCanvas.width = 512;
+    panelCanvas.height = 256;
+    const panelCtx = panelCanvas.getContext('2d');
+    
+    // Draw rounded rectangle with flat design
+    const cornerRadius = 50;
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+    panelCtx.lineTo(cornerRadius, panelCanvas.height);
+    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    
+    // Glass morphism style with gradient
+    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+    gradient.addColorStop(0, 'rgba(60, 65, 92, 0.85)'); // Smoky blue at top
+    gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
+    panelCtx.fillStyle = gradient;
+    panelCtx.fill();
+    
+    // Add subtle glass effect with highlights
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
+    panelCtx.lineTo(0, panelCanvas.height/3);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    panelCtx.fill();
+    
+    // Add thin, elegant border with gradient
+    const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
+    borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.8)'); // Light purple-blue
+    borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.6)'); // Medium purple-blue
+    borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.8)'); // Darker purple-blue
+    panelCtx.strokeStyle = borderGradient;
+    panelCtx.lineWidth = 2;
+    panelCtx.stroke();
+    
+    // Add "Control Center" text as panel title with modern font
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
+    panelCtx.textAlign = 'center';
+    panelCtx.fillText('CONTROL CENTER', panelCanvas.width/2, 36);
+    
+    // Add subtle line under the title
+    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    panelCtx.lineWidth = 1;
+    panelCtx.beginPath();
+    panelCtx.moveTo(panelCanvas.width/2 - 120, 46);
+    panelCtx.lineTo(panelCanvas.width/2 + 120, 46);
+    panelCtx.stroke();
+    
+    // Create texture from canvas
+    const panelTexture = new THREE.CanvasTexture(panelCanvas);
+    const panelMaterial = new THREE.MeshBasicMaterial({
+        map: panelTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    // Set high renderOrder to ensure panel renders on top of other elements
+    panelMesh.renderOrder = 1000;
+    controlPanel.add(panelMesh);
+    
+    // Add background blur effect with subtle glow
+    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x6495ED, // Cornflower blue glow
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.002;
+    glowMesh.renderOrder = 998;
+    controlPanel.add(glowMesh);
+    
+    // Make the entire panel draggable by attaching a hidden drag area
+    const fullPanelDragGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    const fullPanelDragMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.001, // Nearly invisible
+        side: THREE.DoubleSide
+    });
+    const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
+    fullPanelDrag.position.z = 0.0005; // Between panel and buttons
+    fullPanelDrag.renderOrder = 1001; // Above panel for interaction
+    fullPanelDrag.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        isPartOfDragHandle: true,
+        originalColor: 0xffffff,
+        hoverColor: 0xffffff
+    };
+    controlPanel.add(fullPanelDrag);
+    
+    // Add a modern, visually distinct drag handle at the top
+    const topDragWidth = panelSize.width * 0.25;
+    const topDragHeight = 0.01;
+    const topDragGeometry = new THREE.PlaneGeometry(topDragWidth, topDragHeight);
+    
+    // Create a fancy gradient drag handle with canvas texture
+    const dragHandleCanvas = document.createElement('canvas');
+    dragHandleCanvas.width = 128;
+    dragHandleCanvas.height = 16;
+    const dragHandleCtx = dragHandleCanvas.getContext('2d');
+    
+    // Pill shape for drag handle
+    const pillRadius = 8;
+    dragHandleCtx.beginPath();
+    dragHandleCtx.moveTo(pillRadius, 0);
+    dragHandleCtx.lineTo(dragHandleCanvas.width - pillRadius, 0);
+    dragHandleCtx.arcTo(dragHandleCanvas.width, 0, dragHandleCanvas.width, pillRadius, pillRadius);
+    dragHandleCtx.arcTo(dragHandleCanvas.width, dragHandleCanvas.height, dragHandleCanvas.width - pillRadius, dragHandleCanvas.height, pillRadius);
+    dragHandleCtx.lineTo(pillRadius, dragHandleCanvas.height);
+    dragHandleCtx.arcTo(0, dragHandleCanvas.height, 0, dragHandleCanvas.height - pillRadius, pillRadius);
+    dragHandleCtx.arcTo(0, 0, pillRadius, 0, pillRadius);
+    dragHandleCtx.closePath();
+    
+    const handleGradient = dragHandleCtx.createLinearGradient(0, 0, dragHandleCanvas.width, 0);
+    handleGradient.addColorStop(0, 'rgba(145, 190, 255, 0.8)'); // Light blue
+    handleGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)'); // White
+    handleGradient.addColorStop(1, 'rgba(145, 190, 255, 0.8)'); // Light blue
+    
+    dragHandleCtx.fillStyle = handleGradient;
+    dragHandleCtx.fill();
+    
+    const dragHandleTexture = new THREE.CanvasTexture(dragHandleCanvas);
+    const topDragMaterial = new THREE.MeshBasicMaterial({
+        map: dragHandleTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const topDragHandle = new THREE.Mesh(topDragGeometry, topDragMaterial);
+    topDragHandle.position.set(0, panelSize.height/2 - topDragHeight/2 - 0.015, 0.005);
+    topDragHandle.renderOrder = 1002;
+    topDragHandle.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        isPartOfDragHandle: true,
+        originalColor: 0x91BEFF,
+        hoverColor: 0xB8D4FF
+    };
+    controlPanel.add(topDragHandle);
+    
+    // Define button parameters - preserve original functionality
+        const buttonSize = 0.055; // Increased from default size for better touch targets
+        const buttonRadius = buttonSize / 2;
+    const buttonSpacing = 0.14; // Slightly closer together
+    
+    // Create buttons with modern design
+    const buttonPositions = [
+            new THREE.Vector3(-panelSize.width/4, 0, 0.001),
+            new THREE.Vector3(panelSize.width/4, 0, 0.001)
+    ];
+    
+    const buttonActions = ['newScreen', 'deleteScreen'];
+    const buttonColors = [0x4ecca3, 0xff6b6b]; // Modern mint green and coral red
+    
+    buttonPositions.forEach((position, index) => {
+        // Create modern button with gradient effect using canvas
+        const buttonCanvas = document.createElement('canvas');
+        buttonCanvas.width = 128;
+        buttonCanvas.height = 128;
+        const buttonCtx = buttonCanvas.getContext('2d');
+            
+            // First, create a solid background fill to ensure the entire button is visible and clickable
+            buttonCtx.fillStyle = "#333333"; // Dark grey background
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+            buttonCtx.fill();
+        
+        // Create gradient fill
+            const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        const baseColor = new THREE.Color(buttonColors[index]);
+        const r = Math.floor(baseColor.r * 255);
+        const g = Math.floor(baseColor.g * 255);
+        const b = Math.floor(baseColor.b * 255);
+        
+        buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
+            buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+            buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
+        
+        buttonCtx.fillStyle = buttonGradient;
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        buttonCtx.fill();
+        
+        // Add subtle inner shadow
+            buttonCtx.shadowBlur = 10;
+        buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            buttonCtx.shadowOffsetX = 2;
+            buttonCtx.shadowOffsetY = 2;
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
+        buttonCtx.stroke();
+        buttonCtx.shadowBlur = 0;
+        
+        const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+        const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
+        const buttonMaterial = new THREE.MeshBasicMaterial({
+            map: buttonTexture,
+                transparent: true,
+            side: THREE.DoubleSide
         });
         
-        // Create panel mesh
-        const panelMesh = new THREE.Mesh(geometry, material);
-        panel.add(panelMesh);
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+            button.position.copy(position);
+        button.renderOrder = 1002;
+        button.userData = {
+            type: 'button',
+            action: buttonActions[index],
+                isInteractive: true
+            };
+            
+            // Add button to panel
+        controlPanel.add(button);
         
-        // Store mesh reference for buttons to attach to
-        panel.mesh = panelMesh;
+            // Create a modern icon for the button
+        const iconTexture = createButtonIcon(index);
+            const iconGeometry = new THREE.CircleGeometry(buttonSize * 0.3, 32); // Icon slightly smaller than button
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            map: iconTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+            
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.001;
+        iconMesh.renderOrder = 1003;
+        button.add(iconMesh);
         
-        // Add to parent scene
-        try {
-            parent.add(panel);
-            console.log("Control panel added to scene");
-        } catch (error) {
-            console.error("Failed to add control panel to parent:", error);
-            return null;
+            // Create a label beneath the button
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 128;
+            labelCanvas.height = 32;
+        const labelCtx = labelCanvas.getContext('2d');
+        
+            // Add subtle shadow to text for better readability
+            labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            labelCtx.shadowBlur = 4;
+        labelCtx.shadowOffsetX = 1;
+        labelCtx.shadowOffsetY = 1;
+        
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = '600 18px Inter, SF Pro Display, Arial'; // Modern font, slightly bolder
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        labelCtx.fillText(index === 0 ? 'New Screen' : 'Delete', labelCanvas.width / 2, labelCanvas.height / 2);
+        labelCtx.shadowBlur = 0; // Reset shadow
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(buttonSize * 1.8, buttonSize * 0.6);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(0, -buttonSize * 0.8, 0.002);
+        labelMesh.renderOrder = 1003;
+        button.add(labelMesh);
+    });
+    
+    // Add positioning and interaction
+    controlPanel.position.set(0, -0.3, -0.5);
+    controlPanel.rotation.set(-0.2, 0, 0);
+        
+        // Add to scene safely
+        if (sceneToUse && typeof sceneToUse.add === 'function') {
+            console.log("Adding control panel to scene");
+            try {
+                sceneToUse.add(controlPanel);
+            } catch (err) {
+                console.error("Failed to add control panel to scene:", err);
+            }
+        } else {
+            console.warn("Cannot add control panel to scene: scene is undefined or doesn't have add method");
         }
+    
+    // Add screen type selector below the main panel
+        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, sceneToUse);
         
-        return panel;
+        // Set the mesh property for compatibility with old code expecting controlPanel.mesh
+        controlPanel.mesh = panelMesh;
+    
+    return controlPanel;
     } catch (error) {
         console.error("Error creating control panel:", error);
         return null;
@@ -1034,6 +1285,8 @@ export function floatAnimation() {
 // Create a modern interactive button with customizable options
 export function createButton(options = {}) {
     try {
+        console.log("Creating button with options:", options);
+        
         // Extract options with defaults
         const {
             parent = null,
@@ -1046,17 +1299,19 @@ export function createButton(options = {}) {
             onClick = null
         } = options;
         
-        // Check if parent is provided and valid
+        // Check if parent is provided
         if (!parent) {
             console.error("Parent object is required for createButton");
             return null;
         }
         
-        // Verify parent is a valid THREE.Object3D
-        if (!(parent instanceof THREE.Object3D)) {
-            console.error("Parent must be a THREE.Object3D", parent);
-            return null;
-        }
+        // Log parent details for debugging
+        console.log("Button parent details:", {
+            type: parent.type || typeof parent,
+            isObject3D: parent instanceof THREE.Object3D,
+            hasAdd: typeof parent.add === 'function',
+            hasChildren: parent.children ? parent.children.length : 'no children property'
+        });
         
         // Create button group
         const button = new THREE.Group();
@@ -1132,18 +1387,48 @@ export function createButton(options = {}) {
             onClick: onClick
         };
         
-        // Try to safely add to parent
+        // Try multiple approaches to add the button to the parent
+        let addSuccess = false;
+        
+        // Approach 1: Try normal parent.add()
         try {
             if (parent.add && typeof parent.add === 'function') {
                 parent.add(button);
-                console.log("Button added successfully:", label);
-            } else {
-                console.error("Parent object doesn't have an add method");
-                return null;
+                console.log("Button added successfully via parent.add():", label);
+                addSuccess = true;
             }
         } catch (error) {
-            console.error("Failed to add button to parent:", error);
-            return null;
+            console.warn("Failed to add button via parent.add():", error);
+            // Continue to next approach
+        }
+        
+        // Approach 2: If parent has children, but add doesn't work, try direct array manipulation
+        if (!addSuccess && parent.children && Array.isArray(parent.children)) {
+            try {
+                parent.children.push(button);
+                button.parent = parent;
+                console.log("Button added successfully via children array:", label);
+                addSuccess = true;
+            } catch (error) {
+                console.warn("Failed to add button via children array:", error);
+            }
+        }
+        
+        // Approach 3: If parent is a mesh and has a parent, try adding to grandparent
+        if (!addSuccess && parent.parent && typeof parent.parent.add === 'function') {
+            try {
+                parent.parent.add(button);
+                console.log("Button added successfully to parent's parent:", label);
+                addSuccess = true;
+            } catch (error) {
+                console.warn("Failed to add button to parent's parent:", error);
+            }
+        }
+        
+        // If all approaches failed
+        if (!addSuccess) {
+            console.error("All attempts to add button to parent failed. Created button without adding to scene.");
+            // Return the button anyway - caller might be able to add it
         }
         
         return button;

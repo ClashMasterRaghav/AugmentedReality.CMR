@@ -105,8 +105,7 @@ function initAREnvironment() {
             // Create UI controls once font is loaded
             if (scene) {
                 createControlPanel(scene);
-                // Skip creating virtual keyboard due to position errors
-                // createVirtualKeyboard(scene);
+                createVirtualKeyboard(scene);
             } else {
                 console.error("Cannot create UI elements - scene is undefined");
             }
