@@ -1,11 +1,43 @@
 // Screen creation and management functionality
 import * as THREE from 'three';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { scene, camera, selectedScreen, setSelectedScreen } from './ar_core.js';
 import { virtualKeyboard } from './ar_ui.js';
 import { videoTexture } from './ar_media.js';
 
 // Array to store screen objects
 export let screens = [];
+let css3dRenderer;
+let css3dScene;
+
+// Initialize CSS3D renderer for real web content
+export function initCSS3DRenderer() {
+    // Create CSS3D renderer and scene for web content
+    css3dRenderer = new CSS3DRenderer();
+    css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+    css3dRenderer.domElement.style.position = 'absolute';
+    css3dRenderer.domElement.style.top = '0';
+    css3dRenderer.domElement.style.left = '0';
+    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through
+    document.body.appendChild(css3dRenderer.domElement);
+    
+    css3dScene = new THREE.Scene();
+    
+    // Handle resize events
+    window.addEventListener('resize', () => {
+        css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    console.log("CSS3D Renderer initialized for real website integration");
+    return css3dRenderer;
+}
+
+// Update CSS3D Renderer - call this in your animation loop
+export function updateCSS3DRenderer() {
+    if (css3dRenderer && css3dScene) {
+        css3dRenderer.render(css3dScene, camera);
+    }
+}
 
 // Create a new browser screen
 export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5)) {
@@ -71,21 +103,24 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
 
 // Create a new YouTube screen
 export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Check if CSS3D renderer is initialized
+    if (!css3dRenderer) {
+        initCSS3DRenderer();
+    }
+    
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
     const title = `YouTube ${screens.length + 1}`;
     
-    console.log("Creating YouTube screen with iframe");
+    console.log("Creating real YouTube screen with iframe");
     
-    // Create iframe content texture with specific video
-    // Using the video URL provided by the user: https://youtu.be/Myrr9vA7j5A
-    const videoId = "Myrr9vA7j5A";
-    const iframeTexture = createIframeTexture(`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1`, 1024, 768);
+    // First create placeholder texture for WebGL renderer
+    const placeholderTexture = createFallbackTexture(screens.length + 1);
     
-    // Create the screen container
-    const youtubeScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    // Create the screen container with the placeholder
+    const youtubeScreen = enhancedCreateScreen(position, size, title, placeholderTexture);
     
     // Add basic identification data
     youtubeScreen.userData = { 
@@ -95,7 +130,8 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
         contentType: 'youtube',
-        videoId: videoId
+        videoId: "Myrr9vA7j5A",
+        hasRealContent: true
     };
     
     // Add shadow and border
@@ -123,6 +159,41 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
         youtubeScreen.userData.dragHandle = topBar;
     }
     
+    // Create actual iframe for YouTube with CSS3D
+    const videoId = "Myrr9vA7j5A";
+    const iframeElement = document.createElement('iframe');
+    iframeElement.style.width = `${screenWidth * 1000}px`;
+    iframeElement.style.height = `${screenHeight * 1000}px`;
+    iframeElement.style.border = '0px';
+    iframeElement.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1`;
+    iframeElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    
+    // Create CSS3D object and position it to match the Three.js object
+    const css3dObject = new CSS3DObject(iframeElement);
+    css3dObject.scale.set(0.001, 0.001, 0.001); // Scale down to match Three.js units
+    css3dObject.position.copy(position);
+    css3dObject.quaternion.copy(youtubeScreen.quaternion);
+    
+    // Store reference to CSS3D object
+    youtubeScreen.userData.css3dObject = css3dObject;
+    css3dScene.add(css3dObject);
+    
+    // Update function to sync CSS3D object with Three.js object
+    const updateCSS3DPosition = () => {
+        if (youtubeScreen.userData.css3dObject) {
+            youtubeScreen.userData.css3dObject.position.copy(youtubeScreen.position);
+            youtubeScreen.userData.css3dObject.quaternion.copy(youtubeScreen.quaternion);
+            youtubeScreen.userData.css3dObject.scale.set(
+                0.001 * youtubeScreen.scale.x,
+                0.001 * youtubeScreen.scale.y,
+                0.001 * youtubeScreen.scale.z
+            );
+        }
+    };
+    
+    // Store the update function
+    youtubeScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
     // Add to scene and screens array
     scene.add(youtubeScreen);
     screens.push(youtubeScreen);
@@ -130,7 +201,7 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     // Add entrance animation
     animateScreenEntrance(youtubeScreen);
     
-    console.log("Created YouTube screen with ID:", youtubeScreen.userData.id);
+    console.log("Created real YouTube screen with ID:", youtubeScreen.userData.id);
     
     // Select this as the current screen
     selectScreen(youtubeScreen);
@@ -140,19 +211,24 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
 
 // Create a new DuckDuckGo search screen
 export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Check if CSS3D renderer is initialized
+    if (!css3dRenderer) {
+        initCSS3DRenderer();
+    }
+    
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
     const title = `DuckDuckGo ${screens.length + 1}`;
     
-    console.log("Creating DuckDuckGo screen with iframe");
+    console.log("Creating real DuckDuckGo screen with iframe");
     
-    // Create iframe content texture
-    const iframeTexture = createIframeTexture("https://duckduckgo.com/", 1024, 768);
+    // First create placeholder texture for WebGL renderer
+    const placeholderTexture = createFallbackTexture(screens.length + 1);
     
-    // Create the screen container
-    const duckduckgoScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    // Create the screen container with the placeholder
+    const duckduckgoScreen = enhancedCreateScreen(position, size, title, placeholderTexture);
     
     // Add basic identification data
     duckduckgoScreen.userData = { 
@@ -161,7 +237,8 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
         isSelected: false,
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: 'duckduckgo'
+        contentType: 'duckduckgo',
+        hasRealContent: true
     };
     
     // Add shadow and border
@@ -189,6 +266,40 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
         duckduckgoScreen.userData.dragHandle = topBar;
     }
     
+    // Create actual iframe for DuckDuckGo with CSS3D
+    const iframeElement = document.createElement('iframe');
+    iframeElement.style.width = `${screenWidth * 1000}px`;
+    iframeElement.style.height = `${screenHeight * 1000}px`;
+    iframeElement.style.border = '0px';
+    iframeElement.src = 'https://duckduckgo.com/';
+    iframeElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope";
+    
+    // Create CSS3D object and position it to match the Three.js object
+    const css3dObject = new CSS3DObject(iframeElement);
+    css3dObject.scale.set(0.001, 0.001, 0.001); // Scale down to match Three.js units
+    css3dObject.position.copy(position);
+    css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
+    
+    // Store reference to CSS3D object
+    duckduckgoScreen.userData.css3dObject = css3dObject;
+    css3dScene.add(css3dObject);
+    
+    // Update function to sync CSS3D object with Three.js object
+    const updateCSS3DPosition = () => {
+        if (duckduckgoScreen.userData.css3dObject) {
+            duckduckgoScreen.userData.css3dObject.position.copy(duckduckgoScreen.position);
+            duckduckgoScreen.userData.css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
+            duckduckgoScreen.userData.css3dObject.scale.set(
+                0.001 * duckduckgoScreen.scale.x,
+                0.001 * duckduckgoScreen.scale.y,
+                0.001 * duckduckgoScreen.scale.z
+            );
+        }
+    };
+    
+    // Store the update function
+    duckduckgoScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
     // Add to scene and screens array
     scene.add(duckduckgoScreen);
     screens.push(duckduckgoScreen);
@@ -196,7 +307,7 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Add entrance animation
     animateScreenEntrance(duckduckgoScreen);
     
-    console.log("Created DuckDuckGo screen with ID:", duckduckgoScreen.userData.id);
+    console.log("Created real DuckDuckGo screen with ID:", duckduckgoScreen.userData.id);
     
     // Select this as the current screen
     selectScreen(duckduckgoScreen);
@@ -206,19 +317,24 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
 
 // Create a new Google Maps screen
 export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Check if CSS3D renderer is initialized
+    if (!css3dRenderer) {
+        initCSS3DRenderer();
+    }
+    
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
     const title = `Google Maps ${screens.length + 1}`;
     
-    console.log("Creating Google Maps screen with iframe");
+    console.log("Creating real Google Maps screen with iframe");
     
-    // Create iframe content texture with satellite view enabled
-    const iframeTexture = createIframeTexture("https://www.google.com/maps/embed?maptype=satellite", 1024, 768);
+    // First create placeholder texture for WebGL renderer
+    const placeholderTexture = createFallbackTexture(screens.length + 1);
     
-    // Create the screen container
-    const mapsScreen = enhancedCreateScreen(position, size, title, iframeTexture);
+    // Create the screen container with the placeholder
+    const mapsScreen = enhancedCreateScreen(position, size, title, placeholderTexture);
     
     // Add basic identification data
     mapsScreen.userData = { 
@@ -228,7 +344,8 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
         contentType: 'maps',
-        mapType: 'satellite'
+        mapType: 'satellite',
+        hasRealContent: true
     };
     
     // Add shadow and border
@@ -256,6 +373,40 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
         mapsScreen.userData.dragHandle = topBar;
     }
     
+    // Create actual iframe for Google Maps with satellite view
+    const iframeElement = document.createElement('iframe');
+    iframeElement.style.width = `${screenWidth * 1000}px`;
+    iframeElement.style.height = `${screenHeight * 1000}px`;
+    iframeElement.style.border = '0px';
+    iframeElement.src = 'https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d15057.534307180755!2d-6.2088!3d53.3244!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1sen!2sus!4v1596123198000!5m2!1sen!2sus';
+    iframeElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope";
+    
+    // Create CSS3D object and position it to match the Three.js object
+    const css3dObject = new CSS3DObject(iframeElement);
+    css3dObject.scale.set(0.001, 0.001, 0.001); // Scale down to match Three.js units
+    css3dObject.position.copy(position);
+    css3dObject.quaternion.copy(mapsScreen.quaternion);
+    
+    // Store reference to CSS3D object
+    mapsScreen.userData.css3dObject = css3dObject;
+    css3dScene.add(css3dObject);
+    
+    // Update function to sync CSS3D object with Three.js object
+    const updateCSS3DPosition = () => {
+        if (mapsScreen.userData.css3dObject) {
+            mapsScreen.userData.css3dObject.position.copy(mapsScreen.position);
+            mapsScreen.userData.css3dObject.quaternion.copy(mapsScreen.quaternion);
+            mapsScreen.userData.css3dObject.scale.set(
+                0.001 * mapsScreen.scale.x,
+                0.001 * mapsScreen.scale.y,
+                0.001 * mapsScreen.scale.z
+            );
+        }
+    };
+    
+    // Store the update function
+    mapsScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
     // Add to scene and screens array
     scene.add(mapsScreen);
     screens.push(mapsScreen);
@@ -263,7 +414,7 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Add entrance animation
     animateScreenEntrance(mapsScreen);
     
-    console.log("Created Google Maps screen with ID:", mapsScreen.userData.id);
+    console.log("Created real Google Maps screen with ID:", mapsScreen.userData.id);
     
     // Select this as the current screen
     selectScreen(mapsScreen);
@@ -273,19 +424,24 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
 
 // Create a new Electron app screen
 export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+    // Check if CSS3D renderer is initialized
+    if (!css3dRenderer) {
+        initCSS3DRenderer();
+    }
+    
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
     const title = `Electron App ${screens.length + 1}`;
     
-    console.log("Creating Electron App simulation screen");
+    console.log("Creating real Electron App simulation screen");
     
-    // Create a placeholder texture for Electron with the YouTube video
-    const electronTexture = createElectronPlaceholderTexture(1024, 768, "Myrr9vA7j5A");
+    // Create a placeholder texture for WebGL renderer
+    const placeholderTexture = createElectronPlaceholderTexture(1024, 768, "Myrr9vA7j5A");
     
-    // Create the screen container
-    const electronScreen = enhancedCreateScreen(position, size, title, electronTexture);
+    // Create the screen container with the placeholder
+    const electronScreen = enhancedCreateScreen(position, size, title, placeholderTexture);
     
     // Add basic identification data
     electronScreen.userData = { 
@@ -295,7 +451,8 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
         contentType: 'electron',
-        videoId: "Myrr9vA7j5A" // Store the video ID for reference
+        videoId: "Myrr9vA7j5A", // Store the video ID for reference
+        hasRealContent: true
     };
     
     // Add shadow and border
@@ -323,6 +480,91 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
         electronScreen.userData.dragHandle = topBar;
     }
     
+    // Create actual iframe with a custom Electron-style wrapper around YouTube
+    const iframeElement = document.createElement('iframe');
+    iframeElement.style.width = `${screenWidth * 1000}px`;
+    iframeElement.style.height = `${screenHeight * 1000}px`;
+    iframeElement.style.border = '0px';
+    
+    // Create custom HTML content with Electron-style UI around YouTube
+    const videoId = "Myrr9vA7j5A";
+    const electronHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1e2028; }
+                .title-bar { background: #121317; height: 30px; position: relative; }
+                .controls { position: absolute; top: 8px; left: 10px; }
+                .control { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; }
+                .red { background: #FF5F56; }
+                .yellow { background: #FFBD2E; }
+                .green { background: #27C93F; }
+                .title { color: white; text-align: center; font-family: sans-serif; font-size: 12px; line-height: 30px; }
+                .sidebar { background: #1a1b23; width: 50px; position: absolute; top: 30px; bottom: 0; left: 0; }
+                .sidebar-icon { color: #666; text-align: center; padding: 15px 0; font-size: 18px; }
+                .sidebar-icon.active { color: white; }
+                .content { position: absolute; left: 50px; top: 30px; right: 0; bottom: 0; }
+                iframe { width: 100%; height: 100%; border: none; }
+            </style>
+        </head>
+        <body>
+            <div class="title-bar">
+                <div class="controls">
+                    <span class="control red"></span>
+                    <span class="control yellow"></span>
+                    <span class="control green"></span>
+                </div>
+                <div class="title">Electron YouTube Viewer</div>
+            </div>
+            <div class="sidebar">
+                <div class="sidebar-icon active">#</div>
+                <div class="sidebar-icon">♥</div>
+                <div class="sidebar-icon">★</div>
+                <div class="sidebar-icon">⚙</div>
+            </div>
+            <div class="content">
+                <iframe 
+                    src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    // Create a blob URL for the custom HTML content
+    const blob = new Blob([electronHtml], { type: 'text/html' });
+    const electronUrl = URL.createObjectURL(blob);
+    iframeElement.src = electronUrl;
+    
+    // Create CSS3D object and position it to match the Three.js object
+    const css3dObject = new CSS3DObject(iframeElement);
+    css3dObject.scale.set(0.001, 0.001, 0.001); // Scale down to match Three.js units
+    css3dObject.position.copy(position);
+    css3dObject.quaternion.copy(electronScreen.quaternion);
+    
+    // Store reference to CSS3D object
+    electronScreen.userData.css3dObject = css3dObject;
+    css3dScene.add(css3dObject);
+    
+    // Update function to sync CSS3D object with Three.js object
+    const updateCSS3DPosition = () => {
+        if (electronScreen.userData.css3dObject) {
+            electronScreen.userData.css3dObject.position.copy(electronScreen.position);
+            electronScreen.userData.css3dObject.quaternion.copy(electronScreen.quaternion);
+            electronScreen.userData.css3dObject.scale.set(
+                0.001 * electronScreen.scale.x,
+                0.001 * electronScreen.scale.y,
+                0.001 * electronScreen.scale.z
+            );
+        }
+    };
+    
+    // Store the update function
+    electronScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
     // Add to scene and screens array
     scene.add(electronScreen);
     screens.push(electronScreen);
@@ -330,7 +572,7 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     // Add entrance animation
     animateScreenEntrance(electronScreen);
     
-    console.log("Created Electron App screen with ID:", electronScreen.userData.id);
+    console.log("Created real Electron App screen with ID:", electronScreen.userData.id);
     
     // Select this as the current screen
     selectScreen(electronScreen);
@@ -1350,5 +1592,52 @@ export function updateScreenEffects() {
             // Subtle floating effect
             screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
         }
+        
+        // Update CSS3D object position if the screen has real content
+        if (screen.userData.hasRealContent && screen.userData.updateCSS3DPosition) {
+            screen.userData.updateCSS3DPosition();
+        }
     });
+    
+    // Update CSS3D renderer if initialized
+    if (css3dRenderer) {
+        updateCSS3DRenderer();
+    }
+}
+
+// Create a screen from button press - used to connect UI buttons to screen creation
+export function createScreenFromButton(screenType, position) {
+    // Default position is in front of the camera
+    if (!position) {
+        position = new THREE.Vector3(0, 0, -1.5);
+        
+        // If camera exists, place screen in front of camera
+        if (camera) {
+            // Get camera direction
+            const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            // Position 1.5 meters in front of camera
+            position.copy(camera.position).addScaledVector(direction, 1.5);
+        }
+    }
+    
+    console.log(`Creating ${screenType} screen from button at position:`, position);
+    
+    // Create appropriate screen based on type
+    switch(screenType.toLowerCase()) {
+        case 'youtube':
+            return createYouTubeScreen(position);
+        case 'maps':
+        case 'googlemaps':
+            return createGoogleMapsScreen(position);
+        case 'duckduckgo':
+        case 'search':
+            return createDuckDuckGoScreen(position);
+        case 'electron':
+        case 'app':
+            return createElectronAppScreen(position);
+        case 'browser':
+        case 'video':
+        default:
+            return createNewBrowserScreen(position);
+    }
 } 

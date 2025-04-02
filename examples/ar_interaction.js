@@ -7,7 +7,8 @@ import {
 } from './ar_core.js';
 import { 
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
-    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
+    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, 
+    createElectronAppScreen, createScreenFromButton
 } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
@@ -284,36 +285,15 @@ function handleButtonAction(button) {
             // Position screen in front of camera
             const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
             
-            // Create the appropriate screen type
-            let newScreen;
+            // Use the new centralized function to create the appropriate screen
             const screenType = button.userData.screenType;
-            
-            switch(screenType) {
-                case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
-                    break;
-                case 'duckduckgo':
-                    newScreen = createDuckDuckGoScreen(screenPosition);
-                    break;
-                case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
-                    break;
-                case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
-                    break;
-                default:
-                    newScreen = createNewBrowserScreen(screenPosition);
-                    break;
-            }
+            const newScreen = createScreenFromButton(screenType, screenPosition);
             
             // Make it face the camera
             newScreen.lookAt(camera.position);
             
             // Add visual feedback
             createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
-            
-            // Select this screen
-            selectScreen(newScreen);
             break;
             
         case 'moveMode':
