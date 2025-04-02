@@ -1335,13 +1335,24 @@ function animateScreenScale(screen, targetScale, duration, bounce = false) {
 
 // Update keyboard position relative to the selected screen
 export function updateKeyboardPosition(screen, virtualKeyboard) {
-    // Skip keyboard update due to known issues with camera and screen position
+    // Safely check if screen and keyboard exist
     if (!screen || !virtualKeyboard) {
         console.warn('Cannot update keyboard position: screen or keyboard is undefined');
         return;
     }
 
     try {
+        // Validate that these objects have the required properties to avoid errors
+        if (!screen.position || !screen.scale) {
+            console.warn('Screen object is missing required properties (position or scale)');
+            return;
+        }
+        
+        if (!virtualKeyboard.position || typeof virtualKeyboard.lookAt !== 'function') {
+            console.warn('VirtualKeyboard object is missing required properties');
+            return;
+        }
+        
         // Position the keyboard below the screen
         const screenPosition = screen.position.clone();
         const screenScale = screen.scale.clone();
@@ -1355,18 +1366,20 @@ export function updateKeyboardPosition(screen, virtualKeyboard) {
         // Try to make keyboard face the user using camera if available
         const cameraRef = getActiveCamera();
         
-        if (cameraRef) {
+        if (cameraRef && cameraRef.position) {
             // Use camera to orient keyboard
-            const direction = new THREE.Vector3().subVectors(
-                cameraRef.position,
-                virtualKeyboard.position
-            );
+            try {
+                // Only try to use lookAt if we have a valid camera position
+                virtualKeyboard.lookAt(cameraRef.position);
             
-            virtualKeyboard.lookAt(cameraRef.position);
-            
-            // Keep keyboard upright by zeroing rotation on x and z
-            virtualKeyboard.rotation.x = 0;
-            virtualKeyboard.rotation.z = 0;
+                // Keep keyboard upright by zeroing rotation on x and z
+                virtualKeyboard.rotation.x = 0;
+                virtualKeyboard.rotation.z = 0;
+            } catch (err) {
+                console.warn('Error orienting keyboard with camera:', err);
+                // Fallback to default orientation
+                virtualKeyboard.rotation.set(0, 0, 0);
+            }
         } else {
             // Fallback orientation if no camera
             console.warn('No camera available for keyboard orientation, using default');
@@ -1379,20 +1392,42 @@ export function updateKeyboardPosition(screen, virtualKeyboard) {
 
 // Helper function to get active camera from scene
 function getActiveCamera() {
+    // Try using the imported camera reference first
+    if (typeof camera !== 'undefined' && camera) {
+        return camera;
+    }
+    
+    // Try the global window.arCamera if available
+    if (typeof window !== 'undefined' && window.arCamera) {
+        return window.arCamera;
+    }
+    
     // First try scene.camera if it exists
     if (scene && scene.camera) {
         return scene.camera;
     }
     
-    // Try to find PerspectiveCamera in scene
-    if (scene && scene.children) {
-        const foundCamera = scene.children.find(
-            child => child instanceof THREE.PerspectiveCamera
-        );
-        if (foundCamera) return foundCamera;
+    // Try to find PerspectiveCamera in scene (safely)
+    if (scene && scene.children && Array.isArray(scene.children)) {
+        try {
+            const foundCamera = scene.children.find(
+                child => child && typeof child === 'object' && 
+                child.isCamera === true
+            );
+            if (foundCamera) return foundCamera;
+        } catch (err) {
+            console.warn("Error finding camera in scene:", err);
+        }
     }
     
-    // Last resort - create a default camera position
+    // For debugging
+    console.warn("No camera found. Available references:", {
+        importedCamera: typeof camera !== 'undefined' ? "defined" : "undefined",
+        windowCamera: typeof window !== 'undefined' && window.arCamera ? "defined" : "undefined",
+        sceneCamera: scene && scene.camera ? "defined" : "undefined"
+    });
+    
+    // Last resort - return null
     return null;
 }
 

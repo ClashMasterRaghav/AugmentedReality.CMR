@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { initAR, render, animate, scene } from './ar_core.js?v=4';
+import { initAR, render, animate, scene, camera } from './ar_core.js?v=4';
 import { setupEventListeners } from './ar_interaction.js?v=4';
 import { loadVideoTexture } from './ar_media.js?v=4';
 import { createButton, createControlPanel, updateControlPanel } from './ar_ui_wrapper.js?v=4';
@@ -139,6 +139,14 @@ export async function init() {
         
         // Make sure global scene is set for UI components
         window.arScene = scene;
+        
+        // Ensure camera is globally available to avoid "isPerspectiveCamera" errors
+        if (camera) {
+            console.log("Setting global camera reference");
+            window.arCamera = camera;
+        } else {
+            console.warn("Camera not available after AR initialization");
+        }
         
         // Initialize video texture
         loadVideoTexture();
