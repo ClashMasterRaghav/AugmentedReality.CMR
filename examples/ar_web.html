@@ -7,6 +7,9 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0"
 		/>
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+		<meta http-equiv="Pragma" content="no-cache">
+		<meta http-equiv="Expires" content="0">
 		<link type="text/css" rel="stylesheet" href="main.css" />
 		<style>
 			#info {
@@ -107,6 +110,23 @@
 			#errorMessage p {
 				margin-bottom: 20px;
 			}
+			/* Error display for JavaScript errors */
+			#errorDisplay {
+				position: absolute;
+				bottom: 10px;
+				left: 10px;
+				background-color: rgba(255, 0, 0, 0.7);
+				color: white;
+				font-family: monospace;
+				padding: 10px;
+				border-radius: 5px;
+				font-size: 12px;
+				max-width: 90%;
+				max-height: 150px;
+				overflow: auto;
+				z-index: 1000;
+				display: none;
+			}
 		</style>
 	</head>
 	<body>
@@ -143,6 +163,9 @@
 			<h2>Tap to Enable Video</h2>
 			<p>Tap anywhere to start your AR experience with video and audio.</p>
 		</div>
+		
+		<!-- Error display for JavaScript errors -->
+		<div id="errorDisplay"></div>
 
 		<script type="importmap">
 			{
@@ -153,7 +176,32 @@
 			}
 		</script>
 
-		<!-- Use the main entry point file instead of ar_web.js -->
-		<script type="module" src="ar_main.js"></script>
+		<!-- Main script with cache busting -->
+		<script type="module">
+			// Add a cache busting timestamp to prevent browser caching
+			const timestamp = Date.now();
+			
+			// Set up error tracking
+			window.addEventListener('error', function(event) {
+				const errorDisplay = document.getElementById('errorDisplay');
+				if (errorDisplay) {
+					errorDisplay.style.display = 'block';
+					errorDisplay.innerHTML += `<div>${event.message} at ${event.filename}:${event.lineno}</div>`;
+					console.error("Caught error:", event);
+				}
+			});
+			
+			// Import modules with cache busting
+			import(`./ar_main.js?v=${timestamp}`).catch(error => {
+				console.error("Failed to load ar_main.js:", error);
+				
+				// Show error in UI
+				const errorDisplay = document.getElementById('errorDisplay');
+				if (errorDisplay) {
+					errorDisplay.style.display = 'block';
+					errorDisplay.innerHTML += `<div>Failed to load ar_main.js: ${error.message}</div>`;
+				}
+			});
+		</script>
 	</body>
 </html>
