@@ -181,8 +181,18 @@ async function init() {
         // Add demo controls
         createDemoControls();
         
-        // Start AR
-        await startAR();
+        // Create global no-op function for startAR if not defined
+        const startARFunc = typeof startAR === 'function' ? startAR : () => {
+            console.log("startAR function not available - continuing without it");
+            return Promise.resolve();
+        };
+        
+        // Start AR if function is available
+        try {
+            await startARFunc();
+        } catch (error) {
+            console.warn("Error in startAR:", error);
+        }
         
         // Animation loop
         renderer.setAnimationLoop(update);
@@ -193,61 +203,44 @@ async function init() {
 
 // Function to create demo controls for different web content approaches
 function createDemoControls() {
-    // Create the main control panel first to hold our buttons
-    const controlPanel = createControlPanel(scene);
-    
-    if (!controlPanel) {
-        console.error("Failed to create control panel for demo");
-        return;
+    try {
+        // Create the main control panel first to hold our buttons
+        const controlPanel = createControlPanel(scene);
+        
+        if (!controlPanel) {
+            console.error("Failed to create control panel for demo");
+            return null;
+        }
+        
+        // Add buttons for each approach - check if controlPanel exists first
+        const addButton = (position, label, onClick) => {
+            try {
+                return createButton({
+                    parent: controlPanel.mesh || controlPanel,
+                    position: position,
+                    width: 0.25,
+                    height: 0.07,
+                    label: label,
+                    onClick: onClick
+                });
+            } catch (error) {
+                console.error(`Error adding button "${label}":`, error);
+                return null;
+            }
+        };
+        
+        // Add each button with error handling
+        addButton(new THREE.Vector3(-0.15, 0.05, 0.01), "DOM Injection", createDOMDemo);
+        addButton(new THREE.Vector3(0.15, 0.05, 0.01), "HTML Texture", createTextureDemo);
+        addButton(new THREE.Vector3(-0.15, -0.05, 0.01), "DOM Overlay", createOverlayDemo);
+        addButton(new THREE.Vector3(0.15, -0.05, 0.01), "Web Messaging", createMessagingDemo);
+        addButton(new THREE.Vector3(0, -0.15, 0.01), "Reset All Demos", resetAllDemos);
+        
+        return controlPanel;
+    } catch (error) {
+        console.error("Error creating demo controls:", error);
+        return null;
     }
-    
-    // Add buttons for each approach
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(-0.15, 0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "DOM Injection",
-        onClick: () => createDOMDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0.15, 0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "HTML Texture",
-        onClick: () => createTextureDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(-0.15, -0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "DOM Overlay",
-        onClick: () => createOverlayDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0.15, -0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "Web Messaging",
-        onClick: () => createMessagingDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0, -0.15, 0.01),
-        width: 0.5,
-        height: 0.07,
-        label: "Reset All Demos",
-        onClick: resetAllDemos
-    });
-    
-    return controlPanel;
 }
 
 // Demo functions for each approach

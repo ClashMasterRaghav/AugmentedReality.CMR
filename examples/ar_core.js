@@ -154,8 +154,12 @@ function initAREnvironment() {
         toggleVideoMute
     });
     
-    // Setup event listeners
-    setupEventListeners();
+    // Setup event listeners only if controller is initialized
+    if (controller) {
+        setupEventListeners();
+    } else {
+        console.error("Cannot setup event listeners - controller is undefined");
+    }
     
     // Start animation loop
     renderer.setAnimationLoop(animate);
@@ -300,4 +304,133 @@ function createStartScreen() {
     
     // Set up control panel initial position
     setTimeout(setupControlPanel, 500);
+}
+
+// Create a modern, styled keyboard background
+export function createKeyboardBackground(width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw a rounded rectangle for the keyboard background
+    const cornerRadius = width * 0.05;
+    ctx.fillStyle = 'rgba(40, 44, 52, 0.85)'; // Dark, semi-transparent background
+    
+    // Create rounded rectangle
+    ctx.beginPath();
+    ctx.moveTo(cornerRadius, 0);
+    ctx.lineTo(width - cornerRadius, 0);
+    ctx.quadraticCurveTo(width, 0, width, cornerRadius);
+    ctx.lineTo(width, height - cornerRadius);
+    ctx.quadraticCurveTo(width, height, width - cornerRadius, height);
+    ctx.lineTo(cornerRadius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - cornerRadius);
+    ctx.lineTo(0, cornerRadius);
+    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Add subtle gradient overlay
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Add a border
+    ctx.strokeStyle = 'rgba(100, 120, 255, 0.6)';
+    ctx.lineWidth = width * 0.005;
+    ctx.stroke();
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+}
+
+// Create a modern, styled key texture
+export function createKeyTexture(text, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Calculate rounded corners based on width
+    const cornerRadius = width * 0.15;
+    
+    // Create key background with gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(65, 70, 80, 0.9)');
+    gradient.addColorStop(1, 'rgba(45, 50, 60, 0.9)');
+    
+    // Draw rounded rectangle for key
+    ctx.beginPath();
+    ctx.moveTo(cornerRadius, 0);
+    ctx.lineTo(width - cornerRadius, 0);
+    ctx.quadraticCurveTo(width, 0, width, cornerRadius);
+    ctx.lineTo(width, height - cornerRadius);
+    ctx.quadraticCurveTo(width, height, width - cornerRadius, height);
+    ctx.lineTo(cornerRadius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - cornerRadius);
+    ctx.lineTo(0, cornerRadius);
+    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    ctx.closePath();
+    
+    // Fill with gradient
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Add subtle inner shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = width * 0.03;
+    ctx.shadowOffsetX = width * 0.01;
+    ctx.shadowOffsetY = height * 0.01;
+    
+    // Add key border
+    ctx.strokeStyle = 'rgba(80, 90, 100, 0.8)';
+    ctx.lineWidth = width * 0.01;
+    ctx.stroke();
+    
+    // Reset shadow for text
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Add text
+    const fontSize = Math.min(width, height) * 0.4;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+}
+
+// Create an output display for the keyboard
+export function createOutputDisplay(width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw background
+    ctx.fillStyle = 'rgba(20, 20, 25, 0.8)';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Add a subtle border
+    ctx.strokeStyle = 'rgba(100, 120, 255, 0.5)';
+    ctx.lineWidth = width * 0.005;
+    ctx.strokeRect(0, 0, width, height);
+    
+    // Add placeholder text
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+    ctx.font = `${height * 0.5}px Arial, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('', width * 0.05, height / 2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
 }

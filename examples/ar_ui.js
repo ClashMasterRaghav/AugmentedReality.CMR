@@ -44,7 +44,7 @@ export function initUI(sceneRef) {
         
         // Initialize UI components with explicit scene reference
         createControlPanel(sceneToUse);
-        createVirtualKeyboard();
+        createVirtualKeyboard(sceneToUse);
         
         return true;
     } catch (error) {
@@ -950,141 +950,145 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     }
 }
 
-// Create a virtual keyboard
-export function createVirtualKeyboard() {
-    virtualKeyboard = new THREE.Group();
-    
-    // Keyboard background
-    const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
-    const keyboardMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-    });
-    const keyboardMesh = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
-    virtualKeyboard.add(keyboardMesh);
-    
-    // Add glow border
-    const borderGeometry = new THREE.PlaneGeometry(0.82, 0.32);
-    const borderMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4FC3F7,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-    });
-    const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
-    borderMesh.position.z = -0.001;
-    virtualKeyboard.add(borderMesh);
-    
-    // Create keys
-    const keyRows = [
-        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '.'],
-        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '?', '!']
-    ];
-    
-    const keySize = 0.07;
-    const keyMargin = 0.005;
-    const rowOffsetY = 0.12;
-    
-    keyRows.forEach((row, rowIndex) => {
-        const offsetY = rowOffsetY - (rowIndex * (keySize + keyMargin));
+// Create a virtual keyboard for text input
+export function createVirtualKeyboard(sceneRef) {
+    try {
+        // Get scene reference
+        const scene = sceneRef || window.arScene;
         
-        row.forEach((key, keyIndex) => {
-            // Calculate key position
-            const offsetX = -0.36 + (keyIndex * (keySize + keyMargin));
-            
-            // Create key background
-            const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
-            const keyMaterial = new THREE.MeshBasicMaterial({
-                color: 0x555555,
-                transparent: true,
-                opacity: 0.9,
-                side: THREE.DoubleSide
-            });
-            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-            keyMesh.position.set(offsetX, offsetY, 0.001);
-            keyMesh.userData = {
-                type: 'key',
-                value: key
-            };
-            virtualKeyboard.add(keyMesh);
-            
-            // Create key label
-            const labelCanvas = document.createElement('canvas');
-            labelCanvas.width = 64;
-            labelCanvas.height = 64;
-            const labelCtx = labelCanvas.getContext('2d');
-            labelCtx.fillStyle = '#ffffff';
-            labelCtx.font = 'bold 48px Arial';
-            labelCtx.textAlign = 'center';
-            labelCtx.textBaseline = 'middle';
-            labelCtx.fillText(key, 32, 32);
-            
-            const labelTexture = new THREE.CanvasTexture(labelCanvas);
-            const labelGeometry = new THREE.PlaneGeometry(keySize * 0.8, keySize * 0.8);
-            const labelMaterial = new THREE.MeshBasicMaterial({
-                map: labelTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-            labelMesh.position.z = 0.001;
-            keyMesh.add(labelMesh);
-        });
-    });
-    
-    // Add special keys
-    const specialKeys = [
-        { label: '⌫', value: 'Backspace', width: 0.15, x: 0.3, y: -0.12 },
-        { label: '↵', value: 'Enter', width: 0.15, x: 0.3, y: 0 },
-        { label: '␣', value: 'Space', width: 0.4, x: 0, y: -0.24 }
-    ];
-    
-    specialKeys.forEach(specialKey => {
-        const keyGeometry = new THREE.PlaneGeometry(specialKey.width, keySize);
-        const keyMaterial = new THREE.MeshBasicMaterial({
-            color: 0x2196F3,
+        if (!scene) {
+            console.error("Cannot create virtual keyboard: scene is undefined");
+            return null;
+        }
+        
+        console.log("Creating virtual keyboard with scene:", scene);
+        
+        // Create keyboard group
+        virtualKeyboard = new THREE.Group();
+        virtualKeyboard.name = "virtualKeyboard";
+        
+        // Define keyboard layout
+        const layout = [
+            '1234567890',
+            'QWERTYUIOP',
+            'ASDFGHJKL',
+            'ZXCVBNM_.',
+            '⌫ SPACE ENTER'
+        ];
+        
+        // Keyboard dimensions
+        const keyboardWidth = 0.6;
+        const keyboardHeight = 0.3;
+        const rows = layout.length;
+        const keyPadding = 0.005;
+        
+        // Calculate key size
+        const rowWidths = layout.map(row => row.length);
+        const maxCols = Math.max(...rowWidths);
+        const keyWidth = (keyboardWidth - (keyPadding * (maxCols + 1))) / maxCols;
+        const keyHeight = (keyboardHeight - (keyPadding * (rows + 1))) / rows;
+        
+        // Create keyboard background
+        const bgGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
+        const bgTexture = createKeyboardBackground(keyboardWidth * 500, keyboardHeight * 500);
+        const bgMaterial = new THREE.MeshBasicMaterial({
+            map: bgTexture,
             transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
+            opacity: 0.9
         });
-        const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-        keyMesh.position.set(specialKey.x, specialKey.y, 0.001);
-        keyMesh.userData = {
-            type: 'key',
-            value: specialKey.value
-        };
-        virtualKeyboard.add(keyMesh);
+        const background = new THREE.Mesh(bgGeometry, bgMaterial);
+        virtualKeyboard.add(background);
         
-        // Create key label
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 64;
-        labelCanvas.height = 64;
-        const labelCtx = labelCanvas.getContext('2d');
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = 'bold 48px Arial';
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        labelCtx.fillText(specialKey.label, 32, 32);
+        // Create keys
+        layout.forEach((row, rowIndex) => {
+            const rowWidth = row.length * keyWidth + (row.length + 1) * keyPadding;
+            const rowStartX = -keyboardWidth / 2 + (keyboardWidth - rowWidth) / 2 + keyWidth / 2 + keyPadding;
+            
+            [...row].forEach((key, colIndex) => {
+                // Special handling for space and other special keys
+                let keyLabel = key;
+                let keyTextWidth = keyWidth;
+                let specialKeyWidth = keyWidth;
+                
+                if (key === ' ') {
+                    // Space key
+                    keyLabel = 'SPACE';
+                    specialKeyWidth = keyWidth * 5;
+                } else if (key === '⌫') {
+                    // Backspace key
+                    keyLabel = '⌫';
+                    specialKeyWidth = keyWidth * 1.5;
+                } else if (key === 'ENTER') {
+                    // Enter key
+                    specialKeyWidth = keyWidth * 2;
+                }
+                
+                // Calculate key position
+                let posX = rowStartX + colIndex * (keyWidth + keyPadding);
+                
+                // Adjust for special key widths
+                if (key === 'SPACE' && colIndex > 0) {
+                    posX += (specialKeyWidth - keyWidth) / 2;
+                } else if (key === 'ENTER' && colIndex > 0) {
+                    posX += (specialKeyWidth - keyWidth) / 2;
+                }
+                
+                const posY = keyboardHeight / 2 - keyHeight / 2 - rowIndex * (keyHeight + keyPadding) - keyPadding;
+                
+                const keyGeometry = new THREE.PlaneGeometry(
+                    key === 'SPACE' || key === 'ENTER' || key === '⌫' ? specialKeyWidth : keyWidth,
+                    keyHeight
+                );
+                
+                const keyTexture = createKeyTexture(keyLabel, keyLabel === 'SPACE' ? specialKeyWidth * 300 : keyWidth * 300, keyHeight * 300);
+                const keyMaterial = new THREE.MeshBasicMaterial({
+                    map: keyTexture,
+                    transparent: true
+                });
+                
+                const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
+                keyMesh.position.set(posX, posY, 0.001);
+                
+                // Add user data for interaction
+                keyMesh.userData = {
+                    type: 'key',
+                    key: key === 'SPACE' ? ' ' : key,
+                    label: keyLabel,
+                    originalPosition: new THREE.Vector3(posX, posY, 0.001)
+                };
+                
+                virtualKeyboard.add(keyMesh);
+            });
+        });
         
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(specialKey.width * 0.8, keySize * 0.8);
+        // Create a simple label for the output display
+        const labelGeometry = new THREE.PlaneGeometry(keyboardWidth - keyPadding * 2, keyHeight);
+        const labelTexture = createOutputDisplay(keyboardWidth * 500 - keyPadding * 2 * 500, keyHeight * 300);
         const labelMaterial = new THREE.MeshBasicMaterial({
             map: labelTexture,
-            transparent: true,
-            side: THREE.DoubleSide
+            transparent: true
         });
+        
         const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
         labelMesh.position.z = 0.001;
         keyMesh.add(labelMesh);
-    });
-    
-    // Hide keyboard initially
-    virtualKeyboard.visible = false;
-    scene.add(virtualKeyboard);
+        
+        // Hide keyboard initially
+        virtualKeyboard.visible = false;
+        
+        // Add to scene
+        if (scene && scene.add) {
+            scene.add(virtualKeyboard);
+            console.log("Virtual keyboard added to scene");
+        } else {
+            console.error("Cannot add virtual keyboard: scene is invalid");
+        }
+        
+        return virtualKeyboard;
+    } catch (error) {
+        console.error("Error creating virtual keyboard:", error);
+        return null;
+    }
 }
 
 // Toggle mode buttons (move, rotate, resize)
