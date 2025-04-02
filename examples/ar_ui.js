@@ -1215,3 +1215,132 @@ export function floatAnimation() {
         glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
     }
 }
+
+// Create a button with given parameters
+export function createButton(options = {}) {
+    const {
+        parent,
+        position = new THREE.Vector3(0, 0, 0),
+        width = 0.2,
+        height = 0.05,
+        label = 'Button',
+        onClick = null,
+        color = 0x4285f4,
+        hoverColor = 0x5a95f5,
+        textColor = 0xffffff
+    } = options;
+    
+    if (!parent) {
+        console.error("Parent object is required for createButton");
+        return null;
+    }
+    
+    // Create button group
+    const buttonGroup = new THREE.Group();
+    buttonGroup.position.copy(position);
+    
+    // Create button background with rounded corners using canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw button background with gradient
+    const cornerRadius = Math.min(20, canvas.height / 4);
+    
+    // Convert THREE.Color to RGB format
+    const buttonColor = new THREE.Color(color);
+    const r = Math.floor(buttonColor.r * 255);
+    const g = Math.floor(buttonColor.g * 255);
+    const b = Math.floor(buttonColor.b * 255);
+    
+    // Draw a solid base color first (important for hit detection)
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    roundRect(ctx, 0, 0, canvas.width, canvas.height, cornerRadius);
+    
+    // Add gradient overlay
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, `rgba(255, 255, 255, 0.2)`);
+    gradient.addColorStop(1, `rgba(0, 0, 0, 0.1)`);
+    ctx.fillStyle = gradient;
+    roundRect(ctx, 0, 0, canvas.width, canvas.height, cornerRadius);
+    
+    // Add subtle border
+    ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
+    ctx.lineWidth = 2;
+    roundRect(ctx, 1, 1, canvas.width - 2, canvas.height - 2, cornerRadius, false, true);
+    
+    // Add text
+    ctx.fillStyle = `rgb(${textColor})`;
+    ctx.font = 'bold 40px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Add text shadow for better readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    
+    ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 4;
+    
+    // Create button geometry and material
+    const buttonGeometry = new THREE.PlaneGeometry(width, height);
+    const buttonMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    // Create button mesh
+    const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    button.renderOrder = 1000;
+    
+    // Add user data for interaction
+    button.userData = {
+        type: 'button',
+        action: 'customButton',
+        originalColor: color,
+        hoverColor: hoverColor,
+        isHovered: false,
+        isPressed: false,
+        isToggle: false,
+        isActive: true,
+        onClick: onClick
+    };
+    
+    // Add to group
+    buttonGroup.add(button);
+    
+    // Add to parent
+    parent.add(buttonGroup);
+    
+    return buttonGroup;
+}
+
+// Helper function to draw rounded rectangles
+function roundRect(ctx, x, y, width, height, radius, fill = true, stroke = false) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    
+    if (fill) {
+        ctx.fill();
+    }
+    
+    if (stroke) {
+        ctx.stroke();
+    }
+}
