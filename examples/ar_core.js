@@ -88,21 +88,21 @@ function initAREnvironment() {
     document.body.appendChild(arButton);
     
     // Style the button for better visibility
-    arButton.style.cssText = `
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 20px;
-        border: none;
-        border-radius: 4px;
-        background: linear-gradient(45deg, #3f51b5, #2196f3);
-        color: white;
-        font-size: 16px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    `;
+    // arButton.style.cssText = `
+    //     position: absolute;
+    //     bottom: 20px;
+    //     left: 50%;
+    //     transform: translateX(-50%);
+    //     padding: 12px 20px;
+    //     border: none;
+    //     border-radius: 4px;
+    //     background: linear-gradient(45deg, #3f51b5, #2196f3);
+    //     color: white;
+    //     font-size: 16px;
+    //     font-weight: bold;
+    //     cursor: pointer;
+    //     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    // `;
     
     // Add event listener for session start
     renderer.xr.addEventListener('sessionstart', function() {
