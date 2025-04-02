@@ -201,8 +201,15 @@ async function init() {
 export function createDemoControls() {
     console.log("Creating demo controls...");
     try {
-        // Create control panel
+        // Make sure scene is available
+        if (!scene) {
+            console.error("Scene is not available for creating control panel");
+            return null;
+        }
+        
+        // Create control panel with scene
         const controlPanel = createControlPanel({
+            parent: scene,
             width: 0.5,
             height: 0.25,
             position: new THREE.Vector3(0, -0.3, -0.7),

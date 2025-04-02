@@ -1207,9 +1207,6 @@ function createFallbackTexture(screenNumber) {
 // Select a screen and update UI accordingly with enhanced visual feedback
 export function selectScreen(screen) {
     try {
-        // IMPORTANT: Don't try to use keyboard for now - it's causing errors
-        const skipKeyboardUpdate = true;
-        
         // Deselect previously selected screen
         if (selectedScreen) {
             try {
@@ -1278,15 +1275,6 @@ export function selectScreen(screen) {
             animateScreenScale(screen, 1.0, 300, true);
         } catch (error) {
             console.warn("Error while applying visual effects to selected screen:", error);
-        }
-        
-        // Position keyboard under selected screen if needed - skip if we're having issues
-        if (!skipKeyboardUpdate && virtualKeyboard) {
-            try {
-                updateKeyboardPosition(screen, virtualKeyboard);
-            } catch (error) {
-                console.warn("Error updating keyboard position:", error);
-            }
         }
     } catch (error) {
         console.error("Error in selectScreen:", error);
