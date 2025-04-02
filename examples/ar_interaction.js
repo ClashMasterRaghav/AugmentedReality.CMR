@@ -304,57 +304,150 @@ function getScreenFromIntersect(object) {
 
 // Handle different button actions
 function handleButtonAction(button) {
-    if (!button || !button.userData || !button.userData.action) return;
+    if (!button || !button.userData) {
+        console.log("Invalid button object");
+        return;
+    }
     
+    console.log("Handling button action:", button.userData.action);
+    
+    // Extract the button action
     const action = button.userData.action;
+    
+    // Provide haptic feedback for button press
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
+    }
     
     // Handle different button actions
     switch (action) {
         case 'newScreen':
+            console.log("New screen button pressed");
+            // Create a new screen positioned in front of the camera
             createNewScreenInFrontOfCamera();
             break;
             
         case 'deleteScreen':
+            console.log("Delete screen button pressed - calling deleteLastScreen()");
+            // Delete the last interacted screen
             deleteLastScreen();
-            break;
             
-        case 'toggleDragMode':
-            toggleDragMode(button);
-            break;
+            // Add haptic feedback for destructive action
+            if (navigator.vibrate) {
+                navigator.vibrate([30, 20, 80]);
+            }
             
-        case 'moveMode':
-            toggleMoveMode(button);
-            break;
-            
-        case 'rotateMode':
-            toggleRotateMode(button);
+            // Create visual indicator
+            createModeChangeIndicator('Screen Deleted');
             break;
             
         case 'selectScreenType':
-            if (button.userData.screenType) {
-                createScreenWithType(button.userData.screenType);
+            console.log("Screen type button pressed:", button.userData.screenType);
+            // Get camera position and direction
+            const cameraPosition = new THREE.Vector3();
+            camera.getWorldPosition(cameraPosition);
+            
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(camera.quaternion);
+            
+            // Position screen in front of camera
+            const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
+            
+            // Create the appropriate screen type
+            let newScreen;
+            const screenType = button.userData.screenType;
+            
+            switch(screenType) {
+                case 'youtube':
+                    newScreen = createYouTubeScreen(screenPosition);
+                    break;
+                case 'duckduckgo':
+                    newScreen = createDuckDuckGoScreen(screenPosition);
+                    break;
+                case 'maps':
+                    newScreen = createGoogleMapsScreen(screenPosition);
+                    break;
+                case 'electron':
+                    newScreen = createElectronAppScreen(screenPosition);
+                    break;
+                default:
+                    newScreen = createNewBrowserScreen(screenPosition);
+                    break;
             }
+            
+            // Make it face the camera
+            newScreen.lookAt(camera.position);
+            
+            // Add visual feedback
+            createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
+            
+            // Select this screen
+            selectScreen(newScreen);
             break;
             
+        case 'moveMode':
+            console.log("Move mode button pressed");
+            // Toggle move mode
+            isMoveModeActive = !isMoveModeActive;
+            isRotateModeActive = false; // Disable rotate mode
+            
+            // Update button state
+            button.material.color.set(isMoveModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
+            break;
+            
+        case 'rotateMode':
+            console.log("Rotate mode button pressed");
+            // Toggle rotate mode
+            isRotateModeActive = !isRotateModeActive;
+            isMoveModeActive = false; // Disable move mode
+            
+            // Update button state
+            button.material.color.set(isRotateModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
+            break;
+            
+        // FIXED: Add explicit handling for playButton and volumeButton from screens
         case 'playButton':
+            console.log("Play/pause button pressed");
+            // Toggle video playback
             if (videoControlFunctions.togglePlayback) {
                 videoControlFunctions.togglePlayback();
             }
             break;
             
         case 'volumeButton':
+            console.log("Mute/unmute button pressed");
+            // Toggle video mute
+            if (videoControlFunctions.toggleMute) {
+                videoControlFunctions.toggleMute();
+            }
+            break;
+            
+        // Keep generic play/pause and mute/unmute handlers for compatibility
+        case 'play':
+        case 'pause':
+            console.log("Play/pause button pressed");
+            if (videoControlFunctions.togglePlayback) {
+                videoControlFunctions.togglePlayback();
+            }
+            break;
+            
+        case 'mute':
+        case 'unmute':
+            console.log("Mute/unmute button pressed");
             if (videoControlFunctions.toggleMute) {
                 videoControlFunctions.toggleMute();
             }
             break;
             
         default:
-            console.log("Unhandled button action:", action);
-    }
-    
-    // Provide haptic feedback if available
-    if (navigator.vibrate) {
-        navigator.vibrate(50); // Short vibration for button press
+            console.log("Unknown button action:", action);
+            break;
     }
 }
 
@@ -519,6 +612,8 @@ function toggleFullscreen(screen) {
         // Return to original scale
         if (screen.userData.originalScale) {
             screen.scale.copy(screen.userData.originalScale);
+        } else {
+            screen.scale.set(1, 1, 1);
         }
         
         // Return to original position
@@ -591,109 +686,137 @@ function findAllButtons() {
 
 // Touch start handler
 function onTouchStart(event) {
-    // Get normalized touch coordinates
+    event.preventDefault();
+    
+    console.log("Touch start detected in AR");
+    
+    // Single touch handling
     const touch = event.touches[0];
-    const touchX = (touch.clientX / window.innerWidth) * 2 - 1;
-    const touchY = -((touch.clientY / window.innerHeight) * 2 - 1);
-    touchPos.set(touchX, touchY);
     
-    // Store current touch position for calculations
-    initialTouchPosition.set(touchX, touchY);
-    currentTouchPosition.set(touchX, touchY);
-    
-    // Setup raycaster
-    raycaster.setFromCamera(touchPos, camera);
-    
-    // Check if virtual keyboard is active and handle key press
-    if (virtualKeyboard && virtualKeyboard.visible) {
-        const keyIntersects = raycaster.intersectObject(virtualKeyboard, true);
-        if (keyIntersects.length > 0) {
-            const key = getButtonFromIntersect(keyIntersects[0].object);
-            if (key && key.userData && key.userData.key) {
-                // Highlight the key and handle the keypress
-                selectedKey = key;
-                if (key.userData.originalColor) {
-                    key.material.color.setHex(key.userData.hoverColor || 0xffcc00);
-                }
-                
-                // Provide haptic feedback for key press
-                if (navigator.vibrate) {
-                    navigator.vibrate(20); // Very short vibration for key tap
-                }
-                
-                console.log("Keyboard key pressed:", key.userData.key);
-                // Key handling in onTouchEnd
-            }
-            return;
-        }
+    if (!touch) {
+        console.log("No valid touch point");
+        return;
     }
     
-    // First priority: check if we're touching the control panel or its buttons
-    // Control panel always works regardless of drag mode
-    const panelIntersects = raycaster.intersectObject(controlPanel, true);
-    if (panelIntersects.length > 0) {
-        // Find if we've hit a button on the control panel
-        const button = getButtonFromIntersect(panelIntersects[0].object);
-        if (button) {
-            console.log("Control panel button touched:", button.userData.action);
-            selectedButton = button;
-            
-            // Visual feedback - highlight button
-            if (button.material && button.userData.hoverColor) {
-                // Store original color if needed
-                if (!button.userData.originalColor) {
-                    button.userData.originalColor = button.material.color ? 
-                        button.material.color.getHex() : 0xffffff;
-                }
-                
-                if (button.material.color) {
-                    button.material.color.setHex(button.userData.hoverColor);
-                } else if (button.material.map) {
-                    // For textured buttons, scale up slightly instead
-                    button.scale.set(1.05, 1.05, 1.05);
-                }
-            }
-            
-            return;
-        }
+    // Convert touch to normalized device coordinates
+    initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    initialTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+    currentTouchPosition.copy(initialTouchPosition);
+    
+    console.log("Touch position:", initialTouchPosition.x.toFixed(3), initialTouchPosition.y.toFixed(3));
+    
+    // Update raycaster
+    raycaster.setFromCamera(initialTouchPosition, camera);
+    
+    // Double tap detection
+    const now = performance.now();
+    const doubleTapDetected = (now - lastTapTime) < 300;
+    lastTapTime = now;
+    
+    // PRIORITY 0: Check for control panel dragging
+    if (controlPanel) {
+        const panelIntersects = raycaster.intersectObject(controlPanel, true);
         
-        // Check if we've hit the drag handle
-        const dragHandle = panelIntersects.find(intersect => 
-            intersect.object.userData && 
-            (intersect.object.userData.type === 'dragHandle' || 
-             intersect.object.userData.isPartOfDragHandle))?.object;
-             
-        if (dragHandle) {
-            console.log("Control panel drag handle touched");
-            isControlPanelDragging = true;
+        if (panelIntersects.length > 0) {
+            // Get info about intersection
+            const hitPoint = panelIntersects[0].point.clone();
+            const localPoint = controlPanel.worldToLocal(hitPoint.clone());
+            const hitObject = panelIntersects[0].object;
             
-            // Store initial positions for the drag
-            initialDragPoint.copy(panelIntersects[0].point);
-            initialPanelPosition.copy(controlPanel.position);
-            initialPanelRotation.copy(controlPanel.rotation);
+            console.log("Hit panel object:", hitObject.uuid.slice(0, 8), 
+                      "userData:", hitObject.userData ? JSON.stringify(hitObject.userData) : 'none');
             
-            // Visualize the drag handle being touched
-            if (dragHandle && dragHandle.material) {
-                // Store original color if not already stored
-                if (!dragHandle.userData.originalColor) {
-                    dragHandle.userData.originalColor = dragHandle.material.color.getHex();
+            // Enhanced drag detection - check if we hit:
+            // 1. The explicit drag handle or grip lines
+            // 2. The top portion of the panel
+            // 3. Any object marked as part of drag handle
+            const isDragHandle = hitObject.userData && (
+                hitObject.userData.isDragArea || 
+                hitObject.userData.isPartOfDragHandle ||
+                hitObject.userData.type === 'dragHandle' ||
+                (hitObject.parent && hitObject.parent.userData && 
+                 (hitObject.parent.userData.isDragArea || hitObject.parent.userData.type === 'dragHandle'))
+            );
+            
+            // First check if this is a button
+            const isButton = hitObject.userData && hitObject.userData.type === 'button';
+            
+            // If it's a button, handle the button click
+            if (isButton) {
+                console.log("Touch detected on panel button:", hitObject.userData.action);
+                
+                // Visual feedback
+                const originalColor = hitObject.material.color.clone();
+                hitObject.material.color.set(0x4FC3F7);
+                
+                // Scale effect
+                const originalScale = hitObject.scale.clone();
+                hitObject.scale.multiplyScalar(1.1);
+                
+                setTimeout(() => {
+                    hitObject.material.color.copy(originalColor);
+                    hitObject.scale.copy(originalScale);
+                }, 150);
+                
+                // Haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(40);
                 }
                 
-                // Highlight with hover color
-                if (dragHandle.userData.hoverColor) {
-                    dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
-                } else {
-                    dragHandle.material.color.set(0x81D4FA);
-                }
-                
-                // Add slight scale-up effect
-                dragHandle.scale.set(1.05, 1.05, 1.05);
+                // Handle button click and return
+                handleButtonAction(hitObject);
+                return;
             }
             
-            // Add visual feedback
-            createModeChangeIndicator('Panel Unlocked - Drag to Position');
+            // More generous y-position check for the top section
+            const isInDragArea = localPoint.y > 0.0;
             
-            return;
+            if (isDragHandle || isInDragArea) {
+                console.log("Starting control panel drag - detected via:", isDragHandle ? "drag handle" : "top area");
+                
+                // Store initial panel position and rotation
+                initialPanelPosition.copy(controlPanel.position);
+                initialPanelQuaternion.copy(controlPanel.quaternion);
+                
+                // Calculate offset for more natural dragging
+                panelDragOffset.copy(hitPoint).sub(controlPanel.position);
+                
+                // Set flag to indicate panel is being dragged
+                isPanelBeingDragged = true;
+                controlPanel.userData.isDragging = true;
+                
+                // Provide strong haptic feedback like screen dragging
+                if (navigator.vibrate) {
+                    navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel, same as screen dragging
+                }
+                
+                // Visual feedback - highlight the drag handle if available
+                const dragHandle = controlPanel.children.find(
+                    child => child.userData && (child.userData.isDragArea || child.userData.type === 'dragHandle')
+                );
+                
+                if (dragHandle && dragHandle.material) {
+                    // Store original color if not already stored
+                    if (!dragHandle.userData.originalColor) {
+                        dragHandle.userData.originalColor = dragHandle.material.color.getHex();
+                    }
+                    
+                    // Highlight with hover color
+                    if (dragHandle.userData.hoverColor) {
+                        dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
+                    } else {
+                        dragHandle.material.color.set(0x81D4FA);
+                    }
+                    
+                    // Add slight scale-up effect
+                    dragHandle.scale.set(1.05, 1.05, 1.05);
+                }
+                
+                // Add visual feedback
+                createModeChangeIndicator('Panel Unlocked - Drag to Position');
+                
+                return;
+            }
         }
     }
     
@@ -718,228 +841,372 @@ function onTouchStart(event) {
     // Sort by distance so we prioritize closer screens
     screenIntersections.sort((a, b) => a.distance - b.distance);
     
-    // PRIORITY 1: Check for button interactions - always process control panel buttons
+    // PRIORITY 1: Check for button interactions
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
-        const button = getButtonFromIntersect(buttonIntersects[0].object);
-        if (button) {
-            console.log("Button touched:", button.userData.action);
-            selectedButton = button;
+        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
+        if (buttonObj) {
+            console.log("Button touched:", buttonObj.userData.action);
             
-            // Visual feedback - highlight button
-            if (button.material && button.userData.hoverColor) {
-                // Store original color if needed
-                if (!button.userData.originalColor) {
-                    button.userData.originalColor = button.material.color ? 
-                        button.material.color.getHex() : 0xffffff;
-                }
-                
-                if (button.material.color) {
-                    button.material.color.setHex(button.userData.hoverColor);
-                } else if (button.material.map) {
-                    // For textured buttons, scale up slightly instead
-                    button.scale.set(1.05, 1.05, 1.05);
-                }
+            // Visual feedback
+            const originalColor = buttonObj.material.color.clone();
+            buttonObj.material.color.set(0x4FC3F7);
+            
+            // Scale up and back for button press effect
+            const originalScale = buttonObj.scale.clone();
+            buttonObj.scale.multiplyScalar(1.2);
+            
+            setTimeout(() => {
+                buttonObj.material.color.copy(originalColor);
+                buttonObj.scale.copy(originalScale);
+            }, 200);
+            
+            // Provide haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(40);
             }
             
+            // Handle the button action
+            handleButtonAction(buttonObj);
             return;
         }
     }
     
-    // If we have screen intersections, decide what to do based on the current mode
+    // PRIORITY 2: Check closest screen for progress bar interaction
     if (screenIntersections.length > 0) {
         const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
         
-        // Check if we're in drag mode (controlled by the toggle)
-        if (window.dragModeEnabled) {
-            console.log("Drag mode enabled - initiating screen drag");
+        // Check if we hit the progress bar
+        if (handleProgressBarTouch(screen, closestHit.point)) {
+            console.log("Progress bar touched on screen:", screen.userData.id);
+            return;
+        }
+    }
+    
+    // PRIORITY 3: Check for draggable areas on screens
+    let draggableAreaHit = false;
+    let intersectedScreen = null;
+    
+    // Check for draggable area hits on the closest screens first
+    for (const hit of screenIntersections) {
+        const screen = hit.screen;
+        // Get position relative to the screen
+        let localPoint = hit.point.clone();
+        if (screen.worldToLocal) {
+            localPoint = screen.worldToLocal(localPoint.clone());
+        }
+        
+        // Screen dimensions
+        const screenHeight = 0.75; // Standard screen height
+        
+        // Check if we're in the top 2/3 of the screen
+        // The top of the screen is at y = screenHeight/2
+        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
+        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+            // We hit the draggable area
+            intersectedScreen = screen;
+            draggableAreaHit = true;
+            break;
+        }
+    }
+    
+    // If we found a draggable area, set up for dragging
+    if (draggableAreaHit && intersectedScreen) {
+        console.log("Starting drag on screen:", intersectedScreen.userData.id, "via draggable area");
+        
+        // Set up drag state
+        isDraggingHandle = true;
+        draggedScreen = intersectedScreen;
+        
+        // Preserve original scale
+        if (!intersectedScreen.userData.originalScale) {
+            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
+        } else {
+            // Restore original scale when starting drag
+            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
+        }
+        
+        // Select this screen
+        selectScreen(intersectedScreen);
+        
+        // Calculate offset - use a fixed offset for better positioning
+        dragOffset.set(0, 0, 0);
+        
+        // Visual feedback - highlight the top bar if available
+        if (intersectedScreen.userData.dragHandle) {
+            intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
+        }
+        
+        // Strong haptic feedback to confirm grab
+        if (navigator.vibrate) {
+            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
+        }
+        
+        createModeChangeIndicator('Dragging Screen');
+        return;
+    }
+    
+    // PRIORITY 4: Regular screen selection - use the closest screen from our sorted list
+    if (screenIntersections.length > 0) {
+        const closestHit = screenIntersections[0];
+        const screen = closestHit.screen;
+        
+        console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
+        
+        // Select the screen
+        selectScreen(screen);
+        
+        // Double tap to toggle resize
+        if (doubleTapDetected) {
+            console.log("Double tap detected, toggling resize");
+            toggleResize(screen);
             
-            // Find the closest screen to our touch ray
-            const screenToSelect = closestHit.screen;
-            setSelectedScreen(screenToSelect);
-            
-            // Track the interaction start point and screen's initial position
-            isDraggingScreen = true;
-            initialDragPoint.copy(closestHit.point);
-            initialScreenPosition.copy(screenToSelect.position);
-            initialScreenRotation.copy(screenToSelect.rotation);
-            
-            // Visual feedback for drag start
-            flashScreenHighlight(screenToSelect);
-            
-            // Haptic feedback
+            // Provide haptic feedback
             if (navigator.vibrate) {
-                navigator.vibrate([15, 15, 30]); // Drag pattern
+                navigator.vibrate([30, 20, 30]);
             }
             
-            return; // Skip button interaction in drag mode
+            createModeChangeIndicator('Size Changed');
+            return;
         }
-        // INTERACT MODE: Allow normal screen interaction but disable dragging
-        else {
-            // PRIORITY 1: Check for button interactions on the screen
-            const hitObject = closestHit.object;
-            
-            // Debug what we've hit
-            console.log("Hit object:", hitObject.userData ? hitObject.userData.type : "unknown");
-            
-            // Check if we hit a button
-            if (hitObject.userData && hitObject.userData.type === 'button') {
-                console.log("Screen button touched:", hitObject.userData.action);
-                selectedButton = hitObject;
-                
-                // Visual feedback - highlight button
-                if (hitObject.material && hitObject.userData.hoverColor) {
-                    // Store original color if needed
-                    if (!hitObject.userData.originalColor) {
-                        hitObject.userData.originalColor = hitObject.material.color ? 
-                            hitObject.material.color.getHex() : 0xffffff;
-                    }
-                    
-                    if (hitObject.material.color) {
-                        hitObject.material.color.setHex(hitObject.userData.hoverColor);
-                    } else if (hitObject.material.map) {
-                        // For textured buttons, scale up slightly instead
-                        hitObject.scale.set(1.05, 1.05, 1.05);
-                    }
-                }
-                
-                return;
-            }
-            
-            // Select the hit screen
-            const screenToSelect = getScreenFromIntersect(hitObject);
-            if (screenToSelect) {
-                setSelectedScreen(screenToSelect);
-                flashScreenHighlight(screenToSelect);
-            }
-        }
+        
+        // Flash highlight around selected screen
+        flashScreenHighlight(screen);
+        createModeChangeIndicator('Screen Selected');
     }
 }
 
-// Touch move handler updated for drag modes
-function onTouchMove(event) {
-    // Skip processing if no active touch
-    if (event.touches.length === 0) return;
+// Flash a highlight effect around a selected screen
+function flashScreenHighlight(screen) {
+    // Find the border or create one if it doesn't exist
+    let highlightMesh = screen.children.find(child => 
+        child.userData && child.userData.isHighlight);
     
-    // Get normalized touch coordinates
-    const touch = event.touches[0];
-    const touchX = (touch.clientX / window.innerWidth) * 2 - 1;
-    const touchY = -((touch.clientY / window.innerHeight) * 2 - 1);
-    
-    // Update current touch position
-    currentTouchPosition.set(touchX, touchY);
-    
-    // Calculate delta from last position
-    const deltaX = touchX - touchPos.x;
-    const deltaY = touchY - touchPos.y;
-    
-    // Update the stored touch position
-    touchPos.set(touchX, touchY);
-    
-    // Update raycaster with new touch position
-    raycaster.setFromCamera(touchPos, camera);
-    
-    // Handle control panel dragging - always enabled regardless of mode
-    if (isControlPanelDragging && controlPanel) {
-        // Calculate the hit point in 3D space
-        const hitTestResults = raycaster.intersectObjects(scene.children, true);
+    if (!highlightMesh) {
+        // Get screen dimensions (use the first plane geometry as reference)
+        const screenMesh = screen.children.find(child => 
+            child.geometry && child.geometry.type === 'PlaneGeometry');
         
-        // Use the hit point if ray intersects something, otherwise use a point in front of the camera
-        let targetPoint;
-        if (hitTestResults.length > 0) {
-            targetPoint = hitTestResults[0].point;
-        } else {
-            // Fall back to a point in front of the camera
-            const cameraPosition = new THREE.Vector3();
-            camera.getWorldPosition(cameraPosition);
-            const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-            targetPoint = cameraPosition.clone().addScaledVector(cameraDirection, 0.5);
+        let width = 1.05;
+        let height = 0.8;
+        
+        if (screenMesh && screenMesh.geometry) {
+            // Extract dimensions from existing geometry
+            const size = new THREE.Vector3();
+            screenMesh.geometry.computeBoundingBox();
+            screenMesh.geometry.boundingBox.getSize(size);
+            
+            // Scale slightly larger than the original screen
+            width = size.x * 1.05;
+            height = size.y * 1.05;
         }
         
-        // Calculate the move delta
-        const moveDelta = new THREE.Vector3().subVectors(targetPoint, initialDragPoint);
+        // Create highlight mesh
+        const glowGeometry = new THREE.PlaneGeometry(width, height);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4fc3f7,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
+        });
         
-        // Create a new position by adding the move delta to the initial position
-        const newPosition = initialPanelPosition.clone().add(moveDelta);
+        highlightMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        highlightMesh.position.z = -0.01;
+        highlightMesh.userData = { isHighlight: true };
+        screen.add(highlightMesh);
+    }
+    
+    // Animate the highlight
+    let opacity = 0;
+    const fadeIn = () => {
+        opacity += 0.1;
+        highlightMesh.material.opacity = opacity;
         
-        // Apply position with smoothing
-        controlPanel.position.lerp(newPosition, 0.3);
+        if (opacity < 0.6) {
+            requestAnimationFrame(fadeIn);
+        } else {
+            // Fade out
+            const fadeOut = () => {
+                opacity -= 0.1;
+                highlightMesh.material.opacity = opacity;
+                
+                if (opacity > 0) {
+                    requestAnimationFrame(fadeOut);
+                }
+            };
+            requestAnimationFrame(fadeOut);
+        }
+    };
+    
+    requestAnimationFrame(fadeIn);
+}
+
+// Touch move handler - make the movement more responsive and direct
+function onTouchMove(event) {
+    // Always prevent default to avoid browser gestures
+    event.preventDefault();
+    
+    // Make sure we have a valid touch point
+    const touch = event.touches[0];
+    if (!touch) {
+        return;
+    }
+    
+    // Convert touch to normalized device coordinates
+    const previousTouchPosition = currentTouchPosition.clone();
+    currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+    
+    // Handle control panel dragging
+    if (isPanelBeingDragged && controlPanel) {
+        // Update raycaster with current touch position
+        raycaster.setFromCamera(currentTouchPosition, camera);
         
-        // Make the panel face the camera
-        const cameraDirection = new THREE.Vector3();
-        camera.getWorldDirection(cameraDirection);
-        cameraDirection.negate(); // Panel should face camera, so negate the direction
+        // Get camera direction and up vectors
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        forward.y = 0; // Keep panel at a constant height relative to camera view
+        forward.normalize();
         
-        // Create a target rotation
-        const targetRotation = new THREE.Euler().setFromQuaternion(
-            new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1), // Panel's forward direction
-                cameraDirection // Direction panel should face
-            )
-        );
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0);
         
-        // Apply rotation with smoothing
-        controlPanel.rotation.x = THREE.MathUtils.lerp(controlPanel.rotation.x, targetRotation.x, 0.2);
-        controlPanel.rotation.y = THREE.MathUtils.lerp(controlPanel.rotation.y, targetRotation.y, 0.2);
-        controlPanel.rotation.z = THREE.MathUtils.lerp(controlPanel.rotation.z, targetRotation.z, 0.2);
+        // IMPROVED: Use same approach as screen dragging for more intuitive movement
+        // Calculate movement delta from touch (like screen dragging)
+        const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+        const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+        
+        // Get camera's right and up vectors for moving in screen space
+        const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+        
+        // Scale factor for more responsive movement - INCREASED
+        const moveScale = 1.5; // Much more responsive movement
+        
+        // Create movement vector
+        const movement = new THREE.Vector3()
+            .addScaledVector(cameraRight, deltaX * moveScale)
+            .addScaledVector(cameraUp, deltaY * moveScale);
+        
+        // Apply movement directly for more responsive feel
+        controlPanel.position.add(movement);
+        
+        // Keep y position within reasonable bounds
+        controlPanel.position.y = THREE.MathUtils.clamp(controlPanel.position.y, -0.3, 0.4);
+        
+        // Always face the camera for better visibility
+        controlPanel.lookAt(camera.position);
+        
+        // Mark that the user has manually positioned the panel
+        controlPanel.userData.manuallyPositioned = true;
+        
+        // Visual feedback - show tiny movement indicator
+        const moveIndicatorSize = 0.01;
+        createMoveIndicator(controlPanel.position.clone(), moveIndicatorSize);
         
         return;
     }
     
-    // Handle screen dragging when in drag mode
-    if (isDraggingScreen && selectedScreen && window.dragModeEnabled) {
-        moveScreenWithTouch();
+    // Handle dragging via the drag handle - even more direct approach
+    if (isDraggingHandle && draggedScreen) {
+        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
+        
+        try {
+            // Preserve original scale
+            if (draggedScreen.userData && draggedScreen.userData.originalScale) {
+                // Ensure scale doesn't change during movement
+                draggedScreen.scale.copy(draggedScreen.userData.originalScale);
+            }
+            
+            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
+            // Calculate movement delta from touch
+            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+            
+            // Get camera's right and up vectors for moving in screen space
+            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+            
+            // Scale for more noticeable movement in AR - INCREASED for faster movement
+            const moveScale = 0.75; // Significantly increased for better AR response
+            
+            // Create movement vector
+            const movement = new THREE.Vector3()
+                .addScaledVector(cameraRight, deltaX * moveScale)
+                .addScaledVector(cameraUp, deltaY * moveScale);
+            
+            // Apply movement directly
+            draggedScreen.position.add(movement);
+            
+            // Make screen face the camera
+            draggedScreen.lookAt(camera.position);
+            
+            // Optional visual feedback
+            createMoveIndicator(draggedScreen.position.clone(), 0.03);
+            
+        } catch (error) {
+            console.error("Error in drag movement:", error);
+        }
+        
         return;
     }
+    
+    // We're not handling other forms of movement to simplify the interaction model
+    // This keeps the drag handle as the primary way to move screens, which improves reliability
 }
 
 // Move screen based on touch movement
 function moveScreenWithTouch() {
     if (!selectedScreen) return;
     
-    // Calculate movement based on touch delta
+    // Create more direct movement with less complexity
+    // Use a simplified approach that always works
+    
+    // Get the camera's forward and right vectors
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    
+    // Calculate the touch delta
     const touchDelta = new THREE.Vector2(
         currentTouchPosition.x - initialTouchPosition.x,
         currentTouchPosition.y - initialTouchPosition.y
     );
     
-    // Create a temporary camera-aligned plane to project movement
-    const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    // Scale the movement (adjust multiplier as needed)
+    const movementSpeed = 4.0;
     
-    // Calculate movement vectors scaled by a factor to make dragging more responsive
-    const moveFactor = 1.5; // Increase factor for more responsive movement
+    // Create movement vector in world space
+    const movement = new THREE.Vector3()
+        .addScaledVector(right, touchDelta.x * movementSpeed)
+        .addScaledVector(new THREE.Vector3(0, 1, 0), touchDelta.y * movementSpeed);
     
-    // Create movement vector from touch delta
-    const moveVector = new THREE.Vector3()
-        .add(cameraRight.clone().multiplyScalar(touchDelta.x * moveFactor))
-        .add(cameraUp.clone().multiplyScalar(touchDelta.y * moveFactor));
+    // Apply movement directly
+    selectedScreen.position.add(movement);
     
-    // Apply movement to the screen's position
-    const newPosition = initialScreenPosition.clone().add(moveVector);
+    // Ensure screen always faces the camera
+    selectedScreen.lookAt(camera.position);
     
-    // Constrain y-position to reasonable bounds to prevent floating too high or going through floor
-    newPosition.y = Math.max(0.2, Math.min(2.0, newPosition.y));
+    // Keep the screen at a reasonable distance
+    const distanceToCamera = selectedScreen.position.distanceTo(camera.position);
+    if (distanceToCamera < 0.5 || distanceToCamera > 5) {
+        // Get direction from camera to screen
+        const direction = selectedScreen.position.clone().sub(camera.position).normalize();
+        
+        // Set new position at ideal distance
+        const idealDistance = THREE.MathUtils.clamp(distanceToCamera, 0.5, 5);
+        selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
+    }
     
-    // Apply position with slight smoothing
-    selectedScreen.position.lerp(newPosition, 0.7);
+    // Optional: Add visual feedback
+    createMoveIndicator(selectedScreen.position.clone(), 0.03);
     
-    // Always make screen face the camera for better visibility
-    const lookDirection = camera.position.clone().sub(selectedScreen.position).normalize();
-    const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1), // Screen forward direction
-        lookDirection // Direction to camera
-    );
-    
-    // Apply rotation with slight smoothing
-    selectedScreen.quaternion.slerp(targetQuaternion, 0.3);
-    
-    // Create a visual indicator for movement
-    createMoveIndicator(selectedScreen.position.clone(), 0.05);
+    // Update control panel if needed
+    if (controlPanel && controlPanel.userData && controlPanel.userData.update) {
+        controlPanel.userData.update();
+    }
 }
 
 // Create a visual indicator for movement feedback
@@ -1120,109 +1387,74 @@ function updateVideoTime(progress) {
 
 // Create a floating text indicator for mode changes
 function createModeChangeIndicator(message) {
-    // Create a group for the indicator
-    const indicator = new THREE.Group();
-    
-    // Create background plane
-    const bgWidth = 0.3; // Wider for longer messages
-    const bgHeight = 0.08;
-    const backgroundGeometry = new THREE.PlaneGeometry(bgWidth, bgHeight);
-    
-    // Create canvas for background texture
+    // Create a canvas for the text
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
+    canvas.width = 256;
+    canvas.height = 64;
     const ctx = canvas.getContext('2d');
     
-    // Draw background with gradient and rounded corners
-    const cornerRadius = 20;
-    ctx.beginPath();
-    ctx.moveTo(cornerRadius, 0);
-    ctx.lineTo(canvas.width - cornerRadius, 0);
-    ctx.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
-    ctx.lineTo(canvas.width, canvas.height - cornerRadius);
-    ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
-    ctx.lineTo(cornerRadius, canvas.height);
-    ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
-    ctx.lineTo(0, cornerRadius);
-    ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    ctx.closePath();
+    // Draw the text
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(50, 150, 255, 0.8)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
     
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, 'rgba(40, 40, 70, 0.9)');
-    gradient.addColorStop(1, 'rgba(20, 20, 40, 0.9)');
-    ctx.fillStyle = gradient;
-    ctx.fill();
-    
-    // Add border
-    ctx.strokeStyle = 'rgba(120, 120, 255, 0.6)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    
-    // Add text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Arial';
+    ctx.font = '24px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
-    // Measure text to possibly adjust canvas size
-    const textMetrics = ctx.measureText(message);
-    
-    // Draw text centered
     ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     
-    // Create texture and material
+    // Create texture
     const texture = new THREE.CanvasTexture(canvas);
+    const geometry = new THREE.PlaneGeometry(0.3, 0.075);
     const material = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
-        opacity: 0,  // Start invisible for fade-in
+        opacity: 0.9,
         side: THREE.DoubleSide
     });
     
-    // Create mesh and add to indicator group
-    const background = new THREE.Mesh(backgroundGeometry, material);
-    indicator.add(background);
+    const indicator = new THREE.Mesh(geometry, material);
     
-    // Position indicator in front of the camera
-    indicator.position.set(0, 0.1, -0.5);
-    indicator.lookAt(camera.position);
+    // Position above the control panel
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(camera.quaternion);
+    
+    indicator.position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
+    indicator.position.y += 0.15; // Position above control panel
+    indicator.quaternion.copy(camera.quaternion);
+    
     scene.add(indicator);
     
-    // Fade in animation
-    let opacity = 0;
-    const fadeIn = () => {
-        opacity += 0.05;
-        material.opacity = opacity;
+    // Fade out and remove
+    const startTime = performance.now();
+    const duration = 1500; // 1.5 seconds
+    
+    function fadeOut() {
+        const elapsed = performance.now() - startTime;
+        const progress = elapsed / duration;
         
-        if (opacity < 1) {
-            requestAnimationFrame(fadeIn);
+        if (progress < 1) {
+            if (progress > 0.7) {
+                // Start fading out in the last 30% of time
+                material.opacity = 0.9 * (1 - ((progress - 0.7) / 0.3));
+            }
+            
+            // Float upward slightly
+            indicator.position.y += 0.0002;
+            
+            requestAnimationFrame(fadeOut);
         } else {
-            // Once fully visible, start a delay before fade out
-            setTimeout(() => {
-                // Fade out animation
-                const fadeOut = () => {
-                    opacity -= 0.05;
-                    material.opacity = opacity;
-                    
-                    if (opacity > 0) {
-                        requestAnimationFrame(fadeOut);
-                    } else {
-                        // Remove from scene when fully invisible
-                        scene.remove(indicator);
-                        material.dispose();
-                    }
-                };
-                
-                requestAnimationFrame(fadeOut);
-            }, 2000);  // Show for 2 seconds before fading out
+            scene.remove(indicator);
+            material.dispose();
+            geometry.dispose();
+            texture.dispose();
         }
-    };
+    }
     
-    requestAnimationFrame(fadeIn);
-    
-    return indicator;
+    requestAnimationFrame(fadeOut);
 }
 
 // Helper function to find a screen from a drag handle
@@ -1423,134 +1655,4 @@ export function showControlPanelInstructions() {
     setTimeout(() => {
         createModeChangeIndicator('Drag the blue panel to reposition controls');
     }, 3000); // Show after a delay to let the user get oriented
-}
-
-// Toggle between drag mode and interact mode for screens
-function toggleDragMode(button) {
-    // Toggle the state
-    const isActive = !button.userData.isActive;
-    button.userData.isActive = isActive;
-    
-    // Update the global drag mode state
-    window.dragModeEnabled = isActive;
-    
-    // Update the toggle appearance
-    const knobX = isActive ? button.userData.rightPosition : button.userData.leftPosition;
-    
-    // Animate the knob movement
-    const startX = button.position.x;
-    const endX = knobX;
-    const duration = 150; // ms
-    const startTime = performance.now();
-    
-    function animateKnob(time) {
-        const elapsed = time - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        // Use easing function for smoother movement
-        const easedProgress = 0.5 - 0.5 * Math.cos(progress * Math.PI);
-        
-        button.position.x = startX + (endX - startX) * easedProgress;
-        
-        if (progress < 1) {
-            requestAnimationFrame(animateKnob);
-        }
-    }
-    
-    requestAnimationFrame(animateKnob);
-    
-    // Update color of toggle background to indicate state
-    // Find the toggle background (parent's child that's not the button)
-    const toggleBackground = button.parent.children.find(child => 
-        child !== button && 
-        child.geometry && 
-        child.geometry.type === 'PlaneGeometry' &&
-        Math.abs(child.position.y - button.position.y) < 0.01);
-    
-    if (toggleBackground && toggleBackground.material && toggleBackground.material.map) {
-        // Create new background canvas with updated colors
-        const canvas = document.createElement('canvas');
-        canvas.width = 200;
-        canvas.height = 80;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw rounded rectangle
-        const toggleRadius = 40;
-        ctx.beginPath();
-        ctx.moveTo(toggleRadius, 0);
-        ctx.lineTo(canvas.width - toggleRadius, 0);
-        ctx.arcTo(canvas.width, 0, canvas.width, toggleRadius, toggleRadius);
-        ctx.arcTo(canvas.width, canvas.height, canvas.width - toggleRadius, canvas.height, toggleRadius);
-        ctx.lineTo(toggleRadius, canvas.height);
-        ctx.arcTo(0, canvas.height, 0, canvas.height - toggleRadius, toggleRadius);
-        ctx.arcTo(0, 0, toggleRadius, 0, toggleRadius);
-        ctx.closePath();
-        
-        // Use gradient color based on state
-        let gradient;
-        if (isActive) {
-            // DRAG mode - purple/blue gradient
-            gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, 'rgba(80, 80, 130, 0.7)');
-            gradient.addColorStop(1, 'rgba(120, 100, 180, 0.8)');
-        } else {
-            // INTERACT mode - gray/blue gradient
-            gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, 'rgba(80, 80, 100, 0.7)');
-            gradient.addColorStop(1, 'rgba(60, 60, 80, 0.7)');
-        }
-        
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        // Add highlight based on state
-        const activePosition = isActive ? 0.7 : 0.3;
-        
-        // Add subtle glow to the active side
-        ctx.fillStyle = `rgba(255, 255, 255, ${isActive ? 0.15 : 0.1})`;
-        ctx.beginPath();
-        ctx.arc(canvas.width * activePosition, canvas.height/2, 30, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add subtle inner shadow
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        
-        // Add labels
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '600 14px Inter, SF Pro Display, Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Make the active label brighter
-        ctx.fillStyle = isActive ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)';
-        ctx.fillText('INTERACT', canvas.width * 0.3, canvas.height * 0.5);
-        ctx.fillStyle = isActive ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.5)';
-        ctx.fillText('DRAG', canvas.width * 0.7, canvas.height * 0.5);
-        
-        // Update the texture
-        const newTexture = new THREE.CanvasTexture(canvas);
-        toggleBackground.material.map.dispose();
-        toggleBackground.material.map = newTexture;
-        toggleBackground.material.needsUpdate = true;
-    }
-    
-    // Change the button mode
-    button.userData.mode = isActive ? 'drag' : 'interact';
-    
-    // Create visual indicator
-    createModeChangeIndicator(isActive ? 'DRAG MODE: Screens are draggable' : 'INTERACT MODE: Screens are interactive');
-    
-    // Debug
-    console.log(`Drag mode ${isActive ? 'enabled' : 'disabled'}`);
-    
-    // Provide haptic feedback if available
-    if (navigator.vibrate) {
-        navigator.vibrate(50); // Short vibration for toggle
-    }
 } 
