@@ -137,8 +137,10 @@
                         startButton.style.display = 'none';
                         loadingIndicator.style.display = 'block';
                         
+                        // Add timestamp to force cache refresh
+                        const timestamp = Date.now();
                         // Load the demo module dynamically
-                        import('./ar_main.js').then(module => {
+                        import(`./ar_main.js?v=${timestamp}`).then(module => {
                             // Module loaded, the init function will be called automatically
                             loadingIndicator.style.display = 'none';
                             setTimeout(() => {

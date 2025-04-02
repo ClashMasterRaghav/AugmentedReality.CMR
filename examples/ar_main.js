@@ -2,14 +2,14 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
-import { initAR, render, animate } from './ar_core.js';
-import { setupEventListeners } from './ar_interaction.js';
-import { loadVideoTexture } from './ar_media.js';
-import { createButton, createControlPanel, updateControlPanel } from './ar_ui.js';
-import * as WebDOM from './ar_web_dom.js';
-import * as WebOverlay from './ar_web_overlay.js';
-import * as WebMessaging from './ar_web_messaging.js';
-import { createInteractivePlane } from './ar_interaction.js';
+import { initAR, render, animate } from './ar_core.js?v=3';
+import { setupEventListeners } from './ar_interaction.js?v=3';
+import { loadVideoTexture } from './ar_media.js?v=3';
+import { createButton, createControlPanel, updateControlPanel } from './ar_ui_wrapper.js';
+import * as WebDOM from './ar_web_dom.js?v=3';
+import * as WebOverlay from './ar_web_overlay.js?v=3';
+import * as WebMessaging from './ar_web_messaging.js?v=3';
+import { createInteractivePlane } from './ar_interaction.js?v=3';
 
 // Wait for DOM content to be loaded before initializing
 document.addEventListener('DOMContentLoaded', () => {
