@@ -79,8 +79,10 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     
     console.log("Creating YouTube screen with iframe");
     
-    // Create iframe content texture
-    const iframeTexture = createIframeTexture("https://www.youtube.com/embed?enablejsapi=1", 1024, 768);
+    // Create iframe content texture with specific video
+    // Using the video URL provided by the user: https://youtu.be/Myrr9vA7j5A
+    const videoId = "Myrr9vA7j5A";
+    const iframeTexture = createIframeTexture(`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1`, 1024, 768);
     
     // Create the screen container
     const youtubeScreen = enhancedCreateScreen(position, size, title, iframeTexture);
@@ -92,7 +94,8 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
         isSelected: false,
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: 'youtube'
+        contentType: 'youtube',
+        videoId: videoId
     };
     
     // Add shadow and border
@@ -211,8 +214,8 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     
     console.log("Creating Google Maps screen with iframe");
     
-    // Create iframe content texture
-    const iframeTexture = createIframeTexture("https://www.google.com/maps/embed", 1024, 768);
+    // Create iframe content texture with satellite view enabled
+    const iframeTexture = createIframeTexture("https://www.google.com/maps/embed?maptype=satellite", 1024, 768);
     
     // Create the screen container
     const mapsScreen = enhancedCreateScreen(position, size, title, iframeTexture);
@@ -224,7 +227,8 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
         isSelected: false,
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: 'maps'
+        contentType: 'maps',
+        mapType: 'satellite'
     };
     
     // Add shadow and border
@@ -277,8 +281,8 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     
     console.log("Creating Electron App simulation screen");
     
-    // Create a placeholder texture for Electron (we can't actually run Electron in the browser)
-    const electronTexture = createElectronPlaceholderTexture();
+    // Create a placeholder texture for Electron with the YouTube video
+    const electronTexture = createElectronPlaceholderTexture(1024, 768, "Myrr9vA7j5A");
     
     // Create the screen container
     const electronScreen = enhancedCreateScreen(position, size, title, electronTexture);
@@ -290,7 +294,8 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
         isSelected: false,
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: 'electron'
+        contentType: 'electron',
+        videoId: "Myrr9vA7j5A" // Store the video ID for reference
     };
     
     // Add shadow and border
@@ -341,66 +346,72 @@ function createIframeTexture(url, width = 1024, height = 768) {
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     
-    // Fill with a light background
+    // Fill background
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
     
-    // Draw a border
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    // Add some realistic UI elements based on the URL
+    // Draw header bar for any page
+    ctx.fillStyle = '#f9f9f9';
+    ctx.fillRect(0, 0, width, 50);
     
-    // Draw the URL bar
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(10, 10, canvas.width - 20, 30);
-    
-    // Draw the URL text
-    ctx.fillStyle = '#333333';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    
-    // Truncate URL if too long
-    let displayUrl = url;
-    if (url.length > 40) {
-        displayUrl = url.substring(0, 37) + '...';
-    }
-    ctx.fillText(displayUrl, 20, 25);
-    
-    // Draw loading indicator or content placeholder
-    ctx.fillStyle = '#f8f8f8';
-    ctx.fillRect(10, 50, canvas.width - 20, height - 60);
+    ctx.fillStyle = '#e5e5e5';
+    ctx.fillRect(0, 48, width, 2);
     
     // Draw content based on URL type
     if (url.includes('youtube')) {
-        // Draw YouTube style content
-        // Red header
-        ctx.fillStyle = '#ff0000';
-        ctx.fillRect(10, 50, canvas.width - 20, 50);
+        // Extract video ID if present
+        let videoId = "Myrr9vA7j5A"; // Default to provided video
+        if (url.includes('embed/')) {
+            const parts = url.split('embed/');
+            if (parts.length > 1) {
+                videoId = parts[1].split('?')[0];
+            }
+        }
         
-        // YouTube logo
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px Arial';
-        ctx.fillText('YouTube', 30, 75);
+        // Draw YouTube style content with video thumbnail
+        // Background
+        ctx.fillStyle = '#0f0f0f'; // YouTube dark mode background
+        ctx.fillRect(0, 50, canvas.width, canvas.height - 50);
         
         // Video player area
         ctx.fillStyle = '#000000';
-        ctx.fillRect(100, 120, width - 200, height - 240);
+        ctx.fillRect(50, 80, width - 100, (width - 100) * 9/16); // 16:9 aspect ratio
+        
+        // Draw video title below player
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px Roboto, Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('AR Experience Video - ID: ' + videoId, 50, (width - 100) * 9/16 + 100);
+        
+        // Video progress bar
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(50, (width - 100) * 9/16 + 50, (width - 100) * 0.2, 4); // Red progress
+        ctx.fillStyle = '#3d3d3d';
+        ctx.fillRect(50 + (width - 100) * 0.2, (width - 100) * 9/16 + 50, (width - 100) * 0.8, 4); // Dark gray remaining
+        
+        // Video controls area
+        ctx.fillStyle = '#222222';
+        ctx.fillRect(50, (width - 100) * 9/16 + 40, width - 100, 30);
         
         // Play button
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(width/2 - 25, height/2 - 30);
-        ctx.lineTo(width/2 + 35, height/2);
-        ctx.lineTo(width/2 - 25, height/2 + 30);
+        ctx.moveTo(70, (width - 100) * 9/16 + 48);
+        ctx.lineTo(70, (width - 100) * 9/16 + 62);
+        ctx.lineTo(85, (width - 100) * 9/16 + 55);
         ctx.closePath();
         ctx.fill();
         
-        // Video title
-        ctx.fillStyle = '#333333';
-        ctx.font = '18px Arial';
-        ctx.fillText('AR Experience Video', 100, height - 90);
-        
+        // Recommended videos on right side
+        for (let i = 0; i < 3; i++) {
+            ctx.fillStyle = '#222222';
+            ctx.fillRect(width - 300, 80 + i * 120, 250, 100);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '14px Roboto, Arial';
+            ctx.fillText(`Recommended Video ${i + 1}`, width - 290, 150 + i * 120);
+        }
     } else if (url.includes('duckduckgo')) {
         // Draw DuckDuckGo style content
         // Logo area
@@ -411,6 +422,12 @@ function createIframeTexture(url, width = 1024, height = 768) {
         ctx.fillStyle = '#de5833';
         ctx.beginPath();
         ctx.arc(width/2, 120, 50, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // White duck silhouette in center of logo
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(width/2, 120, 25, 0, Math.PI * 2);
         ctx.fill();
         
         // Search bar
@@ -426,61 +443,127 @@ function createIframeTexture(url, width = 1024, height = 768) {
         ctx.textAlign = 'left';
         ctx.fillText('Search the web without being tracked...', width/2 - 190, 210);
         
+        // Privacy info section
+        ctx.fillStyle = '#f9f9f9';
+        ctx.fillRect(50, 260, width - 100, 100);
+        ctx.fillStyle = '#333333';
+        ctx.font = 'bold 18px Arial';
+        ctx.fillText('Privacy, simplified.', width/2, 290);
+        ctx.font = '14px Arial';
+        ctx.fillText('Search privately with DuckDuckGo. We never track your searches.', width/2, 320);
     } else if (url.includes('maps')) {
         // Draw Google Maps style content
-        // Sky
-        ctx.fillStyle = '#a5d6ff';
-        ctx.fillRect(10, 50, canvas.width - 20, height - 60);
+        // Check if satellite view is requested
+        const isSatellite = url.includes('satellite');
         
-        // Land
-        ctx.fillStyle = '#e8e8e8';
-        ctx.fillRect(10, height - 300, canvas.width - 20, 250);
-        
-        // Roads
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.moveTo(10, height - 200);
-        ctx.lineTo(canvas.width - 10, height - 150);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.moveTo(width/2, 50);
-        ctx.lineTo(width/2, height - 60);
-        ctx.stroke();
-        
-        // Buildings
-        ctx.fillStyle = '#cccccc';
-        for (let i = 0; i < 10; i++) {
-            const bw = Math.random() * 60 + 40;
-            const bh = Math.random() * 80 + 40;
-            const bx = Math.random() * (width - bw - 40) + 20;
-            const by = Math.random() * (height - 350) + 70;
-            ctx.fillRect(bx, by, bw, bh);
+        // Maps area - different background for satellite vs regular
+        if (isSatellite) {
+            // Satellite view - dark blue/black with city lights
+            const gradient = ctx.createLinearGradient(0, 50, 0, height);
+            gradient.addColorStop(0, '#000a12');
+            gradient.addColorStop(1, '#002f52');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 50, width, height - 50);
+            
+            // Draw some "city lights" as small yellow dots
+            ctx.fillStyle = 'rgba(255, 240, 180, 0.5)';
+            for (let i = 0; i < 300; i++) {
+                const x = Math.random() * width;
+                const y = 50 + Math.random() * (height - 50);
+                const size = Math.random() * 2;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw some "roads" as thin white lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 15; i++) {
+                const x1 = Math.random() * width;
+                const y1 = 50 + Math.random() * (height - 50);
+                const x2 = Math.random() * width;
+                const y2 = 50 + Math.random() * (height - 50);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        } else {
+            // Regular map view - light colors
+            ctx.fillStyle = '#e8eaed';
+            ctx.fillRect(0, 50, width, height - 50);
+            
+            // Draw some "roads"
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6;
+            for (let i = 0; i < 10; i++) {
+                const x1 = Math.random() * width;
+                const y1 = 50 + Math.random() * (height - 50);
+                const x2 = Math.random() * width;
+                const y2 = 50 + Math.random() * (height - 50);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            
+            // Draw some "roads" as thinner gray lines
+            ctx.strokeStyle = '#d4d4d4';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 20; i++) {
+                const x1 = Math.random() * width;
+                const y1 = 50 + Math.random() * (height - 50);
+                const x2 = Math.random() * width;
+                const y2 = 50 + Math.random() * (height - 50);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
         }
         
-        // Location pin
-        ctx.fillStyle = '#EA4335';
+        // Map search bar
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(50, 65, width - 100, 40);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 3;
+        ctx.fillRect(50, 65, width - 100, 40);
+        ctx.shadowBlur = 0;
+        
+        // Map controls
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(width/2, height/2, 10, 0, Math.PI * 2);
+        ctx.arc(width - 50, height/2, 25, 0, Math.PI * 2);
         ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(width/2, height/2);
-        ctx.lineTo(width/2, height/2 + 25);
-        ctx.lineTo(width/2 - 10, height/2 + 15);
-        ctx.closePath();
-        ctx.fill();
+        
+        // Zoom in/out
+        ctx.fillStyle = '#5f6368';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('+', width - 50, height/2 - 10);
+        ctx.fillText('−', width - 50, height/2 + 15);
+        
+        // Map type toggle button (satellite/regular)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(width - 150, height - 80, 100, 30);
+        ctx.fillStyle = '#5f6368';
+        ctx.font = '14px Arial';
+        ctx.fillText(isSatellite ? 'Satellite' : 'Map', width - 100, height - 60);
     }
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 4; // Improve texture quality
     texture.needsUpdate = true;
     
     return texture;
 }
 
 // Create a placeholder texture for Electron apps
-function createElectronPlaceholderTexture(width = 1024, height = 768) {
+function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = null) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -511,53 +594,94 @@ function createElectronPlaceholderTexture(width = 1024, height = 768) {
     ctx.fillStyle = '#ffffff';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('Electron YouTube App', width/2, 20);
+    ctx.fillText('Electron YouTube Viewer App', width/2, 20);
     
-    // Electron logo
+    // Electron logo smaller and in the top left
     ctx.fillStyle = '#47848F';
     ctx.beginPath();
-    ctx.arc(width/2, height/2 - 50, 80, 0, Math.PI * 2);
+    ctx.arc(width - 60, 15, 12, 0, Math.PI * 2);
     ctx.fill();
     
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(width/2, height/2 - 50, 40, 0, Math.PI * 2);
-    ctx.fill();
+    // Sidebar
+    ctx.fillStyle = '#1a1b23';
+    ctx.fillRect(0, 30, 50, height - 30);
     
-    // Electron name
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 32px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Electron', width/2, height/2 + 80);
+    // Sidebar icons (simplified)
+    const sidebarIcons = ['#', '♥', '★', '⚙'];
+    sidebarIcons.forEach((icon, i) => {
+        ctx.fillStyle = i === 0 ? '#ffffff' : '#666666';
+        ctx.font = '18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(icon, 25, 60 + i * 40);
+    });
     
-    // YouTube placeholder
+    // YouTube player area
     ctx.fillStyle = '#000000';
-    ctx.fillRect(width/2 - 200, height/2 + 120, 400, 225);
+    const playerWidth = width - 70;
+    const playerHeight = playerWidth * 9/16; // 16:9 aspect ratio
+    ctx.fillRect(60, 50, playerWidth, playerHeight);
     
-    // YouTube logo
-    ctx.fillStyle = '#FF0000';
-    ctx.fillRect(width/2 - 150, height/2 + 140, 50, 35);
-    
-    // Play button
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(width/2 - 15, height/2 + 220);
-    ctx.lineTo(width/2 + 25, height/2 + 245);
-    ctx.lineTo(width/2 - 15, height/2 + 270);
-    ctx.closePath();
-    ctx.fill();
-    
-    // Status bar with info
-    ctx.fillStyle = '#121317';
-    ctx.fillRect(0, height - 25, width, 25);
-    
-    ctx.fillStyle = '#77787a';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('Electron v24.0.0', 10, height - 8);
+    if (videoId) {
+        // Add video ID to display
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Video ID: ${videoId}`, 65, playerHeight + 65);
+        
+        // Video progress bar
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(60, playerHeight + 80, playerWidth * 0.3, 4);
+        ctx.fillStyle = '#3d3d3d';
+        ctx.fillRect(60 + (playerWidth * 0.3), playerHeight + 80, playerWidth * 0.7, 4);
+        
+        // Control buttons
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(60, playerHeight + 90, playerWidth, 40);
+        
+        // Play button
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(80, playerHeight + 110);
+        ctx.lineTo(100, playerHeight + 110);
+        ctx.stroke();
+        
+        // Volume icon
+        ctx.beginPath();
+        ctx.moveTo(130, playerHeight + 105);
+        ctx.lineTo(140, playerHeight + 105);
+        ctx.lineTo(150, playerHeight + 100);
+        ctx.lineTo(150, playerHeight + 120);
+        ctx.lineTo(140, playerHeight + 115);
+        ctx.lineTo(130, playerHeight + 115);
+        ctx.closePath();
+        ctx.fill();
+    } else {
+        // Show Electron logo and welcome message when no video
+        // Electron logo
+        ctx.fillStyle = '#47848F';
+        ctx.beginPath();
+        ctx.arc(width/2, height/2 - 50, 80, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(width/2, height/2 - 50, 40, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Electron name
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Electron', width/2, height/2 + 80);
+        
+        // App description
+        ctx.font = '16px Arial';
+        ctx.fillText('YouTube Viewer App', width/2, height/2 + 110);
+    }
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 4; // Improve texture quality
     texture.needsUpdate = true;
     
     return texture;
