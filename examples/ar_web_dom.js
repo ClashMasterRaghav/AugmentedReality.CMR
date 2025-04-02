@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import { scene, camera, renderer } from './ar_core.js';
-import { createScreenBase } from './ar_screens.js';
+// Import the enhancedCreateScreen function from ar_screens.js
+import { screens } from './ar_screens.js';
 
 let css3dRenderer;
 let css3dScene;
@@ -81,20 +82,29 @@ export function createInteractiveWebPanel(options = {}) {
     // Create a unique ID for this panel
     const panelId = `web-panel-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
-    // Create base screen with WebGL
-    const screen = createScreenBase({
-        width,
-        height,
-        position,
-        rotation
-    });
+    // Create a basic screen without using createScreenBase
+    const screen = {
+        mesh: new THREE.Group()
+    };
     
-    // Make the WebGL plane transparent or semi-transparent to show CSS content
-    screen.mesh.material = new THREE.MeshBasicMaterial({
+    // Create a basic plane for the screen
+    const planeGeometry = new THREE.PlaneGeometry(width, height);
+    const planeMaterial = new THREE.MeshBasicMaterial({
         opacity: 0.1,
         transparent: true,
         side: THREE.DoubleSide
     });
+    
+    // Create mesh and add to group
+    const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    screen.mesh.add(planeMesh);
+    
+    // Position the screen mesh
+    screen.mesh.position.copy(position);
+    screen.mesh.rotation.copy(rotation);
+    
+    // Add to scene
+    scene.add(screen.mesh);
     
     // Calculate pixel size based on physical size
     const aspectRatio = width / height;
@@ -179,8 +189,8 @@ export function createInteractiveWebPanel(options = {}) {
             }
             
             // Dispose of geometries and materials
-            screen.mesh.geometry.dispose();
-            screen.mesh.material.dispose();
+            planeMesh.geometry.dispose();
+            planeMesh.material.dispose();
             
             // Remove from panels array
             const index = webPanels.indexOf(this);

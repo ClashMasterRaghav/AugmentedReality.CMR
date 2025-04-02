@@ -1,6 +1,6 @@
 // WebView Messaging System for WebXR
 import * as THREE from 'three';
-import { createScreenBase } from './ar_screens.js';
+import { scene } from './ar_core.js';
 
 // Store all interactive web panels
 const webPanels = [];
@@ -28,14 +28,26 @@ export function createInteractiveWebPanel(options = {}) {
         iframeId = `web-frame-${Date.now()}`
     } = options;
 
-    // Create base screen object
-    const panel = createScreenBase({
-        width,
-        height,
-        position,
-        rotation
-    });
-
+    // Create a basic panel container group
+    const panel = {
+        mesh: new THREE.Group(),
+        data: {}
+    };
+    
+    // Create a plane geometry for the panel
+    const geometry = new THREE.PlaneGeometry(width, height);
+    
+    // Set the panel position and rotation
+    panel.mesh.position.copy(position);
+    panel.mesh.rotation.copy(rotation);
+    
+    // Add the panel to the scene or parent
+    if (parent) {
+        parent.add(panel.mesh);
+    } else {
+        scene.add(panel.mesh);
+    }
+    
     // Create a unique ID for the iframe
     const frameId = iframeId;
     
@@ -65,13 +77,9 @@ export function createInteractiveWebPanel(options = {}) {
         transparent: true
     });
     
-    // Apply material to the panel mesh
-    panel.mesh.material = material;
-    
-    // Add panel to the parent if provided
-    if (parent) {
-        parent.add(panel.mesh);
-    }
+    // Create the mesh and add it to the panel
+    const mesh = new THREE.Mesh(geometry, material);
+    panel.mesh.add(mesh);
     
     // Create the texture canvas for rendering
     const canvas = document.createElement('canvas');
@@ -360,6 +368,7 @@ export function createInteractiveWebPanel(options = {}) {
         frameId,
         canvas,
         texture,
+        data: panel.data,
         
         // Navigate to a new URL
         navigate(newUrl) {
@@ -376,7 +385,7 @@ export function createInteractiveWebPanel(options = {}) {
             if (typeof xOrIntersection === 'object' && xOrIntersection.point) {
                 // Convert 3D intersection to 2D coordinates
                 raycaster.setFromCamera(xOrIntersection.point, xOrIntersection.camera);
-                const intersects = raycaster.intersectObject(panel.mesh);
+                const intersects = raycaster.intersectObject(mesh);
                 
                 if (intersects.length > 0) {
                     coords = convertTo2D(intersects[0]);
@@ -415,7 +424,7 @@ export function createInteractiveWebPanel(options = {}) {
         // Check if a point intersects with the panel
         intersectsPoint(point, camera) {
             raycaster.setFromCamera(point, camera);
-            const intersects = raycaster.intersectObject(panel.mesh);
+            const intersects = raycaster.intersectObject(mesh);
             return intersects.length > 0 ? intersects[0] : null;
         },
         
@@ -433,8 +442,8 @@ export function createInteractiveWebPanel(options = {}) {
             
             // Dispose of textures and geometries
             texture.dispose();
-            panel.mesh.geometry.dispose();
-            panel.mesh.material.dispose();
+            geometry.dispose();
+            material.dispose();
             
             // Remove from panels array
             const index = webPanels.indexOf(this);
