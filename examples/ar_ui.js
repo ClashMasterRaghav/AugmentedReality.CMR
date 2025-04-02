@@ -953,6 +953,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
 // Create a virtual keyboard for text input
 export function createVirtualKeyboard(sceneRef) {
     try {
+        console.log("Creating virtual keyboard with scene:", sceneRef);
         // Get a valid scene reference
         const sceneToUse = sceneRef || window.arScene || scene;
         
@@ -974,6 +975,8 @@ export function createVirtualKeyboard(sceneRef) {
         // Create the keyboard base
         const keyboardWidth = 0.6;
         const keyboardHeight = 0.25;
+        
+        // Create keyboard background directly here instead of using a separate function
         const keyboardGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
         
         // Create keyboard texture

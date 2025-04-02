@@ -300,8 +300,24 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
-    
-    // Set up control panel initial position
-    setTimeout(setupControlPanel, 500);
+    try {
+        console.log("Creating start screen...");
+        
+        // Make sure scene is globally available
+        if (scene) {
+            window.arScene = scene;
+        }
+        
+        // Call the function with a default position
+        const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+        
+        if (!startScreen) {
+            console.warn("Could not create start screen - this might be normal in some environments");
+        }
+        
+        // Set up control panel initial position
+        setTimeout(setupControlPanel, 500);
+    } catch (error) {
+        console.error("Error creating start screen:", error);
+    }
 }

@@ -445,19 +445,31 @@ export function createVideoOverlay(videoUrl, width = 0.76, height = 0.46) {
 
 // Update video textures in render loop
 export function updateVideoTextures() {
-    // Update main video texture
-    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
-        videoTexture.needsUpdate = true;
-    }
-    
-    // Update any other video textures in the scene
-    scene.traverse(object => {
-        if (object.userData && object.userData.texture && object.userData.video) {
-            if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
-                object.userData.texture.needsUpdate = true;
-            }
+    try {
+        // Get scene reference
+        const sceneToUse = window.arScene || scene;
+        
+        // Update main video texture
+        if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
+            videoTexture.needsUpdate = true;
         }
-    });
+        
+        // Update any other video textures in the scene
+        if (sceneToUse) {
+            sceneToUse.traverse(object => {
+                if (object.userData && object.userData.texture && object.userData.video) {
+                    if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
+                        object.userData.texture.needsUpdate = true;
+                    }
+                }
+            });
+        } else {
+            // Just update the main video texture when scene isn't available
+            console.warn("Scene not available for updating video textures");
+        }
+    } catch (error) {
+        console.error("Error updating video textures:", error);
+    }
 }
 
 // Play spatial audio at a location
