@@ -30,6 +30,11 @@ const contentLoaders = {
 // Export a global function for content loading
 window.loadWebContent = function(type) {
     console.log(`Loading web content type: ${type}`);
+    
+    // Remove any existing text overlays
+    const existingOverlays = document.querySelectorAll('.content-type-overlay');
+    existingOverlays.forEach(overlay => overlay.remove());
+    
     // Reset any existing content
     resetAllDemos();
     
@@ -246,6 +251,9 @@ function displayErrorMessage(message) {
 export function createDemoControls() {
     console.log("Creating demo controls...");
     
+    // First, remove any text overlays that might have been created
+    document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
+    
     try {
         // Make sure we have a valid scene reference
         const sceneToUse = window.arScene || scene;
@@ -298,9 +306,16 @@ export function createDemoControls() {
                 const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
                 basicPanel.add(panelMesh);
                 
+                // Add fallback DOM buttons for debugging
+                addFallbackDOMButtons();
+                
                 return basicPanel;
             } catch (error) {
                 console.error("Failed to create even a basic panel:", error);
+                
+                // Add fallback DOM buttons for debugging
+                addFallbackDOMButtons();
+                
                 return null;
             }
         }
@@ -365,6 +380,7 @@ export function createDemoControls() {
                 label: 'Fixed Content',
                 onClick: () => {
                     console.log("Fixed Content button clicked");
+                    document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
                     if (window.loadWebContent) {
                         window.loadWebContent('fixed');
                     } else {
@@ -389,6 +405,7 @@ export function createDemoControls() {
                 label: 'Responsive Content',
                 onClick: () => {
                     console.log("Responsive Content button clicked");
+                    document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
                     if (window.loadWebContent) {
                         window.loadWebContent('responsive');
                     } else {
@@ -413,6 +430,7 @@ export function createDemoControls() {
                 label: 'VR Optimized Content',
                 onClick: () => {
                     console.log("VR Optimized Content button clicked");
+                    document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
                     if (window.loadWebContent) {
                         window.loadWebContent('vr-optimized');
                     } else {
@@ -430,11 +448,97 @@ export function createDemoControls() {
         }
         
         console.log(`Created ${buttonsCreated}/${totalButtons} buttons successfully`);
+        
+        // Add fallback DOM buttons as backup in case 3D buttons don't work
+        if (buttonsCreated < totalButtons) {
+            addFallbackDOMButtons();
+        }
+        
         return controlPanel;
     } catch (error) {
         console.error("Error creating demo controls:", error);
+        
+        // Add fallback DOM buttons for debugging
+        addFallbackDOMButtons();
+        
         return null;
     }
+}
+
+// Function to add fallback DOM buttons that will appear in DOM overlay
+function addFallbackDOMButtons() {
+    // Remove any existing buttons
+    const existingButtons = document.getElementById('ar-fallback-buttons');
+    if (existingButtons) {
+        existingButtons.remove();
+    }
+    
+    // Create buttons container
+    const container = document.createElement('div');
+    container.id = 'ar-fallback-buttons';
+    container.style.position = 'fixed';
+    container.style.bottom = '20px';
+    container.style.left = '50%';
+    container.style.transform = 'translateX(-50%)';
+    container.style.zIndex = '10000';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '10px';
+    
+    // Create buttons
+    const buttonStyles = `
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 15px;
+        font-weight: bold;
+        font-size: 16px;
+        cursor: pointer;
+        width: 200px;
+        text-align: center;
+    `;
+    
+    // Fixed Content Button
+    const fixedBtn = document.createElement('button');
+    fixedBtn.textContent = 'Fixed Content';
+    fixedBtn.style.cssText = buttonStyles;
+    fixedBtn.addEventListener('click', () => {
+        document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
+        if (window.loadWebContent) {
+            window.loadWebContent('fixed');
+        }
+    });
+    container.appendChild(fixedBtn);
+    
+    // Responsive Content Button
+    const responsiveBtn = document.createElement('button');
+    responsiveBtn.textContent = 'Responsive Content';
+    responsiveBtn.style.cssText = buttonStyles;
+    responsiveBtn.addEventListener('click', () => {
+        document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
+        if (window.loadWebContent) {
+            window.loadWebContent('responsive');
+        }
+    });
+    container.appendChild(responsiveBtn);
+    
+    // VR Optimized Content Button
+    const vrBtn = document.createElement('button');
+    vrBtn.textContent = 'VR Optimized Content';
+    vrBtn.style.cssText = buttonStyles;
+    vrBtn.addEventListener('click', () => {
+        document.querySelectorAll('.content-type-overlay').forEach(el => el.remove());
+        if (window.loadWebContent) {
+            window.loadWebContent('vr-optimized');
+        }
+    });
+    container.appendChild(vrBtn);
+    
+    // Add container to body
+    document.body.appendChild(container);
+    
+    console.log("Added fallback DOM buttons for direct interaction");
 }
 
 // Demo functions for each approach

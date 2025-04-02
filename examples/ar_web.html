@@ -181,6 +181,23 @@
 			// Add a cache busting timestamp to prevent browser caching
 			const timestamp = Date.now();
 			
+			// Remove any content type overlays that might be present from previous runs
+			document.addEventListener('DOMContentLoaded', () => {
+				const removeOverlays = () => {
+					const overlays = document.querySelectorAll('.content-type-overlay');
+					overlays.forEach(overlay => {
+						console.log("Removing overlay:", overlay);
+						overlay.remove();
+					});
+				};
+				
+				// Remove on load
+				removeOverlays();
+				
+				// And periodically check for new ones (in case they're added dynamically)
+				setInterval(removeOverlays, 2000);
+			});
+			
 			// Set up error tracking
 			window.addEventListener('error', function(event) {
 				const errorDisplay = document.getElementById('errorDisplay');
