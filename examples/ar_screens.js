@@ -18,7 +18,22 @@ export function initCSS3DRenderer() {
     css3dRenderer.domElement.style.position = 'absolute';
     css3dRenderer.domElement.style.top = '0';
     css3dRenderer.domElement.style.left = '0';
-    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through
+    css3dRenderer.domElement.style.zIndex = '1'; // Set appropriate z-index
+    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through by default
+    
+    // Add CSS that allows only iframes to receive pointer events
+    const style = document.createElement('style');
+    style.textContent = `
+        .css3d-container iframe {
+            pointer-events: auto !important; /* Make iframes interactive */
+            transform: translateZ(0); /* Force GPU acceleration */
+            backface-visibility: hidden; /* Reduce visual glitches */
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Add a class to the renderer for styling
+    css3dRenderer.domElement.className = 'css3d-container';
     document.body.appendChild(css3dRenderer.domElement);
     
     css3dScene = new THREE.Scene();
@@ -181,18 +196,28 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (youtubeScreen.userData.css3dObject) {
+            // Precisely match position, rotation and scale
             youtubeScreen.userData.css3dObject.position.copy(youtubeScreen.position);
             youtubeScreen.userData.css3dObject.quaternion.copy(youtubeScreen.quaternion);
+            
+            // Ensure consistent scale with fixed multiplier for stable appearance
             youtubeScreen.userData.css3dObject.scale.set(
                 0.001 * youtubeScreen.scale.x,
                 0.001 * youtubeScreen.scale.y,
                 0.001 * youtubeScreen.scale.z
             );
+            
+            // Force the CSS3D object to update its matrix
+            youtubeScreen.userData.css3dObject.updateMatrix();
+            youtubeScreen.userData.css3dObject.updateMatrixWorld(true);
         }
     };
     
     // Store the update function
     youtubeScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
+    // Initial position update
+    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(youtubeScreen);
@@ -287,18 +312,28 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (duckduckgoScreen.userData.css3dObject) {
+            // Precisely match position, rotation and scale
             duckduckgoScreen.userData.css3dObject.position.copy(duckduckgoScreen.position);
             duckduckgoScreen.userData.css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
+            
+            // Ensure consistent scale with fixed multiplier for stable appearance
             duckduckgoScreen.userData.css3dObject.scale.set(
                 0.001 * duckduckgoScreen.scale.x,
                 0.001 * duckduckgoScreen.scale.y,
                 0.001 * duckduckgoScreen.scale.z
             );
+            
+            // Force the CSS3D object to update its matrix
+            duckduckgoScreen.userData.css3dObject.updateMatrix();
+            duckduckgoScreen.userData.css3dObject.updateMatrixWorld(true);
         }
     };
     
     // Store the update function
     duckduckgoScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
+    // Initial position update
+    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(duckduckgoScreen);
@@ -394,18 +429,28 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (mapsScreen.userData.css3dObject) {
+            // Precisely match position, rotation and scale
             mapsScreen.userData.css3dObject.position.copy(mapsScreen.position);
             mapsScreen.userData.css3dObject.quaternion.copy(mapsScreen.quaternion);
+            
+            // Ensure consistent scale with fixed multiplier for stable appearance
             mapsScreen.userData.css3dObject.scale.set(
                 0.001 * mapsScreen.scale.x,
                 0.001 * mapsScreen.scale.y,
                 0.001 * mapsScreen.scale.z
             );
+            
+            // Force the CSS3D object to update its matrix
+            mapsScreen.userData.css3dObject.updateMatrix();
+            mapsScreen.userData.css3dObject.updateMatrixWorld(true);
         }
     };
     
     // Store the update function
     mapsScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
+    // Initial position update
+    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(mapsScreen);
@@ -552,18 +597,28 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (electronScreen.userData.css3dObject) {
+            // Precisely match position, rotation and scale
             electronScreen.userData.css3dObject.position.copy(electronScreen.position);
             electronScreen.userData.css3dObject.quaternion.copy(electronScreen.quaternion);
+            
+            // Ensure consistent scale with fixed multiplier for stable appearance
             electronScreen.userData.css3dObject.scale.set(
                 0.001 * electronScreen.scale.x,
                 0.001 * electronScreen.scale.y,
                 0.001 * electronScreen.scale.z
             );
+            
+            // Force the CSS3D object to update its matrix
+            electronScreen.userData.css3dObject.updateMatrix();
+            electronScreen.userData.css3dObject.updateMatrixWorld(true);
         }
     };
     
     // Store the update function
     electronScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    
+    // Initial position update
+    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(electronScreen);
@@ -1588,9 +1643,6 @@ export function updateScreenEffects() {
                 const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.25; // Reduced max intensity
                 glowMesh.material.opacity = glowIntensity;
             }
-            
-            // Subtle floating effect
-            screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
         }
         
         // Update CSS3D object position if the screen has real content
