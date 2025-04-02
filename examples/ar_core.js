@@ -1,13 +1,14 @@
 // Core AR functionality for initialization, scene setup, and render loop
-import * as THREE from 'three';
+import * as THREE from '../three.module.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
+import { createControlPanel, createVirtualKeyboard, setupControlPanel, floatAnimation } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
+import * as BufferGeometryUtils from '../BufferGeometryUtils.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;
@@ -105,8 +106,8 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        // Create UI controls once font is loaded
-        createControlPanel();
+        // Use setupControlPanel instead of directly calling createControlPanel
+        setupControlPanel();
         createVirtualKeyboard();
     });
 
@@ -289,6 +290,11 @@ export function render() {
         // Update last known position and rotation
         lastCameraPosition.copy(currentCameraPosition);
         lastCameraRotation.copy(currentCameraRotation);
+    }
+    
+    // Add subtle floating animation to control panel
+    if (typeof floatAnimation === 'function') {
+        floatAnimation();
     }
     
     // Update screen visual effects

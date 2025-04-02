@@ -8,7 +8,7 @@ import { videoTexture } from './ar_media.js';
 // Array to store screen objects
 export let screens = [];
 let css3dRenderer;
-export let css3dScene;
+let css3dScene;
 
 // Initialize CSS3D renderer for real web content
 export function initCSS3DRenderer() {
@@ -18,30 +18,7 @@ export function initCSS3DRenderer() {
     css3dRenderer.domElement.style.position = 'absolute';
     css3dRenderer.domElement.style.top = '0';
     css3dRenderer.domElement.style.left = '0';
-    css3dRenderer.domElement.style.zIndex = '1'; // Set appropriate z-index
-    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through by default
-    
-    // Add CSS that forces proper occlusion and attachment of iframes to screens
-    const style = document.createElement('style');
-    style.textContent = `
-        .css3d-container iframe {
-            pointer-events: auto !important; /* Make iframes interactive */
-            transform: translateZ(0); /* Force GPU acceleration */
-            backface-visibility: hidden; /* Reduce visual glitches */
-            will-change: transform; /* Hint for browser optimization */
-            position: absolute !important; 
-            overflow: hidden;
-        }
-        
-        /* Ensure proper stacking context for occlusion */
-        .css3d-container > div > div {
-            transform-style: flat !important; /* Override preserve-3d to fix occlusion */
-        }
-    `;
-    document.head.appendChild(style);
-    
-    // Add a class to the renderer for styling
-    css3dRenderer.domElement.className = 'css3d-container';
+    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through
     document.body.appendChild(css3dRenderer.domElement);
     
     css3dScene = new THREE.Scene();
@@ -197,15 +174,6 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(youtubeScreen.quaternion);
     
-    // Add occlusion data to track z-order
-    css3dObject.userData = {
-        screenId: youtubeScreen.userData.id,
-        zIndex: 100 + screens.length // Ensure proper stacking
-    };
-    
-    // Apply CSS for proper rendering
-    iframeElement.style.overflow = 'hidden';
-    
     // Store reference to CSS3D object
     youtubeScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -213,35 +181,18 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (youtubeScreen.userData.css3dObject) {
-            // Precisely match position, rotation and scale
             youtubeScreen.userData.css3dObject.position.copy(youtubeScreen.position);
             youtubeScreen.userData.css3dObject.quaternion.copy(youtubeScreen.quaternion);
-            
-            // Ensure consistent scale with fixed multiplier for stable appearance
             youtubeScreen.userData.css3dObject.scale.set(
                 0.001 * youtubeScreen.scale.x,
                 0.001 * youtubeScreen.scale.y,
                 0.001 * youtubeScreen.scale.z
             );
-            
-            // Force the CSS3D object to update its matrix
-            youtubeScreen.userData.css3dObject.updateMatrix();
-            youtubeScreen.userData.css3dObject.updateMatrixWorld(true);
-            
-            // Update z-index to match depth from camera for proper occlusion
-            if (camera) {
-                const distance = youtubeScreen.position.distanceTo(camera.position);
-                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
-                youtubeScreen.userData.css3dObject.element.style.zIndex = zIndex;
-            }
         }
     };
     
     // Store the update function
     youtubeScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
-    
-    // Initial position update
-    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(youtubeScreen);
@@ -329,15 +280,6 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
     
-    // Add occlusion data to track z-order
-    css3dObject.userData = {
-        screenId: duckduckgoScreen.userData.id,
-        zIndex: 100 + screens.length // Ensure proper stacking
-    };
-    
-    // Apply CSS for proper rendering
-    iframeElement.style.overflow = 'hidden';
-    
     // Store reference to CSS3D object
     duckduckgoScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -345,35 +287,18 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (duckduckgoScreen.userData.css3dObject) {
-            // Precisely match position, rotation and scale
             duckduckgoScreen.userData.css3dObject.position.copy(duckduckgoScreen.position);
             duckduckgoScreen.userData.css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
-            
-            // Ensure consistent scale with fixed multiplier for stable appearance
             duckduckgoScreen.userData.css3dObject.scale.set(
                 0.001 * duckduckgoScreen.scale.x,
                 0.001 * duckduckgoScreen.scale.y,
                 0.001 * duckduckgoScreen.scale.z
             );
-            
-            // Force the CSS3D object to update its matrix
-            duckduckgoScreen.userData.css3dObject.updateMatrix();
-            duckduckgoScreen.userData.css3dObject.updateMatrixWorld(true);
-            
-            // Update z-index to match depth from camera for proper occlusion
-            if (camera) {
-                const distance = duckduckgoScreen.position.distanceTo(camera.position);
-                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
-                duckduckgoScreen.userData.css3dObject.element.style.zIndex = zIndex;
-            }
         }
     };
     
     // Store the update function
     duckduckgoScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
-    
-    // Initial position update
-    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(duckduckgoScreen);
@@ -462,15 +387,6 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(mapsScreen.quaternion);
     
-    // Add occlusion data to track z-order
-    css3dObject.userData = {
-        screenId: mapsScreen.userData.id,
-        zIndex: 100 + screens.length // Ensure proper stacking
-    };
-    
-    // Apply CSS for proper rendering
-    iframeElement.style.overflow = 'hidden';
-    
     // Store reference to CSS3D object
     mapsScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -478,35 +394,18 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (mapsScreen.userData.css3dObject) {
-            // Precisely match position, rotation and scale
             mapsScreen.userData.css3dObject.position.copy(mapsScreen.position);
             mapsScreen.userData.css3dObject.quaternion.copy(mapsScreen.quaternion);
-            
-            // Ensure consistent scale with fixed multiplier for stable appearance
             mapsScreen.userData.css3dObject.scale.set(
                 0.001 * mapsScreen.scale.x,
                 0.001 * mapsScreen.scale.y,
                 0.001 * mapsScreen.scale.z
             );
-            
-            // Force the CSS3D object to update its matrix
-            mapsScreen.userData.css3dObject.updateMatrix();
-            mapsScreen.userData.css3dObject.updateMatrixWorld(true);
-            
-            // Update z-index to match depth from camera for proper occlusion
-            if (camera) {
-                const distance = mapsScreen.position.distanceTo(camera.position);
-                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
-                mapsScreen.userData.css3dObject.element.style.zIndex = zIndex;
-            }
         }
     };
     
     // Store the update function
     mapsScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
-    
-    // Initial position update
-    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(mapsScreen);
@@ -646,15 +545,6 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(electronScreen.quaternion);
     
-    // Add occlusion data to track z-order
-    css3dObject.userData = {
-        screenId: electronScreen.userData.id,
-        zIndex: 100 + screens.length // Ensure proper stacking
-    };
-    
-    // Apply CSS for proper rendering
-    iframeElement.style.overflow = 'hidden';
-    
     // Store reference to CSS3D object
     electronScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -662,35 +552,18 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     // Update function to sync CSS3D object with Three.js object
     const updateCSS3DPosition = () => {
         if (electronScreen.userData.css3dObject) {
-            // Precisely match position, rotation and scale
             electronScreen.userData.css3dObject.position.copy(electronScreen.position);
             electronScreen.userData.css3dObject.quaternion.copy(electronScreen.quaternion);
-            
-            // Ensure consistent scale with fixed multiplier for stable appearance
             electronScreen.userData.css3dObject.scale.set(
                 0.001 * electronScreen.scale.x,
                 0.001 * electronScreen.scale.y,
                 0.001 * electronScreen.scale.z
             );
-            
-            // Force the CSS3D object to update its matrix
-            electronScreen.userData.css3dObject.updateMatrix();
-            electronScreen.userData.css3dObject.updateMatrixWorld(true);
-            
-            // Update z-index to match depth from camera for proper occlusion
-            if (camera) {
-                const distance = electronScreen.position.distanceTo(camera.position);
-                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
-                electronScreen.userData.css3dObject.element.style.zIndex = zIndex;
-            }
         }
     };
     
     // Store the update function
     electronScreen.userData.updateCSS3DPosition = updateCSS3DPosition;
-    
-    // Initial position update
-    updateCSS3DPosition();
     
     // Add to scene and screens array
     scene.add(electronScreen);
@@ -1141,7 +1014,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     // Define screen dimensions
     const screenWidth = size.x;
     const screenHeight = size.y;
-    const topBarHeight = 0.08; // Increased top bar height (was 0.06)
+    const topBarHeight = 0.06; // Thinner top bar
     
     // Content background - create this first so it's behind the top bar
     const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
@@ -1690,15 +1563,6 @@ export function updateKeyboardPosition(screen) {
 
 // Update visual effects for screens
 export function updateScreenEffects() {
-    // Sort screens by distance from camera for proper z-index handling
-    if (camera) {
-        screens.sort((a, b) => {
-            const distA = a.position.distanceTo(camera.position);
-            const distB = b.position.distanceTo(camera.position);
-            return distB - distA; // Closest first
-        });
-    }
-    
     screens.forEach(screen => {
         if (screen.userData.isSelected) {
             // Find the border mesh
@@ -1725,7 +1589,8 @@ export function updateScreenEffects() {
                 glowMesh.material.opacity = glowIntensity;
             }
             
-            // REMOVED floating effect to keep screens fixed in place
+            // Subtle floating effect
+            screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
         }
         
         // Update CSS3D object position if the screen has real content
