@@ -30,8 +30,22 @@ export const showNotification = createNotification;
 
 // Initialize UI elements
 export function initUI() {
-    createControlPanel();
-    createVirtualKeyboard();
+    // Check if control panel already exists before creating a new one
+    if (!controlPanel) {
+        console.log("Creating control panel");
+        createControlPanel();
+    } else {
+        console.log("Control panel already exists, not creating a duplicate");
+        // Ensure the existing control panel is in the scene
+        if (!scene.children.includes(controlPanel)) {
+            scene.add(controlPanel);
+        }
+    }
+    
+    // Create virtual keyboard if not already created
+    if (!virtualKeyboard) {
+        createVirtualKeyboard();
+    }
 }
 
 // Create a notification in the DOM
@@ -251,29 +265,6 @@ export function createControlPanel() {
     };
     controlPanel.add(panelMesh);
     
-    // Add dragging hint text at the top
-    const hintCanvas = document.createElement('canvas');
-    hintCanvas.width = 512;
-    hintCanvas.height = 32; // Smaller height for hint text
-    const hintCtx = hintCanvas.getContext('2d');
-    hintCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    hintCtx.font = '300 italic 14px Inter, SF Pro Display, Segoe UI, Arial';
-    hintCtx.textAlign = 'center';
-    hintCtx.fillText('Drag anywhere to move panel', hintCanvas.width/2, 18);
-    
-    const hintTexture = new THREE.CanvasTexture(hintCanvas);
-    const hintGeometry = new THREE.PlaneGeometry(panelSize.width * 0.9, 0.02);
-    const hintMaterial = new THREE.MeshBasicMaterial({
-        map: hintTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        opacity: 0.7
-    });
-    
-    const hintMesh = new THREE.Mesh(hintGeometry, hintMaterial);
-    hintMesh.position.set(0, panelSize.height/2 - 0.018, 0.001);
-    controlPanel.add(hintMesh);
-    
     // Add glow effect for visual appeal
     const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
     const glowMaterial = new THREE.MeshBasicMaterial({
@@ -287,11 +278,32 @@ export function createControlPanel() {
     glowMesh.position.z = -0.001;
     controlPanel.add(glowMesh);
     
-    // Position panel initially off-center (below where screens appear)
-    controlPanel.position.set(0, -0.4, -0.6);
-    
-    // Add to the scene
-    scene.add(controlPanel);
+    // Get direction in front of camera
+    if (camera) {
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const position = camera.position.clone().add(direction.multiplyScalar(0.8));
+        position.y -= 0.5; // Position well below where screens appear
+        controlPanel.position.copy(position);
+        
+        // Make panel face the camera
+        controlPanel.lookAt(camera.position);
+        
+        // Keep panel upright
+        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
+        euler.x = 0; // No tilt
+        euler.z = 0; // No roll
+        controlPanel.quaternion.setFromEuler(euler);
+        
+        // Ensure we only add it once to scene
+        if (!scene.children.some(child => child.userData && child.userData.type === 'controlPanel')) {
+            scene.add(controlPanel);
+            console.log("Control panel added to scene");
+        }
+    } else {
+        // Position panel initially in front of where the camera would be
+        controlPanel.position.set(0, -0.5, -0.8);
+        scene.add(controlPanel);
+    }
     
     return controlPanel;
 }
@@ -808,12 +820,23 @@ export function setupControlPanel() {
     cameraDirection.applyQuaternion(camera.quaternion);
     
     const targetPosition = new THREE.Vector3();
-    targetPosition.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
+    targetPosition.copy(camera.position).add(cameraDirection.multiplyScalar(0.8)); // Closer to user (0.8m instead of 0.6m)
     
-    // Position BELOW the default screen position
-    targetPosition.y -= 0.4; // Position it much lower to appear below the screen
+    // Position BELOW the default screen position with more gap
+    targetPosition.y = camera.position.y - 0.5; // Fixed distance below eye level
     
-    // Add smoothing with lerp - use 0.08 factor for gentler movement (matching screen movement)
+    // Check if position would be behind the camera and prevent it
+    const toCameraVector = new THREE.Vector3().subVectors(camera.position, targetPosition).normalize();
+    const dotProduct = toCameraVector.dot(cameraDirection);
+    
+    // If dot product is negative, the panel would be behind the camera - adjust position
+    if (dotProduct < 0) {
+        // Force position in front of camera
+        targetPosition.copy(camera.position).add(cameraDirection.multiplyScalar(0.8));
+        targetPosition.y = camera.position.y - 0.5;
+    }
+    
+    // Add smoothing with lerp for gentle movement
     if (!controlPanel.userData.smoothPositioning) {
         // For first time positioning, set directly
         controlPanel.position.copy(targetPosition);
