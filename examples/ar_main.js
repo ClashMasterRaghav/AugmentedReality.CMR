@@ -199,61 +199,80 @@ async function init() {
 
 // Function to create demo controls for different web content approaches
 function createDemoControls() {
-    // Create the main control panel first to hold our buttons
-    const controlPanel = createControlPanel(scene);
-    
-    if (!controlPanel) {
-        console.error("Failed to create control panel for demo");
-        return;
+    try {
+        // Create the main control panel first to hold our buttons
+        const controlPanel = createControlPanel(scene);
+        
+        if (!controlPanel) {
+            console.error("Failed to create control panel for demo");
+            return null;
+        }
+        
+        // Check if controlPanel.mesh exists - it's needed for buttons
+        if (!controlPanel.mesh) {
+            console.warn("Control panel created but has no mesh property for buttons");
+            // Try to use the controlPanel itself as the parent
+            controlPanel.mesh = controlPanel;
+        }
+        
+        // Create a safe parent reference
+        const buttonParent = controlPanel.mesh || controlPanel;
+        
+        // Add buttons for each approach, with error handling
+        try {
+            createButton({
+                parent: buttonParent,
+                position: new THREE.Vector3(-0.15, 0.05, 0.01),
+                width: 0.25,
+                height: 0.07,
+                label: "DOM Injection",
+                onClick: () => createDOMDemo()
+            });
+            
+            createButton({
+                parent: buttonParent,
+                position: new THREE.Vector3(0.15, 0.05, 0.01),
+                width: 0.25,
+                height: 0.07,
+                label: "HTML Texture",
+                onClick: () => createTextureDemo()
+            });
+            
+            createButton({
+                parent: buttonParent,
+                position: new THREE.Vector3(-0.15, -0.05, 0.01),
+                width: 0.25,
+                height: 0.07,
+                label: "DOM Overlay",
+                onClick: () => createOverlayDemo()
+            });
+            
+            createButton({
+                parent: buttonParent,
+                position: new THREE.Vector3(0.15, -0.05, 0.01),
+                width: 0.25,
+                height: 0.07,
+                label: "Web Messaging",
+                onClick: () => createMessagingDemo()
+            });
+            
+            createButton({
+                parent: buttonParent,
+                position: new THREE.Vector3(0, -0.15, 0.01),
+                width: 0.5,
+                height: 0.07,
+                label: "Reset All Demos",
+                onClick: resetAllDemos
+            });
+        } catch (error) {
+            console.error("Error creating control panel buttons:", error);
+        }
+        
+        return controlPanel;
+    } catch (error) {
+        console.error("Error in createDemoControls:", error);
+        return null;
     }
-    
-    // Add buttons for each approach
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(-0.15, 0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "DOM Injection",
-        onClick: () => createDOMDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0.15, 0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "HTML Texture",
-        onClick: () => createTextureDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(-0.15, -0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "DOM Overlay",
-        onClick: () => createOverlayDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0.15, -0.05, 0.01),
-        width: 0.25,
-        height: 0.07,
-        label: "Web Messaging",
-        onClick: () => createMessagingDemo()
-    });
-    
-    createButton({
-        parent: controlPanel.mesh,
-        position: new THREE.Vector3(0, -0.15, 0.01),
-        width: 0.5,
-        height: 0.07,
-        label: "Reset All Demos",
-        onClick: resetAllDemos
-    });
-    
-    return controlPanel;
 }
 
 // Demo functions for each approach

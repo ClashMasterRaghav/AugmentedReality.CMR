@@ -1206,71 +1206,87 @@ function createFallbackTexture(screenNumber) {
 
 // Select a screen and update UI accordingly with enhanced visual feedback
 export function selectScreen(screen) {
-    // Deselect previously selected screen
-    if (selectedScreen) {
-        // Change border color back to normal
-        const borderMesh = selectedScreen.children.find(child => 
-            child.geometry && child.geometry.type === 'PlaneGeometry' && 
-            Math.abs(child.position.z - (-0.001)) < 0.0001);
+    try {
+        // Deselect previously selected screen
+        if (selectedScreen) {
+            try {
+                // Change border color back to normal
+                const borderMesh = selectedScreen.children.find(child => 
+                    child.geometry && child.geometry.type === 'PlaneGeometry' && 
+                    Math.abs(child.position.z - (-0.001)) < 0.0001);
+                    
+                if (borderMesh) {
+                    borderMesh.material.color.set(0x444444); // Default border color
+                    borderMesh.material.opacity = 0.5; // Less visible
+                }
+                
+                // Turn off glow
+                const glowMesh = selectedScreen.userData.glowMesh;
+                if (glowMesh) {
+                    glowMesh.material.opacity = 0;
+                }
+                
+                selectedScreen.userData.isSelected = false;
+                
+                // Scale down slightly for visual deselection
+                selectedScreen.scale.multiplyScalar(0.97);
+                // Animate back to original scale
+                animateScreenScale(selectedScreen, 1.0, 150);
+            } catch (error) {
+                console.warn("Error while deselecting previous screen:", error);
+            }
+        }
+        
+        // If screen is null, just clear selection
+        if (!screen) {
+            // Update both local and global references
+            setSelectedScreen(null);
+            return;
+        }
+        
+        // Select new screen
+        // Update the global selectedScreen variable through the setter function
+        setSelectedScreen(screen);
+        screen.userData.isSelected = true;
+        
+        // Log selection for debugging
+        console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
+        
+        try {
+            // Highlight border for selected screen
+            const borderMesh = screen.children.find(child => 
+                child.geometry && child.geometry.type === 'PlaneGeometry' && 
+                Math.abs(child.position.z - (-0.001)) < 0.0001);
+                
+            if (borderMesh) {
+                borderMesh.material.color.set(0x1a237e); // Dark blue border (indigo 900)
+                borderMesh.material.opacity = 1.0; // More visible
+            }
             
-        if (borderMesh) {
-            borderMesh.material.color.set(0x444444); // Default border color
-            borderMesh.material.opacity = 0.5; // Less visible
+            // Turn on glow
+            const glowMesh = screen.userData.glowMesh;
+            if (glowMesh) {
+                glowMesh.material.opacity = 0.3; // Subtle glow
+            }
+            
+            // Scale up slightly for visual selection
+            screen.scale.multiplyScalar(1.03);
+            // Animate back to original scale with slight bounce
+            animateScreenScale(screen, 1.0, 300, true);
+        } catch (error) {
+            console.warn("Error while applying visual effects to selected screen:", error);
         }
         
-        // Turn off glow
-        const glowMesh = selectedScreen.userData.glowMesh;
-        if (glowMesh) {
-            glowMesh.material.opacity = 0;
+        // Position keyboard under selected screen if needed
+        if (virtualKeyboard) {
+            try {
+                updateKeyboardPosition(screen);
+            } catch (error) {
+                console.warn("Error updating keyboard position:", error);
+            }
         }
-        
-        selectedScreen.userData.isSelected = false;
-        
-        // Scale down slightly for visual deselection
-        selectedScreen.scale.multiplyScalar(0.97);
-        // Animate back to original scale
-        animateScreenScale(selectedScreen, 1.0, 150);
-    }
-    
-    // If screen is null, just clear selection
-    if (!screen) {
-        // Update both local and global references
-        setSelectedScreen(null);
-        return;
-    }
-    
-    // Select new screen
-    // Update the global selectedScreen variable through the setter function
-    setSelectedScreen(screen);
-    screen.userData.isSelected = true;
-    
-    // Log selection for debugging
-    console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
-    
-    // Highlight border for selected screen
-    const borderMesh = screen.children.find(child => 
-        child.geometry && child.geometry.type === 'PlaneGeometry' && 
-        Math.abs(child.position.z - (-0.001)) < 0.0001);
-        
-    if (borderMesh) {
-        borderMesh.material.color.set(0x1a237e); // Dark blue border (indigo 900)
-        borderMesh.material.opacity = 1.0; // More visible
-    }
-    
-    // Turn on glow
-    const glowMesh = screen.userData.glowMesh;
-    if (glowMesh) {
-        glowMesh.material.opacity = 0.3; // Subtle glow
-    }
-    
-    // Scale up slightly for visual selection
-    screen.scale.multiplyScalar(1.03);
-    // Animate back to original scale with slight bounce
-    animateScreenScale(screen, 1.0, 300, true);
-    
-    // Position keyboard under selected screen if needed
-    if (virtualKeyboard) {
-        updateKeyboardPosition(screen);
+    } catch (error) {
+        console.error("Error in selectScreen:", error);
     }
 }
 
@@ -1316,25 +1332,48 @@ function animateScreenScale(screen, targetScale, duration, bounce = false) {
 
 // Update keyboard position relative to the selected screen
 export function updateKeyboardPosition(screen) {
-    if (!virtualKeyboard) return;
-    
-    const screenPos = screen.position.clone();
-    const screenScale = screen.scale.clone();
-    
-    // Position keyboard under selected screen, accounting for screen scale
-    virtualKeyboard.position.set(
-        screenPos.x, 
-        screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
-        screenPos.z + 0.02
-    );
-    
-    // Scale keyboard proportionally to screen
-    const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
-    virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
-    
-    // Make keyboard face the user
-    virtualKeyboard.lookAt(camera.position);
-    virtualKeyboard.rotation.x = -Math.PI / 8;
+    try {
+        // Make sure we have necessary references
+        if (!screen) {
+            console.warn("Cannot update keyboard position: screen is undefined");
+            return;
+        }
+        
+        if (!virtualKeyboard) {
+            console.warn("Cannot update keyboard position: virtualKeyboard is undefined");
+            return;
+        }
+        
+        // Make sure screen position and scale exist
+        if (!screen.position || !screen.scale) {
+            console.warn("Cannot update keyboard position: screen position/scale is undefined");
+            return;
+        }
+        
+        // Safely clone position and scale
+        const screenPos = screen.position.clone();
+        const screenScale = screen.scale.clone();
+        
+        // Position keyboard under selected screen, accounting for screen scale
+        virtualKeyboard.position.set(
+            screenPos.x, 
+            screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
+            screenPos.z + 0.02
+        );
+        
+        // Scale keyboard proportionally to screen
+        const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
+        virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
+        
+        // Check if camera exists before using it
+        if (camera) {
+            // Make keyboard face the user
+            virtualKeyboard.lookAt(camera.position);
+            virtualKeyboard.rotation.x = -Math.PI / 8;
+        }
+    } catch (error) {
+        console.error("Error updating keyboard position:", error);
+    }
 }
 
 // Update visual effects for screens

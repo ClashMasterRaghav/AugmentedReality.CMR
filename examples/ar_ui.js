@@ -184,10 +184,11 @@ function create3DNotification(message, type = 'info') {
 // Create a minimalist control panel with modern design
 export function createControlPanel(sceneRef) {
     try {
-        // Use the passed scene reference or try to get it from the module
-        const scene = sceneRef || window.arScene;
+        console.log("Creating control panel with scene:", sceneRef);
+        // Get a valid scene reference
+        const sceneToUse = sceneRef || window.arScene || scene;
         
-        if (!scene) {
+        if (!sceneToUse) {
             console.error("Cannot create control panel: scene is undefined");
             return null;
         }
@@ -491,15 +492,18 @@ export function createControlPanel(sceneRef) {
         controlPanel.rotation.set(-0.2, 0, 0);
         
         // Add to scene safely
-        if (scene) {
+        if (sceneToUse) {
             console.log("Adding control panel to scene");
-            scene.add(controlPanel);
+            sceneToUse.add(controlPanel);
         } else {
             console.error("Cannot add control panel to scene: scene is undefined");
         }
         
         // Add screen type selector below the main panel
-        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
+        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, sceneToUse);
+        
+        // Set the mesh property for compatibility with old code expecting controlPanel.mesh
+        controlPanel.mesh = panelMesh;
         
         return controlPanel;
     } catch (error) {
