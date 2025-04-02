@@ -1,4 +1,4 @@
-// UI elements and controls for AR experience
+// UI elements for AR application
 import * as THREE from 'three';
 import { scene, camera, renderer, controller } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
@@ -155,329 +155,330 @@ function create3DNotification(message, type = 'info') {
 }
 
 // Create a minimalist control panel with modern design
-export function createControlPanel() {
-    // Create panel group
-    controlPanel = new THREE.Group();
-    
-    // Add userData with necessary properties
-    controlPanel.userData = {
-        type: 'controlPanel',
-        isDragging: false,
-        manuallyPositioned: false,
-        smoothPositioning: false // Initialize smoothPositioning property
-    };
-    
-    // Modern, sleek panel design with solid appearance
-    const panelSize = { width: 0.28, height: 0.13 };
-    const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
-    
-    // Create rounded panel texture with high-quality design
-    const panelCanvas = document.createElement('canvas');
-    panelCanvas.width = 512;
-    panelCanvas.height = 256;
-    const panelCtx = panelCanvas.getContext('2d');
-    
-    // Draw rounded rectangle with flat design
-    const cornerRadius = 50;
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
-    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
-    panelCtx.lineTo(cornerRadius, panelCanvas.height);
-    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    
-    // Glass morphism style with gradient
-    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
-    gradient.addColorStop(0, 'rgba(60, 65, 92, 0.85)'); // Smoky blue at top
-    gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
-    panelCtx.fillStyle = gradient;
-    panelCtx.fill();
-    
-    // Add subtle glass effect with highlights
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
-    panelCtx.lineTo(0, panelCanvas.height/3);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    panelCtx.fill();
-    
-    // Add thin, elegant border with gradient
-    const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
-    borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.8)'); // Light purple-blue
-    borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.6)'); // Medium purple-blue
-    borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.8)'); // Darker purple-blue
-    panelCtx.strokeStyle = borderGradient;
-    panelCtx.lineWidth = 2;
-    panelCtx.stroke();
-    
-    // Add "Control Center" text as panel title with modern font
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
-    panelCtx.textAlign = 'center';
-    panelCtx.fillText('CONTROL CENTER', panelCanvas.width/2, 36);
-    
-    // Add subtle line under the title
-    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    panelCtx.lineWidth = 1;
-    panelCtx.beginPath();
-    panelCtx.moveTo(panelCanvas.width/2 - 120, 46);
-    panelCtx.lineTo(panelCanvas.width/2 + 120, 46);
-    panelCtx.stroke();
-    
-    // Create texture from canvas
-    const panelTexture = new THREE.CanvasTexture(panelCanvas);
-    const panelMaterial = new THREE.MeshBasicMaterial({
-        map: panelTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-    // Set high renderOrder to ensure panel renders on top of other elements
-    panelMesh.renderOrder = 1000;
-    controlPanel.add(panelMesh);
-    
-    // Add background blur effect with subtle glow
-    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x6495ED, // Cornflower blue glow
-        transparent: true,
-        opacity: 0.15,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending
-    });
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.z = -0.002;
-    glowMesh.renderOrder = 998;
-    controlPanel.add(glowMesh);
-    
-    // Make the entire panel draggable by attaching a hidden drag area
-    const fullPanelDragGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
-    const fullPanelDragMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.001, // Nearly invisible
-        side: THREE.DoubleSide
-    });
-    const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
-    fullPanelDrag.position.z = 0.0005; // Between panel and buttons
-    fullPanelDrag.renderOrder = 1001; // Above panel for interaction
-    fullPanelDrag.userData = {
-        type: 'dragHandle',
-        isDragArea: true,
-        isPartOfDragHandle: true,
-        originalColor: 0xffffff,
-        hoverColor: 0xffffff
-    };
-    controlPanel.add(fullPanelDrag);
-    
-    // Add a modern, visually distinct drag handle at the top
-    const topDragWidth = panelSize.width * 0.25;
-    const topDragHeight = 0.01;
-    const topDragGeometry = new THREE.PlaneGeometry(topDragWidth, topDragHeight);
-    
-    // Create a fancy gradient drag handle with canvas texture
-    const dragHandleCanvas = document.createElement('canvas');
-    dragHandleCanvas.width = 128;
-    dragHandleCanvas.height = 16;
-    const dragHandleCtx = dragHandleCanvas.getContext('2d');
-    
-    // Pill shape for drag handle
-    const pillRadius = 8;
-    dragHandleCtx.beginPath();
-    dragHandleCtx.moveTo(pillRadius, 0);
-    dragHandleCtx.lineTo(dragHandleCanvas.width - pillRadius, 0);
-    dragHandleCtx.arcTo(dragHandleCanvas.width, 0, dragHandleCanvas.width, pillRadius, pillRadius);
-    dragHandleCtx.arcTo(dragHandleCanvas.width, dragHandleCanvas.height, dragHandleCanvas.width - pillRadius, dragHandleCanvas.height, pillRadius);
-    dragHandleCtx.lineTo(pillRadius, dragHandleCanvas.height);
-    dragHandleCtx.arcTo(0, dragHandleCanvas.height, 0, dragHandleCanvas.height - pillRadius, pillRadius);
-    dragHandleCtx.arcTo(0, 0, pillRadius, 0, pillRadius);
-    dragHandleCtx.closePath();
-    
-    const handleGradient = dragHandleCtx.createLinearGradient(0, 0, dragHandleCanvas.width, 0);
-    handleGradient.addColorStop(0, 'rgba(145, 190, 255, 0.8)'); // Light blue
-    handleGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)'); // White
-    handleGradient.addColorStop(1, 'rgba(145, 190, 255, 0.8)'); // Light blue
-    
-    dragHandleCtx.fillStyle = handleGradient;
-    dragHandleCtx.fill();
-    
-    const dragHandleTexture = new THREE.CanvasTexture(dragHandleCanvas);
-    const topDragMaterial = new THREE.MeshBasicMaterial({
-        map: dragHandleTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    
-    const topDragHandle = new THREE.Mesh(topDragGeometry, topDragMaterial);
-    topDragHandle.position.set(0, panelSize.height/2 - topDragHeight/2 - 0.015, 0.005);
-    topDragHandle.renderOrder = 1002;
-    topDragHandle.userData = {
-        type: 'dragHandle',
-        isDragArea: true,
-        isPartOfDragHandle: true,
-        originalColor: 0x91BEFF,
-        hoverColor: 0xB8D4FF
-    };
-    controlPanel.add(topDragHandle);
-    
-    // Define button parameters - preserve original functionality
-    const buttonSize = 0.055; // Increased from default size for better touch targets
-    const buttonRadius = buttonSize / 2;
-    const buttonSpacing = 0.14; // Slightly closer together
-    
-    // Create buttons with modern design
-    const buttonPositions = [
-        new THREE.Vector3(-panelSize.width/4, 0, 0.001),
-        new THREE.Vector3(panelSize.width/4, 0, 0.001)
-    ];
-    
-    const buttonActions = ['newScreen', 'deleteScreen'];
-    const buttonColors = [0x4ecca3, 0xff6b6b]; // Modern mint green and coral red
-    
-    buttonPositions.forEach((position, index) => {
-        // Create modern button with gradient effect using canvas
-        const buttonCanvas = document.createElement('canvas');
-        buttonCanvas.width = 128;
-        buttonCanvas.height = 128;
-        const buttonCtx = buttonCanvas.getContext('2d');
+export function createControlPanel(sceneRef) {
+    try {
+        // Use the passed scene reference or try to get it from the module
+        const scene = sceneRef || window.arScene;
         
-        // First, create a solid background fill to ensure the entire button is visible and clickable
-        buttonCtx.fillStyle = "#333333"; // Dark grey background
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-        buttonCtx.fill();
+        if (!scene) {
+            console.error("Cannot create control panel: scene is undefined");
+            return null;
+        }
         
-        // Create gradient fill
-        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        const baseColor = new THREE.Color(buttonColors[index]);
-        const r = Math.floor(baseColor.r * 255);
-        const g = Math.floor(baseColor.g * 255);
-        const b = Math.floor(baseColor.b * 255);
+        // Create panel group
+        const controlPanel = new THREE.Group();
         
-        buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
-        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
-        
-        buttonCtx.fillStyle = buttonGradient;
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-        buttonCtx.fill();
-        
-        // Add subtle inner shadow
-        buttonCtx.shadowBlur = 10;
-        buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        buttonCtx.shadowOffsetX = 2;
-        buttonCtx.shadowOffsetY = 2;
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
-        buttonCtx.stroke();
-        buttonCtx.shadowBlur = 0;
-        
-        const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
-        const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
-        const buttonMaterial = new THREE.MeshBasicMaterial({
-            map: buttonTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.copy(position);
-        button.renderOrder = 1002;
-        button.userData = {
-            type: 'button',
-            action: buttonActions[index],
-            hoverColor: index === 0 ? 0x7EEEC9 : 0xFF9999, // Lighter versions
-            activeColor: buttonColors[index],
-            inactiveColor: buttonColors[index],
-            originalColor: buttonColors[index],
-            isToggle: false,
-            isActive: true
+        // Add userData with necessary properties
+        controlPanel.userData = {
+            type: 'controlPanel',
+            isDragging: false,
+            manuallyPositioned: false,
+            smoothPositioning: false // Initialize smoothPositioning property
         };
         
-        controlPanel.add(button);
+        // Modern, sleek panel design with solid appearance
+        const panelSize = { width: 0.28, height: 0.13 };
+        const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
         
-        // Add icon with same functionality as before
-        const iconTexture = createButtonIcon(index);
-        const iconSize = buttonSize * 0.6;
-        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-        const iconMaterial = new THREE.MeshBasicMaterial({
-            map: iconTexture,
+        // Create rounded panel texture with high-quality design
+        const panelCanvas = document.createElement('canvas');
+        panelCanvas.width = 512;
+        panelCanvas.height = 256;
+        const panelCtx = panelCanvas.getContext('2d');
+        
+        // Draw rounded rectangle with flat design
+        const cornerRadius = 50;
+        panelCtx.beginPath();
+        panelCtx.moveTo(cornerRadius, 0);
+        panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+        panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+        panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+        panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+        panelCtx.lineTo(cornerRadius, panelCanvas.height);
+        panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+        panelCtx.lineTo(0, cornerRadius);
+        panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+        panelCtx.closePath();
+        
+        // Glass morphism style with gradient
+        const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+        gradient.addColorStop(0, 'rgba(60, 65, 92, 0.85)'); // Smoky blue at top
+        gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
+        panelCtx.fillStyle = gradient;
+        panelCtx.fill();
+        
+        // Add subtle glass effect with highlights
+        panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        panelCtx.beginPath();
+        panelCtx.moveTo(cornerRadius, 0);
+        panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+        panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+        panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
+        panelCtx.lineTo(0, panelCanvas.height/3);
+        panelCtx.lineTo(0, cornerRadius);
+        panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+        panelCtx.closePath();
+        panelCtx.fill();
+        
+        // Add thin, elegant border with gradient
+        const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
+        borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.8)'); // Light purple-blue
+        borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.6)'); // Medium purple-blue
+        borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.8)'); // Darker purple-blue
+        panelCtx.strokeStyle = borderGradient;
+        panelCtx.lineWidth = 2;
+        panelCtx.stroke();
+        
+        // Add "Control Center" text as panel title with modern font
+        panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
+        panelCtx.textAlign = 'center';
+        panelCtx.fillText('CONTROL CENTER', panelCanvas.width/2, 36);
+        
+        // Add subtle line under the title
+        panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        panelCtx.lineWidth = 1;
+        panelCtx.beginPath();
+        panelCtx.moveTo(panelCanvas.width/2 - 120, 46);
+        panelCtx.lineTo(panelCanvas.width/2 + 120, 46);
+        panelCtx.stroke();
+        
+        // Create texture from canvas
+        const panelTexture = new THREE.CanvasTexture(panelCanvas);
+        const panelMaterial = new THREE.MeshBasicMaterial({
+            map: panelTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
-        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.position.z = 0.004;
-        iconMesh.renderOrder = 1003;
-        button.add(iconMesh);
+        const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+        // Set high renderOrder to ensure panel renders on top of other elements
+        panelMesh.renderOrder = 1000;
+        controlPanel.add(panelMesh);
         
-        // Add button shadow for depth
-        const shadowGeometry = new THREE.CircleGeometry(buttonSize / 2 * 1.1, 32);
-        const shadowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+        // Add background blur effect with subtle glow
+        const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x6495ED, // Cornflower blue glow
             transparent: true,
-            opacity: 0.3,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        glowMesh.position.z = -0.002;
+        glowMesh.renderOrder = 998;
+        controlPanel.add(glowMesh);
+        
+        // Make the entire panel draggable by attaching a hidden drag area
+        const fullPanelDragGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+        const fullPanelDragMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.001, // Nearly invisible
             side: THREE.DoubleSide
         });
-        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
-        shadowMesh.position.z = -0.001;
-        shadowMesh.renderOrder = 1001;
-        button.add(shadowMesh);
+        const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
+        fullPanelDrag.position.z = 0.0005; // Between panel and buttons
+        fullPanelDrag.renderOrder = 1001; // Above panel for interaction
+        fullPanelDrag.userData = {
+            type: 'dragHandle',
+            isDragArea: true,
+            isPartOfDragHandle: true,
+            originalColor: 0xffffff,
+            hoverColor: 0xffffff
+        };
+        controlPanel.add(fullPanelDrag);
         
-        // Add label below each button - modern font, more visible
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 128;
-        labelCanvas.height = 48; // Taller for better quality
-        const labelCtx = labelCanvas.getContext('2d');
+        // Add a modern, visually distinct drag handle at the top
+        const topDragWidth = panelSize.width * 0.25;
+        const topDragHeight = 0.01;
+        const topDragGeometry = new THREE.PlaneGeometry(topDragWidth, topDragHeight);
         
-        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        // Create a fancy gradient drag handle with canvas texture
+        const dragHandleCanvas = document.createElement('canvas');
+        dragHandleCanvas.width = 128;
+        dragHandleCanvas.height = 16;
+        const dragHandleCtx = dragHandleCanvas.getContext('2d');
         
-        // Add subtle shadow to text
-        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        labelCtx.shadowBlur = 3;
-        labelCtx.shadowOffsetX = 1;
-        labelCtx.shadowOffsetY = 1;
+        // Pill shape for drag handle
+        const pillRadius = 8;
+        dragHandleCtx.beginPath();
+        dragHandleCtx.moveTo(pillRadius, 0);
+        dragHandleCtx.lineTo(dragHandleCanvas.width - pillRadius, 0);
+        dragHandleCtx.arcTo(dragHandleCanvas.width, 0, dragHandleCanvas.width, pillRadius, pillRadius);
+        dragHandleCtx.arcTo(dragHandleCanvas.width, dragHandleCanvas.height, dragHandleCanvas.width - pillRadius, dragHandleCanvas.height, pillRadius);
+        dragHandleCtx.lineTo(pillRadius, dragHandleCanvas.height);
+        dragHandleCtx.arcTo(0, dragHandleCanvas.height, 0, dragHandleCanvas.height - pillRadius, pillRadius);
+        dragHandleCtx.arcTo(0, 0, pillRadius, 0, pillRadius);
+        dragHandleCtx.closePath();
         
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = '600 18px Inter, SF Pro Display, Arial'; // Modern font, slightly bolder
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        labelCtx.fillText(index === 0 ? 'New Screen' : 'Delete', labelCanvas.width / 2, labelCanvas.height / 2);
-        labelCtx.shadowBlur = 0; // Reset shadow
+        const handleGradient = dragHandleCtx.createLinearGradient(0, 0, dragHandleCanvas.width, 0);
+        handleGradient.addColorStop(0, 'rgba(145, 190, 255, 0.8)'); // Light blue
+        handleGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)'); // White
+        handleGradient.addColorStop(1, 'rgba(145, 190, 255, 0.8)'); // Light blue
         
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(buttonSize * 1.8, buttonSize * 0.6);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
+        dragHandleCtx.fillStyle = handleGradient;
+        dragHandleCtx.fill();
+        
+        const dragHandleTexture = new THREE.CanvasTexture(dragHandleCanvas);
+        const topDragMaterial = new THREE.MeshBasicMaterial({
+            map: dragHandleTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
         
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.set(0, -buttonSize * 0.8, 0.002);
-        labelMesh.renderOrder = 1003;
-        button.add(labelMesh);
-    });
-    
-    // Add positioning and interaction
-    controlPanel.position.set(0, -0.3, -0.5);
-    controlPanel.rotation.set(-0.2, 0, 0);
-    scene.add(controlPanel);
-    
-    // Add screen type selector below the main panel
-    createScreenTypeSelector(controlPanel, 0, -0.08, 0.04);
-    
-    return controlPanel;
+        const topDragHandle = new THREE.Mesh(topDragGeometry, topDragMaterial);
+        topDragHandle.position.set(0, panelSize.height/2 - topDragHeight/2 - 0.015, 0.005);
+        topDragHandle.renderOrder = 1002;
+        topDragHandle.userData = {
+            type: 'dragHandle',
+            isDragArea: true,
+            isPartOfDragHandle: true,
+            originalColor: 0x91BEFF,
+            hoverColor: 0xB8D4FF
+        };
+        controlPanel.add(topDragHandle);
+        
+        // Define button parameters - preserve original functionality
+        const buttonSize = 0.055; // Increased from default size for better touch targets
+        const buttonRadius = buttonSize / 2;
+        const buttonSpacing = 0.14; // Slightly closer together
+        
+        // Create buttons with modern design
+        const buttonPositions = [
+            new THREE.Vector3(-panelSize.width/4, 0, 0.001),
+            new THREE.Vector3(panelSize.width/4, 0, 0.001)
+        ];
+        
+        const buttonActions = ['newScreen', 'deleteScreen'];
+        const buttonColors = [0x4ecca3, 0xff6b6b]; // Modern mint green and coral red
+        
+        buttonPositions.forEach((position, index) => {
+            // Create modern button with gradient effect using canvas
+            const buttonCanvas = document.createElement('canvas');
+            buttonCanvas.width = 128;
+            buttonCanvas.height = 128;
+            const buttonCtx = buttonCanvas.getContext('2d');
+            
+            // First, create a solid background fill to ensure the entire button is visible and clickable
+            buttonCtx.fillStyle = "#333333"; // Dark grey background
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+            buttonCtx.fill();
+            
+            // Create gradient fill
+            const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            const baseColor = new THREE.Color(buttonColors[index]);
+            const r = Math.floor(baseColor.r * 255);
+            const g = Math.floor(baseColor.g * 255);
+            const b = Math.floor(baseColor.b * 255);
+            
+            buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
+            buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+            buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
+            
+            buttonCtx.fillStyle = buttonGradient;
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+            buttonCtx.fill();
+            
+            // Add subtle inner shadow
+            buttonCtx.shadowBlur = 10;
+            buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            buttonCtx.shadowOffsetX = 2;
+            buttonCtx.shadowOffsetY = 2;
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
+            buttonCtx.stroke();
+            buttonCtx.shadowBlur = 0;
+            
+            const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+            const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
+            const buttonMaterial = new THREE.MeshBasicMaterial({
+                map: buttonTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+            button.position.copy(position);
+            button.renderOrder = 1002;
+            button.userData = {
+                type: 'button',
+                action: buttonActions[index],
+                isInteractive: true
+            };
+            
+            // Add button to panel
+            controlPanel.add(button);
+            
+            // Create a modern icon for the button
+            const iconTexture = createButtonIcon(index);
+            const iconGeometry = new THREE.CircleGeometry(buttonSize * 0.3, 32); // Icon slightly smaller than button
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: iconTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.001;
+            iconMesh.renderOrder = 1003;
+            button.add(iconMesh);
+            
+            // Create a label beneath the button
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 128;
+            labelCanvas.height = 32;
+            const labelCtx = labelCanvas.getContext('2d');
+            
+            // Add subtle shadow to text for better readability
+            labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            labelCtx.shadowBlur = 4;
+            labelCtx.shadowOffsetX = 1;
+            labelCtx.shadowOffsetY = 1;
+            
+            labelCtx.fillStyle = '#ffffff';
+            labelCtx.font = '600 18px Inter, SF Pro Display, Arial'; // Modern font, slightly bolder
+            labelCtx.textAlign = 'center';
+            labelCtx.textBaseline = 'middle';
+            labelCtx.fillText(index === 0 ? 'New Screen' : 'Delete', labelCanvas.width / 2, labelCanvas.height / 2);
+            labelCtx.shadowBlur = 0; // Reset shadow
+            
+            const labelTexture = new THREE.CanvasTexture(labelCanvas);
+            const labelGeometry = new THREE.PlaneGeometry(buttonSize * 1.8, buttonSize * 0.6);
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: labelTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+            labelMesh.position.set(0, -buttonSize * 0.8, 0.002);
+            labelMesh.renderOrder = 1003;
+            button.add(labelMesh);
+        });
+        
+        // Add positioning and interaction
+        controlPanel.position.set(0, -0.3, -0.5);
+        controlPanel.rotation.set(-0.2, 0, 0);
+        
+        // Add to scene safely
+        if (scene) {
+            console.log("Adding control panel to scene");
+            scene.add(controlPanel);
+        } else {
+            console.error("Cannot add control panel to scene: scene is undefined");
+        }
+        
+        // Add screen type selector below the main panel
+        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
+        
+        return controlPanel;
+    } catch (error) {
+        console.error("Error creating control panel:", error);
+        return null;
+    }
 }
 
 // Create modern, clean button icons
@@ -621,292 +622,305 @@ function createButtonIcon(buttonIndex) {
 }
 
 // Create a screen type selector with buttons for different content types
-function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
-    // Create a panel for content type selection
-    const selectorGroup = new THREE.Group();
-    
-    // Create a background panel for the selector
-    const panelWidth = 0.40; // Increase width to ensure all buttons fit
-    const panelHeight = 0.15; // Taller panel for larger buttons
-    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    
-    // Create a texture for the selector panel
-    const panelCanvas = document.createElement('canvas');
-    panelCanvas.width = 512;
-    panelCanvas.height = 256; // Taller canvas
-    const panelCtx = panelCanvas.getContext('2d');
-    
-    // Draw panel background with glass morphism style
-    const cornerRadius = 40;
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
-    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
-    panelCtx.lineTo(cornerRadius, panelCanvas.height);
-    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    
-    // Matching gradient to control panel but slightly more transparent
-    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
-    gradient.addColorStop(0, 'rgba(70, 75, 102, 0.80)'); // Slightly lighter than control panel
-    gradient.addColorStop(1, 'rgba(40, 45, 70, 0.80)'); // Slightly lighter than control panel
-    panelCtx.fillStyle = gradient;
-    panelCtx.fill();
-    
-    // Add glass effect highlight
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
-    panelCtx.lineTo(0, panelCanvas.height/3);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    panelCtx.fill();
-    
-    // Add title with modern font
-    panelCtx.fillStyle = '#ffffff';
-    panelCtx.font = '600 18px Inter, SF Pro Display, Arial';
-    panelCtx.textAlign = 'center';
-    panelCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-    panelCtx.shadowBlur = 2;
-    panelCtx.shadowOffsetX = 1;
-    panelCtx.shadowOffsetY = 1;
-    panelCtx.fillText('SCREEN TYPES', panelCanvas.width/2, 28);
-    panelCtx.shadowBlur = 0;
-    
-    // Add subtle divider line
-    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    panelCtx.lineWidth = 1;
-    panelCtx.beginPath();
-    panelCtx.moveTo(panelCanvas.width/2 - 100, 38);
-    panelCtx.lineTo(panelCanvas.width/2 + 100, 38);
-    panelCtx.stroke();
-    
-    // Add subtle border with gradient to match control panel
-    const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
-    borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.7)'); // Light purple-blue
-    borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.5)'); // Medium purple-blue
-    borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.7)'); // Darker purple-blue
-    panelCtx.strokeStyle = borderGradient;
-    panelCtx.lineWidth = 2;
-    panelCtx.stroke();
-    
-    // Create texture for panel
-    const panelTexture = new THREE.CanvasTexture(panelCanvas);
-    panelTexture.needsUpdate = true;
-    
-    const panelMaterial = new THREE.MeshBasicMaterial({
-        map: panelTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    
-    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-    panelMesh.renderOrder = 1004;
-    selectorGroup.add(panelMesh);
-    
-    // Add a solid background blocking plane behind the panel to fix interaction issues
-    const blockingGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    const blockingMaterial = new THREE.MeshBasicMaterial({
-        color: 0x000000,
-        transparent: false,
-        opacity: 1.0,
-        side: THREE.DoubleSide
-    });
-    const blockingMesh = new THREE.Mesh(blockingGeometry, blockingMaterial);
-    blockingMesh.position.z = -0.003;
-    blockingMesh.renderOrder = 1002; // Below panel but above glow
-    blockingMesh.visible = false; // Invisible but still blocks raycasts
-    selectorGroup.add(blockingMesh);
-    
-    // Add subtle glow behind the panel
-    const glowGeometry = new THREE.PlaneGeometry(panelWidth + 0.01, panelHeight + 0.01);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x6495ED, // Cornflower blue glow (matching control panel)
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending
-    });
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.z = -0.002;
-    glowMesh.renderOrder = 1003;
-    selectorGroup.add(glowMesh);
-    
-    // Create type selection buttons (4 buttons in a row)
-    const buttonTypes = ['youtube', 'duckduckgo', 'maps', 'electron'];
-    const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
-    const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
-    
-    // BIGGER button size for better touch targets
-    const smallButtonSize = buttonSize * 1.3; // Increase from 1.2 to 1.3 (larger)
-    const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
-    const startX = -spacing * 1.5; // Starting position for first button
-    const buttonY = 0; // Center buttons vertically
-    
-    buttonTypes.forEach((type, index) => {
-        // Create button canvas for gradient effect
-        const buttonCanvas = document.createElement('canvas');
-        buttonCanvas.width = 128;
-        buttonCanvas.height = 128;
-        const buttonCtx = buttonCanvas.getContext('2d');
+function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04, sceneRef) {
+    try {
+        // Get scene reference
+        const scene = sceneRef || window.arScene || parent.parent;
         
-        // First, create a solid background fill to ensure the entire button is visible and clickable
-        buttonCtx.fillStyle = "#333333"; // Dark grey background
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-        buttonCtx.fill();
-        
-        // Create gradient fill
-        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        const baseColor = new THREE.Color(buttonColors[index]);
-        const r = Math.floor(baseColor.r * 255);
-        const g = Math.floor(baseColor.g * 255);
-        const b = Math.floor(baseColor.b * 255);
-        
-        buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
-        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
-        
-        buttonCtx.fillStyle = buttonGradient;
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-        buttonCtx.fill();
-        
-        // Add subtle inner shadow
-        buttonCtx.shadowBlur = 10;
-        buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        buttonCtx.shadowOffsetX = 2;
-        buttonCtx.shadowOffsetY = 2;
-        buttonCtx.beginPath();
-        buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
-        buttonCtx.stroke();
-        buttonCtx.shadowBlur = 0;
-        
-        const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
-        
-        // Create button with texture - make sure it's a full circle, not just an outline
-        const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
-        const buttonMaterial = new THREE.MeshBasicMaterial({
-            map: buttonTexture,
-            transparent: true, // Keep transparent for proper texture display
-            opacity: 1.0, // Full opacity
-            side: THREE.DoubleSide
-        });
-        
-        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        // Position with adjusted Y coordinate
-        button.position.set(startX + spacing * index, buttonY, 0.004); // Increased z position to ensure it's in front of blocking plane
-        button.renderOrder = 1005;
-        button.userData = {
-            type: 'button',
-            action: 'selectScreenType',
-            screenType: buttonTypes[index],
-            hoverColor: new THREE.Color(buttonColors[index]).lerp(new THREE.Color(0xFFFFFF), 0.3), // Lighter version for hover
-            activeColor: buttonColors[index],
-            inactiveColor: buttonColors[index],
-            originalColor: buttonColors[index],
-            isToggle: false,
-            isActive: true
-        };
-        
-        // Add button shadow for depth
-        const shadowGeometry = new THREE.CircleGeometry(smallButtonSize / 2 * 1.05, 32);
-        const shadowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 0.3,
-            side: THREE.DoubleSide
-        });
-        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
-        shadowMesh.position.z = -0.001;
-        shadowMesh.renderOrder = 1004;
-        // Link shadow mesh to button for interaction
-        shadowMesh.userData = {
-            type: 'buttonPart',
-            parentButton: button
-        };
-        button.add(shadowMesh);
-        
-        // Add icon to button - LARGER
-        const iconTexture = createButtonIcon(buttonIcons[index]);
-        const iconSize = smallButtonSize * 0.8; // Keep at 0.8
-        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-        const iconMaterial = new THREE.MeshBasicMaterial({
-            map: iconTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.position.z = 0.004;
-        iconMesh.renderOrder = 1006;
-        // Link icon mesh to button for interaction
-        iconMesh.userData = {
-            type: 'buttonPart',
-            parentButton: button
-        };
-        button.add(iconMesh);
-        
-        // Add label for each button with text shadow for better readability
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 128;
-        labelCanvas.height = 48; // Taller for better quality
-        const labelCtx = labelCanvas.getContext('2d');
-        
-        // Clear canvas and add text with shadow
-        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
-        
-        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        labelCtx.shadowBlur = 3;
-        labelCtx.shadowOffsetX = 1;
-        labelCtx.shadowOffsetY = 1;
-        
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = '600 14px Inter, SF Pro Display, Arial'; // Use consistent font with control panel
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        
-        // Choose appropriate text for each button
-        let labelText;
-        switch(index) {
-            case 0: labelText = 'YouTube'; break;
-            case 1: labelText = 'Search'; break;
-            case 2: labelText = 'Maps'; break;
-            case 3: labelText = 'App'; break;
+        if (!scene) {
+            console.error("Cannot create screen type selector: scene is undefined");
+            return null;
         }
         
-        labelCtx.fillText(labelText, labelCanvas.width / 2, labelCanvas.height / 2);
-        labelCtx.shadowBlur = 0;
+        // Create a panel for content type selection
+        const selectorGroup = new THREE.Group();
         
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.8, smallButtonSize * 0.6);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
+        // Create a background panel for the selector
+        const panelWidth = 0.40; // Increase width to ensure all buttons fit
+        const panelHeight = 0.15; // Taller panel for larger buttons
+        const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+        
+        // Create a texture for the selector panel
+        const panelCanvas = document.createElement('canvas');
+        panelCanvas.width = 512;
+        panelCanvas.height = 256; // Taller canvas
+        const panelCtx = panelCanvas.getContext('2d');
+        
+        // Draw panel background with glass morphism style
+        const cornerRadius = 40;
+        panelCtx.beginPath();
+        panelCtx.moveTo(cornerRadius, 0);
+        panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+        panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+        panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+        panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+        panelCtx.lineTo(cornerRadius, panelCanvas.height);
+        panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+        panelCtx.lineTo(0, cornerRadius);
+        panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+        panelCtx.closePath();
+        
+        // Matching gradient to control panel but slightly more transparent
+        const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+        gradient.addColorStop(0, 'rgba(70, 75, 102, 0.80)'); // Slightly lighter than control panel
+        gradient.addColorStop(1, 'rgba(40, 45, 70, 0.80)'); // Slightly lighter than control panel
+        panelCtx.fillStyle = gradient;
+        panelCtx.fill();
+        
+        // Add glass effect highlight
+        panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        panelCtx.beginPath();
+        panelCtx.moveTo(cornerRadius, 0);
+        panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+        panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+        panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
+        panelCtx.lineTo(0, panelCanvas.height/3);
+        panelCtx.lineTo(0, cornerRadius);
+        panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+        panelCtx.closePath();
+        panelCtx.fill();
+        
+        // Add title with modern font
+        panelCtx.fillStyle = '#ffffff';
+        panelCtx.font = '600 18px Inter, SF Pro Display, Arial';
+        panelCtx.textAlign = 'center';
+        panelCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        panelCtx.shadowBlur = 2;
+        panelCtx.shadowOffsetX = 1;
+        panelCtx.shadowOffsetY = 1;
+        panelCtx.fillText('SCREEN TYPES', panelCanvas.width/2, 28);
+        panelCtx.shadowBlur = 0;
+        
+        // Add subtle divider line
+        panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        panelCtx.lineWidth = 1;
+        panelCtx.beginPath();
+        panelCtx.moveTo(panelCanvas.width/2 - 100, 38);
+        panelCtx.lineTo(panelCanvas.width/2 + 100, 38);
+        panelCtx.stroke();
+        
+        // Add subtle border with gradient to match control panel
+        const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
+        borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.7)'); // Light purple-blue
+        borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.5)'); // Medium purple-blue
+        borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.7)'); // Darker purple-blue
+        panelCtx.strokeStyle = borderGradient;
+        panelCtx.lineWidth = 2;
+        panelCtx.stroke();
+        
+        // Create texture for panel
+        const panelTexture = new THREE.CanvasTexture(panelCanvas);
+        panelTexture.needsUpdate = true;
+        
+        const panelMaterial = new THREE.MeshBasicMaterial({
+            map: panelTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
         
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.set(0, -smallButtonSize * 0.8, 0.002);
-        labelMesh.renderOrder = 1006;
-        button.add(labelMesh);
+        const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+        panelMesh.renderOrder = 1004;
+        selectorGroup.add(panelMesh);
         
-        selectorGroup.add(button);
-    });
-    
-    // Position the selector panel relative to the parent
-    selectorGroup.position.set(offsetX, offsetY - 0.08, 0.01); // Reduce gap between panels
-    parent.add(selectorGroup);
-    
-    return selectorGroup;
+        // Add a solid background blocking plane behind the panel to fix interaction issues
+        const blockingGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+        const blockingMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: false,
+            opacity: 1.0,
+            side: THREE.DoubleSide
+        });
+        const blockingMesh = new THREE.Mesh(blockingGeometry, blockingMaterial);
+        blockingMesh.position.z = -0.003;
+        blockingMesh.renderOrder = 1002; // Below panel but above glow
+        blockingMesh.visible = false; // Invisible but still blocks raycasts
+        selectorGroup.add(blockingMesh);
+        
+        // Add subtle glow behind the panel
+        const glowGeometry = new THREE.PlaneGeometry(panelWidth + 0.01, panelHeight + 0.01);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x6495ED, // Cornflower blue glow (matching control panel)
+            transparent: true,
+            opacity: 0.12,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        glowMesh.position.z = -0.002;
+        glowMesh.renderOrder = 1003;
+        selectorGroup.add(glowMesh);
+        
+        // Create type selection buttons (4 buttons in a row)
+        const buttonTypes = ['youtube', 'duckduckgo', 'maps', 'electron'];
+        const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
+        const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
+        
+        // BIGGER button size for better touch targets
+        const smallButtonSize = buttonSize * 1.3; // Increase from 1.2 to 1.3 (larger)
+        const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
+        const startX = -spacing * 1.5; // Starting position for first button
+        const buttonY = 0; // Center buttons vertically
+        
+        buttonTypes.forEach((type, index) => {
+            // Create button canvas for gradient effect
+            const buttonCanvas = document.createElement('canvas');
+            buttonCanvas.width = 128;
+            buttonCanvas.height = 128;
+            const buttonCtx = buttonCanvas.getContext('2d');
+            
+            // First, create a solid background fill to ensure the entire button is visible and clickable
+            buttonCtx.fillStyle = "#333333"; // Dark grey background
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+            buttonCtx.fill();
+            
+            // Create gradient fill
+            const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            const baseColor = new THREE.Color(buttonColors[index]);
+            const r = Math.floor(baseColor.r * 255);
+            const g = Math.floor(baseColor.g * 255);
+            const b = Math.floor(baseColor.b * 255);
+            
+            buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
+            buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+            buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
+            
+            buttonCtx.fillStyle = buttonGradient;
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+            buttonCtx.fill();
+            
+            // Add subtle inner shadow
+            buttonCtx.shadowBlur = 10;
+            buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            buttonCtx.shadowOffsetX = 2;
+            buttonCtx.shadowOffsetY = 2;
+            buttonCtx.beginPath();
+            buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
+            buttonCtx.stroke();
+            buttonCtx.shadowBlur = 0;
+            
+            const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+            
+            // Create button with texture - make sure it's a full circle, not just an outline
+            const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
+            const buttonMaterial = new THREE.MeshBasicMaterial({
+                map: buttonTexture,
+                transparent: true, // Keep transparent for proper texture display
+                opacity: 1.0, // Full opacity
+                side: THREE.DoubleSide
+            });
+            
+            const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+            // Position with adjusted Y coordinate
+            button.position.set(startX + spacing * index, buttonY, 0.004); // Increased z position to ensure it's in front of blocking plane
+            button.renderOrder = 1005;
+            button.userData = {
+                type: 'button',
+                action: 'selectScreenType',
+                screenType: buttonTypes[index],
+                hoverColor: new THREE.Color(buttonColors[index]).lerp(new THREE.Color(0xFFFFFF), 0.3), // Lighter version for hover
+                activeColor: buttonColors[index],
+                inactiveColor: buttonColors[index],
+                originalColor: buttonColors[index],
+                isToggle: false,
+                isActive: true
+            };
+            
+            // Add button shadow for depth
+            const shadowGeometry = new THREE.CircleGeometry(smallButtonSize / 2 * 1.05, 32);
+            const shadowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+            shadowMesh.position.z = -0.001;
+            shadowMesh.renderOrder = 1004;
+            // Link shadow mesh to button for interaction
+            shadowMesh.userData = {
+                type: 'buttonPart',
+                parentButton: button
+            };
+            button.add(shadowMesh);
+            
+            // Add icon to button - LARGER
+            const iconTexture = createButtonIcon(buttonIcons[index]);
+            const iconSize = smallButtonSize * 0.8; // Keep at 0.8
+            const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: iconTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.004;
+            iconMesh.renderOrder = 1006;
+            // Link icon mesh to button for interaction
+            iconMesh.userData = {
+                type: 'buttonPart',
+                parentButton: button
+            };
+            button.add(iconMesh);
+            
+            // Add label for each button with text shadow for better readability
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 128;
+            labelCanvas.height = 48; // Taller for better quality
+            const labelCtx = labelCanvas.getContext('2d');
+            
+            // Clear canvas and add text with shadow
+            labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+            
+            labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            labelCtx.shadowBlur = 3;
+            labelCtx.shadowOffsetX = 1;
+            labelCtx.shadowOffsetY = 1;
+            
+            labelCtx.fillStyle = '#ffffff';
+            labelCtx.font = '600 14px Inter, SF Pro Display, Arial'; // Use consistent font with control panel
+            labelCtx.textAlign = 'center';
+            labelCtx.textBaseline = 'middle';
+            
+            // Choose appropriate text for each button
+            let labelText;
+            switch(index) {
+                case 0: labelText = 'YouTube'; break;
+                case 1: labelText = 'Search'; break;
+                case 2: labelText = 'Maps'; break;
+                case 3: labelText = 'App'; break;
+            }
+            
+            labelCtx.fillText(labelText, labelCanvas.width / 2, labelCanvas.height / 2);
+            labelCtx.shadowBlur = 0;
+            
+            const labelTexture = new THREE.CanvasTexture(labelCanvas);
+            const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.8, smallButtonSize * 0.6);
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: labelTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+            labelMesh.position.set(0, -smallButtonSize * 0.8, 0.002);
+            labelMesh.renderOrder = 1006;
+            button.add(labelMesh);
+            
+            selectorGroup.add(button);
+        });
+        
+        // Position the selector panel relative to the parent
+        selectorGroup.position.set(offsetX, offsetY - 0.08, 0.01); // Reduce gap between panels
+        parent.add(selectorGroup);
+        
+        return selectorGroup;
+    } catch (error) {
+        console.error("Error creating screen type selector:", error);
+        return null;
+    }
 }
 
 // Create a virtual keyboard

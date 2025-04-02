@@ -184,17 +184,15 @@ async function init() {
     renderer.setAnimationLoop(update);
 }
 
-// Create demo control panel and buttons
+// Function to create demo controls for different web content approaches
 function createDemoControls() {
-    // Create a control panel for web interaction demo
-    const controlPanel = createControlPanel({
-        title: "Interactive Web Demo",
-        position: new THREE.Vector3(0, 0.15, -0.5),
-        width: 0.6,
-        height: 0.3,
-        rows: 3,
-        columns: 2
-    });
+    // Create the main control panel first to hold our buttons
+    const controlPanel = createControlPanel(scene);
+    
+    if (!controlPanel) {
+        console.error("Failed to create control panel for demo");
+        return;
+    }
     
     // Add buttons for each approach
     createButton({

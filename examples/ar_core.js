@@ -49,10 +49,15 @@ export function initAR() {
 
 // Initialize the AR environment
 function initAREnvironment() {
+    // Initialize scene FIRST to ensure it exists for all other functions
+    scene = new THREE.Scene();
+    
+    // Make scene globally accessible as a fallback
+    window.arScene = scene;
+    
     const container = document.createElement('div');
     document.body.appendChild(container);
 
-    scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
     // Lighting
@@ -94,8 +99,12 @@ function initAREnvironment() {
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
         // Create UI controls once font is loaded
-        createControlPanel();
-        createVirtualKeyboard();
+        if (scene) {
+            createControlPanel(scene);
+            createVirtualKeyboard();
+        } else {
+            console.error("Cannot create UI elements - scene is undefined");
+        }
     });
 
     // Controller setup
@@ -128,8 +137,12 @@ function initAREnvironment() {
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
-    // Initialize UI elements
-    initUI();
+    // Initialize UI elements - make sure scene exists first
+    if (scene) {
+        initUI();
+    } else {
+        console.error("Cannot initialize UI - scene is undefined");
+    }
     
     // Preload video texture right after scene setup
     console.log("Initializing video functionality");
