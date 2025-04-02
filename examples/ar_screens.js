@@ -18,69 +18,69 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
             return null;
         }
         
-        // Screen dimensions
-        const screenWidth = 1.0;
-        const screenHeight = 0.75;
-        const size = { x: screenWidth, y: screenHeight };
-        const title = `Screen ${screens.length + 1}`;
-        
-        console.log("Creating screen with draggable top bar and video");
-        
-        // Create the screen container using the enhanced implementation
-        const browserWindow = enhancedCreateScreen(position, size, title, videoTexture);
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `Screen ${screens.length + 1}`;
+    
+    console.log("Creating screen with draggable top bar and video");
+    
+    // Create the screen container using the enhanced implementation
+    const browserWindow = enhancedCreateScreen(position, size, title, videoTexture);
         
         if (!browserWindow) {
             console.error("Failed to create enhanced screen");
             return null;
         }
-        
-        // Add basic identification data
-        browserWindow.userData = { 
-            type: 'screen', 
-            id: screens.length,
-            isSelected: false,
-            isInteractive: true,
-            originalScale: new THREE.Vector3(1, 1, 1), // Store original scale to prevent scaling issues
-            contentType: 'video'
-        };
-        
-        // Add drop shadow for depth and better visual appearance
-        addDropShadow(browserWindow, screenWidth, screenHeight);
-        
-        // Add border with improved styling
-        const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
-        const borderMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x444444, // Dark gray border
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.8
-        });
-        const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
-        borderPanel.position.z = -0.001;
-        browserWindow.add(borderPanel);
-        
-        // Find and update the drag handle reference in userData
-        const topBar = browserWindow.children.find(child => 
-            child.userData && child.userData.type === 'dragHandle');
-        
-        if (topBar) {
-            topBar.userData.screen = browserWindow;
-            browserWindow.userData.dragHandle = topBar;
-        }
-        
-        // Add to scene and screens array
+    
+    // Add basic identification data
+    browserWindow.userData = { 
+        type: 'screen', 
+        id: screens.length,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1), // Store original scale to prevent scaling issues
+        contentType: 'video'
+    };
+    
+    // Add drop shadow for depth and better visual appearance
+    addDropShadow(browserWindow, screenWidth, screenHeight);
+    
+    // Add border with improved styling
+    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444, // Dark gray border
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    browserWindow.add(borderPanel);
+    
+    // Find and update the drag handle reference in userData
+    const topBar = browserWindow.children.find(child => 
+        child.userData && child.userData.type === 'dragHandle');
+    
+    if (topBar) {
+        topBar.userData.screen = browserWindow;
+        browserWindow.userData.dragHandle = topBar;
+    }
+    
+    // Add to scene and screens array
         sceneToUse.add(browserWindow);
-        screens.push(browserWindow);
-        
-        // Add entrance animation
-        animateScreenEntrance(browserWindow);
-        
-        console.log("Created screen with ID:", browserWindow.userData.id);
-        
-        // Select this as the current screen
-        selectScreen(browserWindow);
-        
-        return browserWindow;
+    screens.push(browserWindow);
+    
+    // Add entrance animation
+    animateScreenEntrance(browserWindow);
+    
+    console.log("Created screen with ID:", browserWindow.userData.id);
+    
+    // Select this as the current screen
+    selectScreen(browserWindow);
+    
+    return browserWindow;
     } catch (error) {
         console.error("Error creating browser screen:", error);
         return null;
@@ -489,7 +489,7 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const x = Math.random() * width;
                 const y = 50 + Math.random() * (height - 50);
                 const size = Math.random() * 2;
-                ctx.beginPath();
+        ctx.beginPath();
                 ctx.arc(x, y, size, 0, Math.PI * 2);
                 ctx.fill();
             }
@@ -502,20 +502,20 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
                 const y2 = 50 + Math.random() * (height - 50);
-                ctx.beginPath();
+        ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
-                ctx.stroke();
+        ctx.stroke();
             }
         } else {
             // Regular map view - light colors
             ctx.fillStyle = '#e8eaed';
             ctx.fillRect(0, 50, width, height - 50);
-            
+        
             // Draw some "roads"
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 6;
-            for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 10; i++) {
                 const x1 = Math.random() * width;
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
@@ -534,7 +534,7 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
                 const y2 = 50 + Math.random() * (height - 50);
-                ctx.beginPath();
+        ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
@@ -629,7 +629,7 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
     sidebarIcons.forEach((icon, i) => {
         ctx.fillStyle = i === 0 ? '#ffffff' : '#666666';
         ctx.font = '18px Arial';
-        ctx.textAlign = 'center';
+    ctx.textAlign = 'center';
         ctx.fillText(icon, 25, 60 + i * 40);
     });
     
@@ -655,10 +655,10 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
         // Control buttons
         ctx.fillStyle = '#333333';
         ctx.fillRect(60, playerHeight + 90, playerWidth, 40);
-        
-        // Play button
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
+    
+    // Play button
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
         ctx.moveTo(80, playerHeight + 110);
         ctx.lineTo(100, playerHeight + 110);
         ctx.stroke();
@@ -671,8 +671,8 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
         ctx.lineTo(150, playerHeight + 120);
         ctx.lineTo(140, playerHeight + 115);
         ctx.lineTo(130, playerHeight + 115);
-        ctx.closePath();
-        ctx.fill();
+    ctx.closePath();
+    ctx.fill();
     } else {
         // Show Electron logo and welcome message when no video
         // Electron logo
@@ -1210,72 +1210,72 @@ export function selectScreen(screen) {
         // IMPORTANT: Don't try to use keyboard for now - it's causing errors
         const skipKeyboardUpdate = true;
         
-        // Deselect previously selected screen
-        if (selectedScreen) {
+    // Deselect previously selected screen
+    if (selectedScreen) {
             try {
-                // Change border color back to normal
-                const borderMesh = selectedScreen.children.find(child => 
-                    child.geometry && child.geometry.type === 'PlaneGeometry' && 
-                    Math.abs(child.position.z - (-0.001)) < 0.0001);
-                    
-                if (borderMesh) {
-                    borderMesh.material.color.set(0x444444); // Default border color
-                    borderMesh.material.opacity = 0.5; // Less visible
-                }
-                
-                // Turn off glow
-                const glowMesh = selectedScreen.userData.glowMesh;
-                if (glowMesh) {
-                    glowMesh.material.opacity = 0;
-                }
-                
-                selectedScreen.userData.isSelected = false;
-                
-                // Scale down slightly for visual deselection
-                selectedScreen.scale.multiplyScalar(0.97);
-                // Animate back to original scale
-                animateScreenScale(selectedScreen, 1.0, 150);
+        // Change border color back to normal
+        const borderMesh = selectedScreen.children.find(child => 
+            child.geometry && child.geometry.type === 'PlaneGeometry' && 
+            Math.abs(child.position.z - (-0.001)) < 0.0001);
+            
+        if (borderMesh) {
+            borderMesh.material.color.set(0x444444); // Default border color
+            borderMesh.material.opacity = 0.5; // Less visible
+        }
+        
+        // Turn off glow
+        const glowMesh = selectedScreen.userData.glowMesh;
+        if (glowMesh) {
+            glowMesh.material.opacity = 0;
+        }
+        
+        selectedScreen.userData.isSelected = false;
+        
+        // Scale down slightly for visual deselection
+        selectedScreen.scale.multiplyScalar(0.97);
+        // Animate back to original scale
+        animateScreenScale(selectedScreen, 1.0, 150);
             } catch (error) {
                 console.warn("Error while deselecting previous screen:", error);
             }
-        }
-        
-        // If screen is null, just clear selection
-        if (!screen) {
-            // Update both local and global references
-            setSelectedScreen(null);
-            return;
-        }
-        
-        // Select new screen
-        // Update the global selectedScreen variable through the setter function
-        setSelectedScreen(screen);
-        screen.userData.isSelected = true;
-        
-        // Log selection for debugging
-        console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
-        
+    }
+    
+    // If screen is null, just clear selection
+    if (!screen) {
+        // Update both local and global references
+        setSelectedScreen(null);
+        return;
+    }
+    
+    // Select new screen
+    // Update the global selectedScreen variable through the setter function
+    setSelectedScreen(screen);
+    screen.userData.isSelected = true;
+    
+    // Log selection for debugging
+    console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
+    
         try {
-            // Highlight border for selected screen
-            const borderMesh = screen.children.find(child => 
-                child.geometry && child.geometry.type === 'PlaneGeometry' && 
-                Math.abs(child.position.z - (-0.001)) < 0.0001);
-                
-            if (borderMesh) {
-                borderMesh.material.color.set(0x1a237e); // Dark blue border (indigo 900)
-                borderMesh.material.opacity = 1.0; // More visible
-            }
-            
-            // Turn on glow
-            const glowMesh = screen.userData.glowMesh;
-            if (glowMesh) {
-                glowMesh.material.opacity = 0.3; // Subtle glow
-            }
-            
-            // Scale up slightly for visual selection
-            screen.scale.multiplyScalar(1.03);
-            // Animate back to original scale with slight bounce
-            animateScreenScale(screen, 1.0, 300, true);
+    // Highlight border for selected screen
+    const borderMesh = screen.children.find(child => 
+        child.geometry && child.geometry.type === 'PlaneGeometry' && 
+        Math.abs(child.position.z - (-0.001)) < 0.0001);
+        
+    if (borderMesh) {
+        borderMesh.material.color.set(0x1a237e); // Dark blue border (indigo 900)
+        borderMesh.material.opacity = 1.0; // More visible
+    }
+    
+    // Turn on glow
+    const glowMesh = screen.userData.glowMesh;
+    if (glowMesh) {
+        glowMesh.material.opacity = 0.3; // Subtle glow
+    }
+    
+    // Scale up slightly for visual selection
+    screen.scale.multiplyScalar(1.03);
+    // Animate back to original scale with slight bounce
+    animateScreenScale(screen, 1.0, 300, true);
         } catch (error) {
             console.warn("Error while applying visual effects to selected screen:", error);
         }
@@ -1355,8 +1355,8 @@ export function updateKeyboardPosition(screen, virtualKeyboard) {
         
         // Position the keyboard below the screen
         const screenPosition = screen.position.clone();
-        const screenScale = screen.scale.clone();
-        
+    const screenScale = screen.scale.clone();
+    
         // Calculate position below the screen
         screenPosition.y -= 0.2 * screenScale.y;
         

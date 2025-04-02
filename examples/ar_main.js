@@ -175,60 +175,60 @@ export async function init() {
     } catch (error) {
         console.error("Failed to initialize AR:", error);
         displayErrorMessage(error.message);
+        }
     }
-}
-
-// Check if WebXR is supported
+    
+    // Check if WebXR is supported
 async function checkWebXRSupport() {
-    if ('xr' in navigator) {
+        if ('xr' in navigator) {
         try {
             const supported = await navigator.xr.isSessionSupported('immersive-ar');
-            console.log('WebXR AR supported:', supported);
-            return supported;
+                    console.log('WebXR AR supported:', supported);
+                    return supported;
         } catch (error) {
-            console.error('Error checking AR support:', error);
-            return false;
+                    console.error('Error checking AR support:', error);
+                    return false;
         }
-    } else {
-        console.log('WebXR not supported in this browser');
+        } else {
+            console.log('WebXR not supported in this browser');
         return false;
     }
 }
 
 // Display AR not supported message
 function displayARNotSupportedMessage() {
-    const loadingMessage = document.getElementById('loadingMessage');
-    const errorMessage = document.getElementById('errorMessage');
-    
-    if (loadingMessage) loadingMessage.style.display = 'none';
-    if (errorMessage) {
-        errorMessage.style.display = 'block';
-        console.error('WebXR AR is not supported on this device or browser');
-    } else {
-        // If error message element doesn't exist, create one
-        const errorDiv = document.createElement('div');
-        errorDiv.id = 'errorMessage';
-        errorDiv.style.position = 'absolute';
-        errorDiv.style.top = '50%';
-        errorDiv.style.left = '50%';
-        errorDiv.style.transform = 'translate(-50%, -50%)';
-        errorDiv.style.color = '#fff';
-        errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
-        errorDiv.style.padding = '20px';
-        errorDiv.style.borderRadius = '10px';
-        errorDiv.style.fontFamily = 'Arial, sans-serif';
-        errorDiv.style.fontSize = '18px';
-        errorDiv.style.textAlign = 'center';
-        errorDiv.style.zIndex = '1000';
-        
-        errorDiv.innerHTML = `
-            <h2>WebXR AR Not Supported</h2>
-            <p>Your browser or device does not support WebXR Augmented Reality.</p>
-            <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
-        `;
-        
-        document.body.appendChild(errorDiv);
-    }
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            
+                if (loadingMessage) loadingMessage.style.display = 'none';
+                if (errorMessage) {
+                    errorMessage.style.display = 'block';
+                    console.error('WebXR AR is not supported on this device or browser');
+                } else {
+                    // If error message element doesn't exist, create one
+                    const errorDiv = document.createElement('div');
+                    errorDiv.id = 'errorMessage';
+                    errorDiv.style.position = 'absolute';
+                    errorDiv.style.top = '50%';
+                    errorDiv.style.left = '50%';
+                    errorDiv.style.transform = 'translate(-50%, -50%)';
+                    errorDiv.style.color = '#fff';
+                    errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+                    errorDiv.style.padding = '20px';
+                    errorDiv.style.borderRadius = '10px';
+                    errorDiv.style.fontFamily = 'Arial, sans-serif';
+                    errorDiv.style.fontSize = '18px';
+                    errorDiv.style.textAlign = 'center';
+                    errorDiv.style.zIndex = '1000';
+                    
+                    errorDiv.innerHTML = `
+                        <h2>WebXR AR Not Supported</h2>
+                        <p>Your browser or device does not support WebXR Augmented Reality.</p>
+                        <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+                    `;
+                    
+                    document.body.appendChild(errorDiv);
+                }
 }
 
 // Display error message
@@ -417,8 +417,8 @@ export function createDemoControls() {
             if (responsiveButton) {
                 console.log("Responsive Content button created successfully");
                 buttonsCreated++;
-            }
-        } catch (error) {
+                }
+            } catch (error) {
             console.error("Failed to create Responsive Content button:", error);
         }
         
@@ -799,6 +799,134 @@ function update(time) {
     // Update all active web panels
     WebDOM.updateWebPanels && WebDOM.updateWebPanels();
     WebMessaging.updateWebPanels && WebMessaging.updateWebPanels();
+}
+
+// Add startup initialization code to ensure UI elements are properly initialized
+window.addEventListener('DOMContentLoaded', function() {
+    console.log("AR Main: DOM content loaded - initializing interface");
+    
+    // Remove any content overlays that may be present from the beginning
+    removeContentOverlays();
+    
+    // Initialize fallback controls immediately
+    setTimeout(initializeFallbackUI, 1000);
+});
+
+// Initialize fallback UI components
+function initializeFallbackUI() {
+    // Create fallback UI if 3D elements aren't working
+    if (document.querySelector('.ar-fallback-button') === null) {
+        console.log("Creating fallback UI for AR interaction");
+        
+        try {
+            // Create a robust container that will always appear
+            const container = document.createElement('div');
+            container.id = 'ar-fallback-container';
+            container.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 9999;
+                display: flex;
+                flex-direction: row;
+                gap: 10px;
+                background: rgba(33, 33, 33, 0.8);
+                padding: 15px;
+                border-radius: 30px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            `;
+            
+            // Define the core UI actions
+            const actions = [
+                {name: 'createNewScreen', label: 'Video'},
+                {name: 'createNewWebScreen', label: 'Web'},
+                {name: 'createNewImageScreen', label: 'Image'},
+                {name: 'deleteScreen', label: 'Delete'}
+            ];
+            
+            // Create each button
+            actions.forEach(action => {
+                const button = document.createElement('button');
+                button.className = 'ar-fallback-button';
+                button.dataset.action = action.name;
+                button.textContent = action.label;
+                button.style.cssText = `
+                    background: rgba(30, 144, 255, 0.9);
+                    color: white;
+                    border: none;
+                    border-radius: 25px;
+                    padding: 14px 24px;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    font-size: 16px;
+                    cursor: pointer;
+                    margin: 0 5px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                    transition: all 0.2s ease;
+                `;
+                
+                // Add hover effect
+                button.addEventListener('mouseover', function() {
+                    this.style.background = 'rgba(65, 164, 255, 0.95)';
+                    this.style.transform = 'scale(1.05)';
+                });
+                
+                button.addEventListener('mouseout', function() {
+                    this.style.background = 'rgba(30, 144, 255, 0.9)';
+                    this.style.transform = 'scale(1)';
+                });
+                
+                // Add click handler
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    console.log(`Fallback button clicked: ${this.dataset.action}`);
+                    
+                    // Visual feedback
+                    this.style.background = 'rgba(255, 165, 0, 0.9)';
+                    
+                    // Create and dispatch a custom event
+                    const event = new CustomEvent('ar-fallback-action', {
+                        detail: { action: this.dataset.action }
+                    });
+                    document.dispatchEvent(event);
+                    
+                    // Reset color after a moment
+                    setTimeout(() => {
+                        this.style.background = 'rgba(30, 144, 255, 0.9)';
+                    }, 300);
+                    
+                    // Remove overlays too
+                    removeContentOverlays();
+                });
+                
+                container.appendChild(button);
+            });
+            
+            // Add to body
+            document.body.appendChild(container);
+            console.log("Fallback UI created successfully");
+        } catch (error) {
+            console.error("Error creating fallback UI:", error);
+        }
+    }
+}
+
+// Function to remove any overlays that block interaction
+function removeContentOverlays() {
+    try {
+        const overlays = document.querySelectorAll('.content-type-overlay');
+        if (overlays.length > 0) {
+            overlays.forEach(overlay => {
+                overlay.remove();
+            });
+            console.log(`Removed ${overlays.length} content overlays`);
+        }
+    } catch (error) {
+        console.error("Error removing content overlays:", error);
+    }
 }
 
 // Start the application

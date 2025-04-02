@@ -83,25 +83,35 @@ export function setupEventListeners() {
 
 // Handle controller selection start
 function onSelectStart(event) {
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-    
-    // Check for button intersections
-    const buttons = findAllButtons();
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
-    
-    if (buttonIntersects.length > 0) {
-        // Visual feedback for button press
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
-        if (buttonObj) {
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7); // Highlight color
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-            }, 200);
+    // Check if controller is defined and has matrixWorld
+    if (!controller || !controller.matrixWorld) {
+        console.warn("Controller not available for selection start");
+        return;
+    }
+
+    try {
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // Check for button intersections
+        const buttons = findAllButtons();
+        const buttonIntersects = raycaster.intersectObjects(buttons, true);
+        
+        if (buttonIntersects.length > 0) {
+            // Visual feedback for button press
+            const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
+            if (buttonObj) {
+                const originalColor = buttonObj.material.color.clone();
+                buttonObj.material.color.set(0x4FC3F7); // Highlight color
+                setTimeout(() => {
+                    buttonObj.material.color.copy(originalColor);
+                }, 200);
+            }
         }
+    } catch (error) {
+        console.error("Error in onSelectStart:", error);
     }
 }
 
@@ -143,63 +153,75 @@ function onSelectEnd(event) {
 
 // Handle controller selection
 function onSelect(event) {
-    // Raycast to detect interactive elements
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-    
-    // First, check for button interactions
-    const buttons = findAllButtons();
-    console.log(`Checking for interactions with ${buttons.length} buttons`);
-    
-    // Use a larger threshold for better button detection
-    raycaster.params.Line.threshold = 0.15; // Increased from 0.1 for better detection
-    raycaster.params.Points.threshold = 0.15; // Increased from 0.1 for better detection
-    raycaster.params.Mesh.threshold = 0.02; // Add mesh threshold for better detection
-    
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
-    
-    if (buttonIntersects.length > 0) {
-        console.log(`Ray intersected with ${buttonIntersects.length} button objects`);
-        
-        // Get closest intersection
-        const intersection = buttonIntersects[0];
-        console.log(`Closest intersection: distance=${intersection.distance.toFixed(3)}, object=${intersection.object.uuid.substring(0,8)}`);
-        
-        const buttonObj = getButtonFromIntersect(intersection.object);
-        if (buttonObj) {
-            console.log(`Found button: action=${buttonObj.userData.action}`);
-            handleButtonAction(buttonObj);
-            return;
-        } else {
-            console.log("Button parent not found from intersection");
-        }
-    } else {
-        console.log("No button intersections found");
+    // Check if controller is defined and has matrixWorld
+    if (!controller || !controller.matrixWorld) {
+        console.warn("Controller not available for selection");
+        return;
     }
-    
-    // Then check for screen selection
-    const screenIntersects = raycaster.intersectObjects(screens, true);
-    
-    if (screenIntersects.length > 0) {
-        const screenObj = getScreenFromIntersect(screenIntersects[0].object);
-        if (screenObj) {
-            console.log(`Selected screen: ID=${screenObj.userData.id}`);
-            // Select screen and update global selectedScreen
-            selectScreen(screenObj);
+
+    try {
+        // Raycast to detect interactive elements
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        // First, check for button interactions
+        const buttons = findAllButtons();
+        console.log(`Checking for interactions with ${buttons.length} buttons`);
+        
+        // Use a larger threshold for better button detection
+        raycaster.params.Line.threshold = 0.15; // Increased from 0.1 for better detection
+        raycaster.params.Points.threshold = 0.15; // Increased from 0.1 for better detection
+        raycaster.params.Mesh.threshold = 0.02; // Add mesh threshold for better detection
+        
+        const buttonIntersects = raycaster.intersectObjects(buttons, true);
+        
+        if (buttonIntersects.length > 0) {
+            console.log(`Ray intersected with ${buttonIntersects.length} button objects`);
             
-            // If in move mode, start moving
-            if (isMoveModeActive) {
-                isTouchMovingScreen = true;
+            // Get closest intersection
+            const intersection = buttonIntersects[0];
+            console.log(`Closest intersection: distance=${intersection.distance.toFixed(3)}, object=${intersection.object.uuid.substring(0,8)}`);
+            
+            const buttonObj = getButtonFromIntersect(intersection.object);
+            if (buttonObj) {
+                console.log(`Found button: action=${buttonObj.userData.action}`);
+                handleButtonAction(buttonObj);
+                return;
+            } else {
+                console.log("Button parent not found from intersection");
             }
-            
-            // If in rotate mode, start rotating
-            if (isRotateModeActive) {
-                isRotatingScreen = true;
-                initialRotation.copy(screenObj.rotation);
+        } else {
+            console.log("No button intersections found");
+        }
+        
+        // Then check for screen selection
+        const screenIntersects = raycaster.intersectObjects(screens, true);
+        
+        if (screenIntersects.length > 0) {
+            const screenObj = getScreenFromIntersect(screenIntersects[0].object);
+            if (screenObj) {
+                console.log(`Selected screen: ID=${screenObj.userData.id}`);
+                // Select screen and update global selectedScreen
+                selectScreen(screenObj);
+                
+                // If in move mode, start moving
+                if (isMoveModeActive) {
+                    isTouchMovingScreen = true;
+                }
+                
+                // If in rotate mode, start rotating
+                if (isRotateModeActive) {
+                    isRotatingScreen = true;
+                    if (screenObj.rotation) {
+                        initialRotation.copy(screenObj.rotation);
+                    }
+                }
             }
         }
+    } catch (error) {
+        console.error("Error in onSelect:", error);
     }
 }
 
@@ -259,150 +281,191 @@ function getScreenFromIntersect(object) {
 
 // Handle different button actions
 function handleButtonAction(button) {
-    if (!button || !button.userData) {
-        console.log("Invalid button object");
-        return;
+    try {
+        if (!button || !button.userData) {
+            console.error("Invalid button object passed to handleButtonAction");
+            return;
+        }
+        
+        console.log("Button action:", button.userData.action);
+        
+        // Provide haptic feedback if available
+        if (controller && controller.gamepad && controller.gamepad.hapticActuators 
+            && controller.gamepad.hapticActuators.length > 0) {
+            controller.gamepad.hapticActuators[0].pulse(0.7, 100);
+        }
+        
+        // Store button data for debugging
+        window.lastButtonAction = {
+            button: button,
+            action: button.userData.action,
+            timestamp: Date.now()
+        };
+        
+        // Create a DOM backup click event
+        if (button.userData.action) {
+            dispatchBackupClickEvent(button.userData.action);
+        }
+        
+        switch (button.userData.action) {
+            case 'createNewScreen':
+                console.log("Creating new screen...");
+                isPlacingNewScreen = true;
+                currentPlacementScreenType = 'video';
+                createModeChangeIndicator("Place Video Screen");
+                break;
+                
+            case 'createNewImageScreen':
+                console.log("Creating new image screen...");
+                isPlacingNewScreen = true;
+                currentPlacementScreenType = 'image';
+                createModeChangeIndicator("Place Image Screen");
+                break;
+                
+            case 'createNewWebScreen':
+                console.log("Creating new web screen...");
+                isPlacingNewScreen = true;
+                currentPlacementScreenType = 'web';
+                createModeChangeIndicator("Place Web Screen");
+                break;
+                
+            case 'createNewTextScreen':
+                console.log("Creating new text screen...");
+                isPlacingNewScreen = true;
+                currentPlacementScreenType = 'text';
+                createModeChangeIndicator("Place Text Screen");
+                break;
+                
+            case 'deleteScreen':
+                console.log("Deleting screen...");
+                if (selectedScreen) {
+                    const screenToDelete = selectedScreen;
+                    selectScreen(null);  // Deselect first
+                    deleteScreen(screenToDelete);
+                    createDeletionEffect(screenToDelete.position);
+                    createModeChangeIndicator("Screen Deleted");
+                } else {
+                    // Delete last screen if none selected
+                    deleteLastScreen();
+                }
+                break;
+                
+            case 'togglePlayback':
+                if (selectedScreen && selectedScreen.userData.type === 'video') {
+                    const videoElement = selectedScreen.userData.video;
+                    if (videoElement) {
+                        if (videoElement.paused) {
+                            videoElement.play().catch(e => console.error("Video play error:", e));
+                            button.userData.label = "Pause";
+                            updateButtonLabel(button, "Pause");
+                        } else {
+                            videoElement.pause();
+                            button.userData.label = "Play";
+                            updateButtonLabel(button, "Play");
+                        }
+                    }
+                }
+                break;
+                
+            // Add additional button actions here
+            
+            default:
+                console.log("Unhandled button action:", button.userData.action);
+        }
+        
+        // Remove any content overlays that might be blocking interactions
+        setTimeout(removeContentOverlays, 100);
+        
+    } catch (error) {
+        console.error("Error handling button action:", error);
+        
+        // Try to extract action and create backup click
+        if (button && button.userData && button.userData.action) {
+            console.log("Attempting backup action execution for:", button.userData.action);
+            dispatchBackupClickEvent(button.userData.action);
+        }
     }
-    
-    console.log("Handling button action:", button.userData.action);
-    
-    // Extract the button action
-    const action = button.userData.action;
-    
-    // Provide haptic feedback for button press
-    if (navigator.vibrate) {
-        navigator.vibrate(30);
+}
+
+// Helper function to dispatch a backup click event through DOM
+function dispatchBackupClickEvent(action) {
+    try {
+        // Create or get a backup button
+        let backupButton = document.getElementById(`ar-backup-button-${action}`);
+        
+        if (!backupButton) {
+            backupButton = document.createElement('button');
+            backupButton.id = `ar-backup-button-${action}`;
+            backupButton.className = 'ar-backup-button';
+            backupButton.dataset.action = action;
+            backupButton.textContent = action.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            backupButton.style.cssText = `
+                position: fixed;
+                bottom: 10px;
+                background: rgba(30, 144, 255, 0.8);
+                color: white;
+                border: none;
+                border-radius: 20px;
+                padding: 8px 15px;
+                font-family: Arial, sans-serif;
+                cursor: pointer;
+                z-index: 9998;
+                margin: 5px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            `;
+            
+            // Position buttons dynamically
+            const existingButtons = document.querySelectorAll('.ar-backup-button');
+            const leftPosition = 10 + (existingButtons.length * 110);
+            backupButton.style.left = `${leftPosition}px`;
+            
+            // Add click handler
+            backupButton.addEventListener('click', function() {
+                console.log(`Backup button clicked: ${this.dataset.action}`);
+                removeContentOverlays();
+                
+                // Find the corresponding 3D button and simulate its action
+                let foundButton = false;
+                scene.traverse(obj => {
+                    if (obj.userData && obj.userData.isButton && obj.userData.action === this.dataset.action) {
+                        foundButton = true;
+                        // Create a simpler fake button object with just the necessary properties
+                        const fakeButton = { userData: { action: obj.userData.action } };
+                        handleButtonAction(fakeButton);
+                    }
+                });
+                
+                if (!foundButton) {
+                    // Direct action handling if no button found
+                    const fakeButton = { userData: { action: this.dataset.action } };
+                    handleButtonAction(fakeButton);
+                }
+            });
+            
+            document.body.appendChild(backupButton);
+        }
+        
+        // Flash the button to indicate activity
+        backupButton.style.backgroundColor = 'rgba(255, 165, 0, 0.9)';  // Orange flash
+        setTimeout(() => {
+            backupButton.style.backgroundColor = 'rgba(30, 144, 255, 0.8)';  // Return to blue
+        }, 300);
+        
+    } catch (error) {
+        console.error("Error creating backup button:", error);
     }
-    
-    // Handle different button actions
-    switch (action) {
-        case 'newScreen':
-            console.log("New screen button pressed");
-            // Create a new screen positioned in front of the camera
-            createNewScreenInFrontOfCamera();
-            break;
-            
-        case 'deleteScreen':
-            console.log("Delete screen button pressed - calling deleteLastScreen()");
-            // Delete the last interacted screen
-            deleteLastScreen();
-            
-            // Add haptic feedback for destructive action
-            if (navigator.vibrate) {
-                navigator.vibrate([30, 20, 80]);
-            }
-            
-            // Create visual indicator
-            createModeChangeIndicator('Screen Deleted');
-            break;
-            
-        case 'selectScreenType':
-            console.log("Screen type button pressed:", button.userData.screenType);
-            // Get camera position and direction
-            const cameraPosition = new THREE.Vector3();
-            camera.getWorldPosition(cameraPosition);
-            
-            const cameraDirection = new THREE.Vector3(0, 0, -1);
-            cameraDirection.applyQuaternion(camera.quaternion);
-            
-            // Position screen in front of camera
-            const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
-            
-            // Create the appropriate screen type
-            let newScreen;
-            const screenType = button.userData.screenType;
-            
-            switch(screenType) {
-                case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
-                    break;
-                case 'duckduckgo':
-                    newScreen = createDuckDuckGoScreen(screenPosition);
-                    break;
-                case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
-                    break;
-                case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
-                    break;
-                default:
-                    newScreen = createNewBrowserScreen(screenPosition);
-                    break;
-            }
-            
-            // Make it face the camera
-            newScreen.lookAt(camera.position);
-            
-            // Add visual feedback
-            createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
-            
-            // Select this screen
-            selectScreen(newScreen);
-            break;
-            
-        case 'moveMode':
-            console.log("Move mode button pressed");
-            // Toggle move mode
-            isMoveModeActive = !isMoveModeActive;
-            isRotateModeActive = false; // Disable rotate mode
-            
-            // Update button state
-            button.material.color.set(isMoveModeActive ? button.userData.activeColor : button.userData.inactiveColor);
-            
-            // Create visual indicator
-            createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
-            break;
-            
-        case 'rotateMode':
-            console.log("Rotate mode button pressed");
-            // Toggle rotate mode
-            isRotateModeActive = !isRotateModeActive;
-            isMoveModeActive = false; // Disable move mode
-            
-            // Update button state
-            button.material.color.set(isRotateModeActive ? button.userData.activeColor : button.userData.inactiveColor);
-            
-            // Create visual indicator
-            createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
-            break;
-            
-        // FIXED: Add explicit handling for playButton and volumeButton from screens
-        case 'playButton':
-            console.log("Play/pause button pressed");
-            // Toggle video playback
-            if (videoControlFunctions.togglePlayback) {
-                videoControlFunctions.togglePlayback();
-            }
-            break;
-            
-        case 'volumeButton':
-            console.log("Mute/unmute button pressed");
-            // Toggle video mute
-            if (videoControlFunctions.toggleMute) {
-                videoControlFunctions.toggleMute();
-            }
-            break;
-            
-        // Keep generic play/pause and mute/unmute handlers for compatibility
-        case 'play':
-        case 'pause':
-            console.log("Play/pause button pressed");
-            if (videoControlFunctions.togglePlayback) {
-                videoControlFunctions.togglePlayback();
-            }
-            break;
-            
-        case 'mute':
-        case 'unmute':
-            console.log("Mute/unmute button pressed");
-            if (videoControlFunctions.toggleMute) {
-                videoControlFunctions.toggleMute();
-            }
-            break;
-            
-        default:
-            console.log("Unknown button action:", action);
-            break;
+}
+
+// Helper function to remove content overlays
+function removeContentOverlays() {
+    try {
+        const overlays = document.querySelectorAll('.content-type-overlay');
+        overlays.forEach(overlay => {
+            overlay.remove();
+        });
+        console.log(`Removed ${overlays.length} content overlays`);
+    } catch (error) {
+        console.error("Error removing content overlays:", error);
     }
 }
 
@@ -1351,30 +1414,43 @@ function updateVideoTime(progress) {
     // Keeping the function to maintain code structure in case we need to reimplement
 }
 
-// Create a floating text indicator for mode changes
+// Create an indicator for mode changes
 function createModeChangeIndicator(message) {
     // Create a canvas for the text
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = 512;
+    canvas.height = 128;
+    
     const ctx = canvas.getContext('2d');
     
-    // Draw the text
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = 'rgba(50, 150, 255, 0.8)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    // Fill background with a gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "rgba(33, 150, 243, 0.95)");  // Blue top
+    gradient.addColorStop(1, "rgba(25, 118, 210, 0.95)");  // Darker blue bottom
     
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, canvas.height, 20);
+    ctx.fill();
+    
+    // Add text
     ctx.fillStyle = '#ffffff';
-    ctx.font = '24px Arial';
+    ctx.font = 'bold 40px Arial, Helvetica, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Draw text in the middle
     ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     
-    // Create texture
+    // Create a texture from the canvas
     const texture = new THREE.CanvasTexture(canvas);
-    const geometry = new THREE.PlaneGeometry(0.3, 0.075);
+    
+    // Create a plane geometry to display the indicator
+    const geometry = new THREE.PlaneGeometry(0.5, 0.125);
     const material = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
@@ -1384,43 +1460,114 @@ function createModeChangeIndicator(message) {
     
     const indicator = new THREE.Mesh(geometry, material);
     
-    // Position above the control panel
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
-    cameraDirection.applyQuaternion(camera.quaternion);
-    
-    indicator.position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
-    indicator.position.y += 0.15; // Position above control panel
-    indicator.quaternion.copy(camera.quaternion);
-    
-    scene.add(indicator);
-    
-    // Fade out and remove
-    const startTime = performance.now();
-    const duration = 1500; // 1.5 seconds
-    
-    function fadeOut() {
-        const elapsed = performance.now() - startTime;
-        const progress = elapsed / duration;
+    // Check if camera is available before positioning
+    if (!camera || !camera.quaternion) {
+        console.warn("Camera not available for mode change indicator");
+        // Position in a default position if camera is not available
+        indicator.position.set(0, 0.15, -0.5);
         
-        if (progress < 1) {
-            if (progress > 0.7) {
-                // Start fading out in the last 30% of time
-                material.opacity = 0.9 * (1 - ((progress - 0.7) / 0.3));
-            }
+        // Add to scene anyway so user can see the message
+        if (scene) {
+            scene.add(indicator);
             
-            // Float upward slightly
-            indicator.position.y += 0.0002;
-            
-            requestAnimationFrame(fadeOut);
-        } else {
-            scene.remove(indicator);
-            material.dispose();
-            geometry.dispose();
-            texture.dispose();
+            // Remove after a short delay
+            setTimeout(() => {
+                scene.remove(indicator);
+                material.dispose();
+                geometry.dispose();
+                texture.dispose();
+            }, 2000);
         }
+        return;
     }
     
-    requestAnimationFrame(fadeOut);
+    try {
+        // Position above the control panel
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(camera.quaternion);
+        
+        indicator.position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.5));
+        indicator.position.y += 0.15; // Position above control panel
+        indicator.quaternion.copy(camera.quaternion);
+        
+        scene.add(indicator);
+        
+        // Fade out and remove
+        const startTime = performance.now();
+        const duration = 1500; // 1.5 seconds
+        
+        function fadeOut() {
+            const elapsed = performance.now() - startTime;
+            const progress = elapsed / duration;
+            
+            if (progress < 1) {
+                if (progress > 0.7) {
+                    // Start fading out in the last 30% of time
+                    material.opacity = 0.9 * (1 - ((progress - 0.7) / 0.3));
+                }
+                
+                // Float upward slightly
+                indicator.position.y += 0.0002;
+                
+                requestAnimationFrame(fadeOut);
+            } else {
+                scene.remove(indicator);
+                material.dispose();
+                geometry.dispose();
+                texture.dispose();
+            }
+        }
+        
+        requestAnimationFrame(fadeOut);
+    } catch (error) {
+        console.error("Error creating mode change indicator:", error);
+        
+        // Fallback - show a DOM notification instead
+        showDOMNotification(message);
+    }
+}
+
+// Fallback function to show notification in DOM when 3D version fails
+function showDOMNotification(message) {
+    try {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.textContent = message;
+        notification.className = 'ar-notification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(33, 150, 243, 0.95);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            z-index: 9999;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        `;
+        
+        // Add to DOM
+        document.body.appendChild(notification);
+        
+        // Remove after 2 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s';
+            
+            // Remove from DOM after fade out
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 500);
+        }, 2000);
+    } catch (error) {
+        console.error("Failed to show DOM notification:", error);
+    }
 }
 
 // Helper function to find a screen from a drag handle
@@ -1669,4 +1816,146 @@ export function createInteractivePlane(options = {}) {
     
     // Return the plane for further manipulation
     return plane;
-} 
+}
+
+// Add document-level click handler for fallback interaction
+document.addEventListener('click', function(event) {
+    console.log("Document click detected - checking for fallback interaction needs");
+    
+    // First remove any content overlays that might be blocking interactions
+    try {
+        const overlays = document.querySelectorAll('.content-type-overlay');
+        overlays.forEach(overlay => {
+            overlay.remove();
+        });
+        console.log(`Removed ${overlays.length} content overlays`);
+    } catch (error) {
+        console.error("Error removing overlays:", error);
+    }
+    
+    // Check if any AR buttons are visible and functioning
+    let arButtonsWorking = false;
+    
+    // Find all buttons in the scene
+    if (scene) {
+        let buttonCount = 0;
+        scene.traverse(obj => {
+            if (obj.userData && obj.userData.isButton) {
+                buttonCount++;
+            }
+        });
+        
+        // If we have buttons in the scene, they should be working
+        arButtonsWorking = buttonCount > 0;
+        console.log(`Found ${buttonCount} AR buttons in scene`);
+    }
+    
+    // Create fallback controls if AR buttons aren't working
+    if (!arButtonsWorking) {
+        console.log("AR buttons not found - creating fallback controls");
+        
+        // Check if fallback controls already exist
+        if (!document.getElementById('ar-fallback-controls')) {
+            createFallbackControls();
+        }
+    }
+}, false);
+
+// Create fallback controls that will always work
+function createFallbackControls() {
+    try {
+        const actions = [
+            'createNewScreen',
+            'createNewWebScreen',
+            'createNewImageScreen',
+            'deleteScreen'
+        ];
+        
+        // Create container for buttons
+        const container = document.createElement('div');
+        container.id = 'ar-fallback-controls';
+        container.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 20px;
+        `;
+        
+        actions.forEach((action, index) => {
+            const button = document.createElement('button');
+            button.id = `ar-fallback-${action}`;
+            button.className = 'ar-fallback-button';
+            button.dataset.action = action;
+            
+            // Simplified names for buttons
+            const buttonLabels = {
+                'createNewScreen': 'Video',
+                'createNewWebScreen': 'Web',
+                'createNewImageScreen': 'Image',
+                'deleteScreen': 'Delete'
+            };
+            
+            button.textContent = buttonLabels[action] || action.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            
+            button.style.cssText = `
+                background: rgba(30, 144, 255, 0.8);
+                color: white;
+                border: none;
+                border-radius: 20px;
+                padding: 12px 20px;
+                font-family: Arial, sans-serif;
+                font-weight: bold;
+                font-size: 16px;
+                cursor: pointer;
+                margin: 0 5px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            `;
+            
+            // Add click handler
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent double handling
+                console.log(`Fallback button clicked: ${this.dataset.action}`);
+                
+                // Create a simple button object with the action
+                const fakeButton = { userData: { action: this.dataset.action } };
+                
+                // Handle the button action
+                handleButtonAction(fakeButton);
+                
+                // Visual feedback
+                this.style.backgroundColor = 'rgba(255, 165, 0, 0.9)';
+                setTimeout(() => {
+                    this.style.backgroundColor = 'rgba(30, 144, 255, 0.8)';
+                }, 300);
+            });
+            
+            container.appendChild(button);
+        });
+        
+        document.body.appendChild(container);
+        console.log("Created fallback controls");
+    } catch (error) {
+        console.error("Error creating fallback controls:", error);
+    }
+}
+
+// Add event listener for fallback button actions
+document.addEventListener('ar-fallback-action', function(event) {
+    if (event && event.detail && event.detail.action) {
+        const action = event.detail.action;
+        console.log("Received fallback action:", action);
+        
+        // Create a simple button object with the action
+        const fakeButton = { userData: { action: action } };
+        
+        // Handle the button action
+        handleButtonAction(fakeButton);
+    }
+}); 
