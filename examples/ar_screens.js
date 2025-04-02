@@ -21,13 +21,21 @@ export function initCSS3DRenderer() {
     css3dRenderer.domElement.style.zIndex = '1'; // Set appropriate z-index
     css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through by default
     
-    // Add CSS that allows only iframes to receive pointer events
+    // Add CSS that forces proper occlusion and attachment of iframes to screens
     const style = document.createElement('style');
     style.textContent = `
         .css3d-container iframe {
             pointer-events: auto !important; /* Make iframes interactive */
             transform: translateZ(0); /* Force GPU acceleration */
             backface-visibility: hidden; /* Reduce visual glitches */
+            will-change: transform; /* Hint for browser optimization */
+            position: absolute !important; 
+            overflow: hidden;
+        }
+        
+        /* Ensure proper stacking context for occlusion */
+        .css3d-container > div > div {
+            transform-style: flat !important; /* Override preserve-3d to fix occlusion */
         }
     `;
     document.head.appendChild(style);
@@ -189,6 +197,15 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(youtubeScreen.quaternion);
     
+    // Add occlusion data to track z-order
+    css3dObject.userData = {
+        screenId: youtubeScreen.userData.id,
+        zIndex: 100 + screens.length // Ensure proper stacking
+    };
+    
+    // Apply CSS for proper rendering
+    iframeElement.style.overflow = 'hidden';
+    
     // Store reference to CSS3D object
     youtubeScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -210,6 +227,13 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
             // Force the CSS3D object to update its matrix
             youtubeScreen.userData.css3dObject.updateMatrix();
             youtubeScreen.userData.css3dObject.updateMatrixWorld(true);
+            
+            // Update z-index to match depth from camera for proper occlusion
+            if (camera) {
+                const distance = youtubeScreen.position.distanceTo(camera.position);
+                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
+                youtubeScreen.userData.css3dObject.element.style.zIndex = zIndex;
+            }
         }
     };
     
@@ -305,6 +329,15 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(duckduckgoScreen.quaternion);
     
+    // Add occlusion data to track z-order
+    css3dObject.userData = {
+        screenId: duckduckgoScreen.userData.id,
+        zIndex: 100 + screens.length // Ensure proper stacking
+    };
+    
+    // Apply CSS for proper rendering
+    iframeElement.style.overflow = 'hidden';
+    
     // Store reference to CSS3D object
     duckduckgoScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -326,6 +359,13 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
             // Force the CSS3D object to update its matrix
             duckduckgoScreen.userData.css3dObject.updateMatrix();
             duckduckgoScreen.userData.css3dObject.updateMatrixWorld(true);
+            
+            // Update z-index to match depth from camera for proper occlusion
+            if (camera) {
+                const distance = duckduckgoScreen.position.distanceTo(camera.position);
+                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
+                duckduckgoScreen.userData.css3dObject.element.style.zIndex = zIndex;
+            }
         }
     };
     
@@ -422,6 +462,15 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(mapsScreen.quaternion);
     
+    // Add occlusion data to track z-order
+    css3dObject.userData = {
+        screenId: mapsScreen.userData.id,
+        zIndex: 100 + screens.length // Ensure proper stacking
+    };
+    
+    // Apply CSS for proper rendering
+    iframeElement.style.overflow = 'hidden';
+    
     // Store reference to CSS3D object
     mapsScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -443,6 +492,13 @@ export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5))
             // Force the CSS3D object to update its matrix
             mapsScreen.userData.css3dObject.updateMatrix();
             mapsScreen.userData.css3dObject.updateMatrixWorld(true);
+            
+            // Update z-index to match depth from camera for proper occlusion
+            if (camera) {
+                const distance = mapsScreen.position.distanceTo(camera.position);
+                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
+                mapsScreen.userData.css3dObject.element.style.zIndex = zIndex;
+            }
         }
     };
     
@@ -590,6 +646,15 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
     css3dObject.position.copy(position);
     css3dObject.quaternion.copy(electronScreen.quaternion);
     
+    // Add occlusion data to track z-order
+    css3dObject.userData = {
+        screenId: electronScreen.userData.id,
+        zIndex: 100 + screens.length // Ensure proper stacking
+    };
+    
+    // Apply CSS for proper rendering
+    iframeElement.style.overflow = 'hidden';
+    
     // Store reference to CSS3D object
     electronScreen.userData.css3dObject = css3dObject;
     css3dScene.add(css3dObject);
@@ -611,6 +676,13 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
             // Force the CSS3D object to update its matrix
             electronScreen.userData.css3dObject.updateMatrix();
             electronScreen.userData.css3dObject.updateMatrixWorld(true);
+            
+            // Update z-index to match depth from camera for proper occlusion
+            if (camera) {
+                const distance = electronScreen.position.distanceTo(camera.position);
+                const zIndex = Math.round(1000 - distance * 100); // Closer objects have higher z-index
+                electronScreen.userData.css3dObject.element.style.zIndex = zIndex;
+            }
         }
     };
     
@@ -1069,7 +1141,7 @@ function enhancedCreateScreen(position, size, title = 'Screen', content = null) 
     // Define screen dimensions
     const screenWidth = size.x;
     const screenHeight = size.y;
-    const topBarHeight = 0.06; // Thinner top bar
+    const topBarHeight = 0.08; // Increased top bar height (was 0.06)
     
     // Content background - create this first so it's behind the top bar
     const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
@@ -1618,6 +1690,15 @@ export function updateKeyboardPosition(screen) {
 
 // Update visual effects for screens
 export function updateScreenEffects() {
+    // Sort screens by distance from camera for proper z-index handling
+    if (camera) {
+        screens.sort((a, b) => {
+            const distA = a.position.distanceTo(camera.position);
+            const distB = b.position.distanceTo(camera.position);
+            return distB - distA; // Closest first
+        });
+    }
+    
     screens.forEach(screen => {
         if (screen.userData.isSelected) {
             // Find the border mesh
@@ -1643,6 +1724,8 @@ export function updateScreenEffects() {
                 const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.25; // Reduced max intensity
                 glowMesh.material.opacity = glowIntensity;
             }
+            
+            // REMOVED floating effect to keep screens fixed in place
         }
         
         // Update CSS3D object position if the screen has real content
