@@ -200,8 +200,9 @@ function onSelect(event) {
     console.log(`Checking for interactions with ${buttons.length} buttons`);
     
     // Use a larger threshold for better button detection
-    raycaster.params.Line.threshold = 0.1;
-    raycaster.params.Points.threshold = 0.1;
+    raycaster.params.Line.threshold = 0.15; // Increased from 0.1 for better detection
+    raycaster.params.Points.threshold = 0.15; // Increased from 0.1 for better detection
+    raycaster.params.Mesh.threshold = 0.02; // Add mesh threshold for better detection
     
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
@@ -655,6 +656,9 @@ function findAllButtons() {
             if (child.userData && child.userData.type === 'button') {
                 panelButtons.push(child);
                 buttons.push(child);
+                
+                // Increase render order for better interaction
+                child.renderOrder = 1500; // Very high renderOrder ensures it's clickable
             }
         });
         console.log(`Panel ${panelIndex}: Found ${panelButtons.length} buttons`);
@@ -671,7 +675,7 @@ function findAllButtons() {
                 screenButtons.push(child);
                 
                 // Ensure button is always interactive by setting renderOrder
-                child.renderOrder = 10; // Higher renderOrder ensures it renders on top
+                child.renderOrder = 1500; // Higher renderOrder ensures it renders on top
             }
         });
         if (buttonsForThisScreen.length > 0) {
@@ -844,34 +848,42 @@ function onTouchStart(event) {
     // PRIORITY 1: Check for button interactions
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
+    
+    // Increase raycaster params for better touch detection on buttons
+    raycaster.params.Line.threshold = 0.15;
+    raycaster.params.Points.threshold = 0.15;
+    raycaster.params.Mesh.threshold = 0.03; // Add mesh threshold for better touch detection
+    
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
+        console.log("Button intersection found!");
+        
         const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
         if (buttonObj) {
             console.log("Button touched:", buttonObj.userData.action);
             
-            // Visual feedback
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7);
-            
-            // Scale up and back for button press effect
-            const originalScale = buttonObj.scale.clone();
-            buttonObj.scale.multiplyScalar(1.2);
-            
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-                buttonObj.scale.copy(originalScale);
-            }, 200);
-            
-            // Provide haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(40);
+            // Add visual and haptic feedback
+            if (buttonObj.material) {
+                const originalColor = buttonObj.material.color.clone();
+                buttonObj.material.color.set(0x4FC3F7); // Highlight color
+                // Pulse button scale for visual feedback
+                const originalScale = buttonObj.scale.clone();
+                buttonObj.scale.multiplyScalar(1.2); // Scale up when touched
+                
+                setTimeout(() => {
+                    buttonObj.material.color.copy(originalColor);
+                    buttonObj.scale.copy(originalScale);
+                }, 200);
             }
             
-            // Handle the button action
+            // Try to trigger vibration if available
+            if (navigator.vibrate) {
+                navigator.vibrate(50); // Short vibration for feedback
+            }
+            
             handleButtonAction(buttonObj);
-            return;
+            return; // Stop processing touch event
         }
     }
     

@@ -159,6 +159,14 @@ export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
     
+    // Add userData with necessary properties
+    controlPanel.userData = {
+        type: 'controlPanel',
+        isDragging: false,
+        manuallyPositioned: false,
+        smoothPositioning: false // Initialize smoothPositioning property
+    };
+    
     // Modern, sleek panel design with solid appearance
     const panelSize = { width: 0.28, height: 0.13 };
     const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
@@ -323,13 +331,14 @@ export function createControlPanel() {
     controlPanel.add(topDragHandle);
     
     // Define button parameters - preserve original functionality
-    const buttonSize = 0.06; // Slightly larger buttons
+    const buttonSize = 0.055; // Increased from default size for better touch targets
+    const buttonRadius = buttonSize / 2;
     const buttonSpacing = 0.14; // Slightly closer together
     
     // Create buttons with modern design
     const buttonPositions = [
-        { x: -buttonSpacing/2, y: 0.01 },  // Left - Add Screen
-        { x: buttonSpacing/2, y: 0.01 }    // Right - Delete Screen
+        new THREE.Vector3(-panelSize.width/4, 0, 0.001),
+        new THREE.Vector3(panelSize.width/4, 0, 0.001)
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];
@@ -376,7 +385,7 @@ export function createControlPanel() {
         });
         
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.set(position.x, position.y, 0.003);
+        button.position.copy(position);
         button.renderOrder = 1002;
         button.userData = {
             type: 'button',
@@ -610,7 +619,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const selectorGroup = new THREE.Group();
     
     // Create a background panel for the selector
-    const panelWidth = 0.32; // Increase width to ensure all buttons fit
+    const panelWidth = 0.40; // Increase width to ensure all buttons fit
     const panelHeight = 0.15; // Taller panel for larger buttons
     const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
     
@@ -730,7 +739,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
     // BIGGER button size for better touch targets
-    const smallButtonSize = buttonSize * 1.2; // Increase from 1.1 to 1.2 (larger)
+    const smallButtonSize = buttonSize * 1.3; // Increase from 1.2 to 1.3 (larger)
     const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
     const startX = -spacing * 1.5; // Starting position for first button
     const buttonY = 0; // Center buttons vertically
@@ -1124,23 +1133,40 @@ export function setupControlPanel() {
     const cameraDirection = new THREE.Vector3(0, 0, -1);
     cameraDirection.applyQuaternion(camera.quaternion);
     
-    const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
+    const targetPosition = new THREE.Vector3();
+    targetPosition.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
     
     // Position BELOW the default screen position
-    position.y -= 0.4; // Position it much lower to appear below the screen
+    targetPosition.y -= 0.4; // Position it much lower to appear below the screen
     
-    // Update panel position and rotation
-    controlPanel.position.copy(position);
-    controlPanel.lookAt(camera.position);
+    // Add smoothing with lerp - use 0.08 factor for gentler movement (matching screen movement)
+    if (!controlPanel.userData.smoothPositioning) {
+        // For first time positioning, set directly
+        controlPanel.position.copy(targetPosition);
+        // Initialize the smoothPositioning flag
+        controlPanel.userData.smoothPositioning = true;
+    } else {
+        // For subsequent positioning, use lerp for smooth transition
+        controlPanel.position.lerp(targetPosition, 0.08); // Smaller factor = slower, smoother movement
+    }
+    
+    // Update panel rotation to face user, but do it smoothly
+    // Get the direction to camera
+    const lookDirection = new THREE.Vector3().subVectors(camera.position, controlPanel.position);
+    
+    // Create a temporary quaternion for the target rotation
+    const targetQuaternion = new THREE.Quaternion();
+    const lookMatrix = new THREE.Matrix4().lookAt(controlPanel.position, camera.position, new THREE.Vector3(0, 1, 0));
+    targetQuaternion.setFromRotationMatrix(lookMatrix);
+    
+    // Apply smooth rotation
+    controlPanel.quaternion.slerp(targetQuaternion, 0.08); // Match position lerp factor
     
     // Keep panel facing the user but upright
     const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
     euler.x = 0; // Keep panel upright (no tilt)
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
-    
-    console.log("Control panel positioned below screen");
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive

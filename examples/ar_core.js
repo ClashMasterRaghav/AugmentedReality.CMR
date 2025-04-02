@@ -256,8 +256,8 @@ export function render() {
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
     // Calculate movement thresholds
-    const positionThreshold = 0.5; // Units of movement
-    const rotationThreshold = 0.3; // Radians (about 17 degrees)
+    const positionThreshold = 0.7; // Increased from 0.5 for less frequent updates
+    const rotationThreshold = 0.4; // Increased from 0.3 for less frequent updates
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
