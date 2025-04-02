@@ -9,15 +9,6 @@ export let screens = [];
 
 // Create a new browser screen
 export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5)) {
-    try {
-        // Get a valid scene reference
-        const sceneToUse = window.arScene || scene;
-        
-        if (!sceneToUse) {
-            console.error("Cannot create browser screen: no scene reference available");
-            return null;
-        }
-        
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
@@ -28,11 +19,6 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     
     // Create the screen container using the enhanced implementation
     const browserWindow = enhancedCreateScreen(position, size, title, videoTexture);
-        
-        if (!browserWindow) {
-            console.error("Failed to create enhanced screen");
-            return null;
-        }
     
     // Add basic identification data
     browserWindow.userData = { 
@@ -69,7 +55,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     }
     
     // Add to scene and screens array
-        sceneToUse.add(browserWindow);
+    scene.add(browserWindow);
     screens.push(browserWindow);
     
     // Add entrance animation
@@ -81,10 +67,6 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
     selectScreen(browserWindow);
     
     return browserWindow;
-    } catch (error) {
-        console.error("Error creating browser screen:", error);
-        return null;
-    }
 }
 
 // Create a new YouTube screen
@@ -489,7 +471,7 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const x = Math.random() * width;
                 const y = 50 + Math.random() * (height - 50);
                 const size = Math.random() * 2;
-        ctx.beginPath();
+                ctx.beginPath();
                 ctx.arc(x, y, size, 0, Math.PI * 2);
                 ctx.fill();
             }
@@ -502,20 +484,20 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
                 const y2 = 50 + Math.random() * (height - 50);
-        ctx.beginPath();
+                ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
-        ctx.stroke();
+                ctx.stroke();
             }
         } else {
             // Regular map view - light colors
             ctx.fillStyle = '#e8eaed';
             ctx.fillRect(0, 50, width, height - 50);
-        
+            
             // Draw some "roads"
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 6;
-        for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 10; i++) {
                 const x1 = Math.random() * width;
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
@@ -534,7 +516,7 @@ function createIframeTexture(url, width = 1024, height = 768) {
                 const y1 = 50 + Math.random() * (height - 50);
                 const x2 = Math.random() * width;
                 const y2 = 50 + Math.random() * (height - 50);
-        ctx.beginPath();
+                ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
@@ -629,7 +611,7 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
     sidebarIcons.forEach((icon, i) => {
         ctx.fillStyle = i === 0 ? '#ffffff' : '#666666';
         ctx.font = '18px Arial';
-    ctx.textAlign = 'center';
+        ctx.textAlign = 'center';
         ctx.fillText(icon, 25, 60 + i * 40);
     });
     
@@ -655,10 +637,10 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
         // Control buttons
         ctx.fillStyle = '#333333';
         ctx.fillRect(60, playerHeight + 90, playerWidth, 40);
-    
-    // Play button
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
+        
+        // Play button
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
         ctx.moveTo(80, playerHeight + 110);
         ctx.lineTo(100, playerHeight + 110);
         ctx.stroke();
@@ -671,8 +653,8 @@ function createElectronPlaceholderTexture(width = 1024, height = 768, videoId = 
         ctx.lineTo(150, playerHeight + 120);
         ctx.lineTo(140, playerHeight + 115);
         ctx.lineTo(130, playerHeight + 115);
-    ctx.closePath();
-    ctx.fill();
+        ctx.closePath();
+        ctx.fill();
     } else {
         // Show Electron logo and welcome message when no video
         // Electron logo
@@ -1206,13 +1188,8 @@ function createFallbackTexture(screenNumber) {
 
 // Select a screen and update UI accordingly with enhanced visual feedback
 export function selectScreen(screen) {
-    try {
-        // IMPORTANT: Don't try to use keyboard for now - it's causing errors
-        const skipKeyboardUpdate = true;
-        
     // Deselect previously selected screen
     if (selectedScreen) {
-            try {
         // Change border color back to normal
         const borderMesh = selectedScreen.children.find(child => 
             child.geometry && child.geometry.type === 'PlaneGeometry' && 
@@ -1235,9 +1212,6 @@ export function selectScreen(screen) {
         selectedScreen.scale.multiplyScalar(0.97);
         // Animate back to original scale
         animateScreenScale(selectedScreen, 1.0, 150);
-            } catch (error) {
-                console.warn("Error while deselecting previous screen:", error);
-            }
     }
     
     // If screen is null, just clear selection
@@ -1255,7 +1229,6 @@ export function selectScreen(screen) {
     // Log selection for debugging
     console.log("Selected screen with ID:", screen.userData.id, "UUID:", screen.uuid.substring(0, 8) + "...");
     
-        try {
     // Highlight border for selected screen
     const borderMesh = screen.children.find(child => 
         child.geometry && child.geometry.type === 'PlaneGeometry' && 
@@ -1276,20 +1249,10 @@ export function selectScreen(screen) {
     screen.scale.multiplyScalar(1.03);
     // Animate back to original scale with slight bounce
     animateScreenScale(screen, 1.0, 300, true);
-        } catch (error) {
-            console.warn("Error while applying visual effects to selected screen:", error);
-        }
-        
-        // Position keyboard under selected screen if needed - skip if we're having issues
-        if (!skipKeyboardUpdate && virtualKeyboard) {
-            try {
-                updateKeyboardPosition(screen, virtualKeyboard);
-            } catch (error) {
-                console.warn("Error updating keyboard position:", error);
-            }
-        }
-    } catch (error) {
-        console.error("Error in selectScreen:", error);
+    
+    // Position keyboard under selected screen if needed
+    if (virtualKeyboard) {
+        updateKeyboardPosition(screen);
     }
 }
 
@@ -1334,101 +1297,26 @@ function animateScreenScale(screen, targetScale, duration, bounce = false) {
 }
 
 // Update keyboard position relative to the selected screen
-export function updateKeyboardPosition(screen, virtualKeyboard) {
-    // Safely check if screen and keyboard exist
-    if (!screen || !virtualKeyboard) {
-        console.warn('Cannot update keyboard position: screen or keyboard is undefined');
-        return;
-    }
-
-    try {
-        // Validate that these objects have the required properties to avoid errors
-        if (!screen.position || !screen.scale) {
-            console.warn('Screen object is missing required properties (position or scale)');
-            return;
-        }
-        
-        if (!virtualKeyboard.position || typeof virtualKeyboard.lookAt !== 'function') {
-            console.warn('VirtualKeyboard object is missing required properties');
-            return;
-        }
-        
-        // Position the keyboard below the screen
-        const screenPosition = screen.position.clone();
+export function updateKeyboardPosition(screen) {
+    if (!virtualKeyboard) return;
+    
+    const screenPos = screen.position.clone();
     const screenScale = screen.scale.clone();
     
-        // Calculate position below the screen
-        screenPosition.y -= 0.2 * screenScale.y;
-        
-        // Set keyboard position
-        virtualKeyboard.position.copy(screenPosition);
-        
-        // Try to make keyboard face the user using camera if available
-        const cameraRef = getActiveCamera();
-        
-        if (cameraRef && cameraRef.position) {
-            // Use camera to orient keyboard
-            try {
-                // Only try to use lookAt if we have a valid camera position
-                virtualKeyboard.lookAt(cameraRef.position);
-            
-                // Keep keyboard upright by zeroing rotation on x and z
-                virtualKeyboard.rotation.x = 0;
-                virtualKeyboard.rotation.z = 0;
-            } catch (err) {
-                console.warn('Error orienting keyboard with camera:', err);
-                // Fallback to default orientation
-                virtualKeyboard.rotation.set(0, 0, 0);
-            }
-        } else {
-            // Fallback orientation if no camera
-            console.warn('No camera available for keyboard orientation, using default');
-            virtualKeyboard.rotation.set(0, 0, 0);
-        }
-    } catch (error) {
-        console.error('Error updating keyboard position:', error);
-    }
-}
-
-// Helper function to get active camera from scene
-function getActiveCamera() {
-    // Try using the imported camera reference first
-    if (typeof camera !== 'undefined' && camera) {
-        return camera;
-    }
+    // Position keyboard under selected screen, accounting for screen scale
+    virtualKeyboard.position.set(
+        screenPos.x, 
+        screenPos.y - (0.3 + 0.15 * screenScale.y), // Adjust for screen height
+        screenPos.z + 0.02
+    );
     
-    // Try the global window.arCamera if available
-    if (typeof window !== 'undefined' && window.arCamera) {
-        return window.arCamera;
-    }
+    // Scale keyboard proportionally to screen
+    const keyboardScale = Math.max(0.8, Math.min(1.2, (screenScale.x + screenScale.y) / 2));
+    virtualKeyboard.scale.set(keyboardScale, keyboardScale, 1);
     
-    // First try scene.camera if it exists
-    if (scene && scene.camera) {
-        return scene.camera;
-    }
-    
-    // Try to find PerspectiveCamera in scene (safely)
-    if (scene && scene.children && Array.isArray(scene.children)) {
-        try {
-            const foundCamera = scene.children.find(
-                child => child && typeof child === 'object' && 
-                child.isCamera === true
-            );
-            if (foundCamera) return foundCamera;
-        } catch (err) {
-            console.warn("Error finding camera in scene:", err);
-        }
-    }
-    
-    // For debugging
-    console.warn("No camera found. Available references:", {
-        importedCamera: typeof camera !== 'undefined' ? "defined" : "undefined",
-        windowCamera: typeof window !== 'undefined' && window.arCamera ? "defined" : "undefined",
-        sceneCamera: scene && scene.camera ? "defined" : "undefined"
-    });
-    
-    // Last resort - return null
-    return null;
+    // Make keyboard face the user
+    virtualKeyboard.lookAt(camera.position);
+    virtualKeyboard.rotation.x = -Math.PI / 8;
 }
 
 // Update visual effects for screens

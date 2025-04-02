@@ -1,4 +1,4 @@
-// UI elements for AR application
+// UI elements and controls for AR experience
 import * as THREE from 'three';
 import { scene, camera, renderer, controller } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
@@ -29,28 +29,9 @@ export function createNotification(message, type = 'info') {
 export const showNotification = createNotification;
 
 // Initialize UI elements
-export function initUI(sceneRef) {
-    try {
-        // Use a scene reference passed directly, from window, or from the module
-        const sceneToUse = sceneRef || window.arScene || scene;
-        
-        if (!sceneToUse) {
-            console.error("Cannot initialize UI: no scene reference available");
-            return false;
-        }
-        
-        // Set module-level scene for components that need it
-        window.arScene = sceneToUse;
-        
-        // Initialize UI components with explicit scene reference
-        createControlPanel(sceneToUse);
-        createVirtualKeyboard(sceneToUse);
-        
-        return true;
-    } catch (error) {
-        console.error("Error initializing UI:", error);
-        return false;
-    }
+export function initUI() {
+    createControlPanel();
+    createVirtualKeyboard();
 }
 
 // Create a notification in the DOM
@@ -92,14 +73,6 @@ function createDOMNotification(message, type = 'info') {
 // Create a 3D notification in space
 function create3DNotification(message, type = 'info') {
     if (!camera) return;
-    
-    // Get a valid scene reference
-    const sceneToUse = window.arScene || scene;
-    
-    if (!sceneToUse) {
-        console.error("Cannot create 3D notification: no scene reference available");
-        return;
-    }
     
     // Create canvas for the notification
     const canvas = document.createElement('canvas');
@@ -170,11 +143,11 @@ function create3DNotification(message, type = 'info') {
     notificationMesh.quaternion.copy(camera.quaternion);
     
     // Add to scene
-    sceneToUse.add(notificationMesh);
+    scene.add(notificationMesh);
     
     // Remove after timeout
     setTimeout(() => {
-        sceneToUse.remove(notificationMesh);
+        scene.remove(notificationMesh);
         material.dispose();
         geometry.dispose();
         texture.dispose();
@@ -182,48 +155,17 @@ function create3DNotification(message, type = 'info') {
 }
 
 // Create a minimalist control panel with modern design
-export function createControlPanel(options = {}) {
-    try {
-        console.log("Creating control panel with options:", options);
-        const {
-            width = 0.5,
-            height = 0.3,
-            position = new THREE.Vector3(0, 0, -1),
-            rotation = new THREE.Euler(-0.2, 0, 0),
-            title = 'Control Panel',
-            transparent = false,
-            scene: customScene = null  // Add explicit scene parameter
-        } = options;
-        
-        // Determine which scene to use
-        let sceneToUse = customScene;
-        
-        // Fallback options for scene
-        if (!sceneToUse) {
-            sceneToUse = window.arScene || window.scene;
-            console.log("Using fallback scene reference");
-        }
-        
-        if (!sceneToUse) {
-            console.warn("No scene available for control panel - will create without adding to scene");
-        } else {
-            // Validate that sceneToUse has an add method
-            if (typeof sceneToUse.add !== 'function') {
-                console.error("Invalid scene provided - missing add method:", sceneToUse);
-                sceneToUse = null;
-            }
-        }
-        
-        // Create panel group
-        const controlPanel = new THREE.Group();
-        
-        // Add userData with necessary properties
-        controlPanel.userData = {
-            type: 'controlPanel',
-            isDragging: false,
-            manuallyPositioned: false,
-            smoothPositioning: false // Initialize smoothPositioning property
-        };
+export function createControlPanel() {
+    // Create panel group
+    controlPanel = new THREE.Group();
+    
+    // Add userData with necessary properties
+    controlPanel.userData = {
+        type: 'controlPanel',
+        isDragging: false,
+        manuallyPositioned: false,
+        smoothPositioning: false // Initialize smoothPositioning property
+    };
     
     // Modern, sleek panel design with solid appearance
     const panelSize = { width: 0.28, height: 0.13 };
@@ -389,14 +331,14 @@ export function createControlPanel(options = {}) {
     controlPanel.add(topDragHandle);
     
     // Define button parameters - preserve original functionality
-        const buttonSize = 0.055; // Increased from default size for better touch targets
-        const buttonRadius = buttonSize / 2;
+    const buttonSize = 0.055; // Increased from default size for better touch targets
+    const buttonRadius = buttonSize / 2;
     const buttonSpacing = 0.14; // Slightly closer together
     
     // Create buttons with modern design
     const buttonPositions = [
-            new THREE.Vector3(-panelSize.width/4, 0, 0.001),
-            new THREE.Vector3(panelSize.width/4, 0, 0.001)
+        new THREE.Vector3(-panelSize.width/4, 0, 0.001),
+        new THREE.Vector3(panelSize.width/4, 0, 0.001)
     ];
     
     const buttonActions = ['newScreen', 'deleteScreen'];
@@ -408,23 +350,23 @@ export function createControlPanel(options = {}) {
         buttonCanvas.width = 128;
         buttonCanvas.height = 128;
         const buttonCtx = buttonCanvas.getContext('2d');
-            
-            // First, create a solid background fill to ensure the entire button is visible and clickable
-            buttonCtx.fillStyle = "#333333"; // Dark grey background
-            buttonCtx.beginPath();
-            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-            buttonCtx.fill();
+        
+        // First, create a solid background fill to ensure the entire button is visible and clickable
+        buttonCtx.fillStyle = "#333333"; // Dark grey background
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        buttonCtx.fill();
         
         // Create gradient fill
-            const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
         const baseColor = new THREE.Color(buttonColors[index]);
         const r = Math.floor(baseColor.r * 255);
         const g = Math.floor(baseColor.g * 255);
         const b = Math.floor(baseColor.b * 255);
         
         buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-            buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
-            buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
+        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
         
         buttonCtx.fillStyle = buttonGradient;
         buttonCtx.beginPath();
@@ -432,10 +374,10 @@ export function createControlPanel(options = {}) {
         buttonCtx.fill();
         
         // Add subtle inner shadow
-            buttonCtx.shadowBlur = 10;
+        buttonCtx.shadowBlur = 10;
         buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            buttonCtx.shadowOffsetX = 2;
-            buttonCtx.shadowOffsetY = 2;
+        buttonCtx.shadowOffsetX = 2;
+        buttonCtx.shadowOffsetY = 2;
         buttonCtx.beginPath();
         buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
         buttonCtx.stroke();
@@ -445,45 +387,64 @@ export function createControlPanel(options = {}) {
         const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             map: buttonTexture,
-                transparent: true,
+            transparent: true,
             side: THREE.DoubleSide
         });
         
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-            button.position.copy(position);
+        button.position.copy(position);
         button.renderOrder = 1002;
         button.userData = {
             type: 'button',
             action: buttonActions[index],
-                isInteractive: true
-            };
-            
-            // Add button to panel
+            hoverColor: index === 0 ? 0x7EEEC9 : 0xFF9999, // Lighter versions
+            activeColor: buttonColors[index],
+            inactiveColor: buttonColors[index],
+            originalColor: buttonColors[index],
+            isToggle: false,
+            isActive: true
+        };
+        
         controlPanel.add(button);
         
-            // Create a modern icon for the button
+        // Add icon with same functionality as before
         const iconTexture = createButtonIcon(index);
-            const iconGeometry = new THREE.CircleGeometry(buttonSize * 0.3, 32); // Icon slightly smaller than button
+        const iconSize = buttonSize * 0.6;
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
             map: iconTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
-            
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.001;
+        iconMesh.position.z = 0.004;
         iconMesh.renderOrder = 1003;
         button.add(iconMesh);
         
-            // Create a label beneath the button
+        // Add button shadow for depth
+        const shadowGeometry = new THREE.CircleGeometry(buttonSize / 2 * 1.1, 32);
+        const shadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+        shadowMesh.position.z = -0.001;
+        shadowMesh.renderOrder = 1001;
+        button.add(shadowMesh);
+        
+        // Add label below each button - modern font, more visible
         const labelCanvas = document.createElement('canvas');
         labelCanvas.width = 128;
-            labelCanvas.height = 32;
+        labelCanvas.height = 48; // Taller for better quality
         const labelCtx = labelCanvas.getContext('2d');
         
-            // Add subtle shadow to text for better readability
-            labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            labelCtx.shadowBlur = 4;
+        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        
+        // Add subtle shadow to text
+        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        labelCtx.shadowBlur = 3;
         labelCtx.shadowOffsetX = 1;
         labelCtx.shadowOffsetY = 1;
         
@@ -511,30 +472,12 @@ export function createControlPanel(options = {}) {
     // Add positioning and interaction
     controlPanel.position.set(0, -0.3, -0.5);
     controlPanel.rotation.set(-0.2, 0, 0);
-        
-        // Add to scene safely
-        if (sceneToUse && typeof sceneToUse.add === 'function') {
-            console.log("Adding control panel to scene");
-            try {
-                sceneToUse.add(controlPanel);
-            } catch (err) {
-                console.error("Failed to add control panel to scene:", err);
-            }
-        } else {
-            console.warn("Cannot add control panel to scene: scene is undefined or doesn't have add method");
-        }
+    scene.add(controlPanel);
     
     // Add screen type selector below the main panel
-        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, sceneToUse);
-        
-        // Set the mesh property for compatibility with old code expecting controlPanel.mesh
-        controlPanel.mesh = panelMesh;
+    createScreenTypeSelector(controlPanel, 0, -0.08, 0.04);
     
     return controlPanel;
-    } catch (error) {
-        console.error("Error creating control panel:", error);
-        return null;
-    }
 }
 
 // Create modern, clean button icons
@@ -678,22 +621,13 @@ function createButtonIcon(buttonIndex) {
 }
 
 // Create a screen type selector with buttons for different content types
-function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04, sceneRef) {
-    try {
-        // Get scene reference
-        const scene = sceneRef || window.arScene || parent.parent;
-        
-        if (!scene) {
-            console.error("Cannot create screen type selector: scene is undefined");
-            return null;
-        }
-        
+function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
     // Create a panel for content type selection
     const selectorGroup = new THREE.Group();
     
     // Create a background panel for the selector
-        const panelWidth = 0.40; // Increase width to ensure all buttons fit
-        const panelHeight = 0.15; // Taller panel for larger buttons
+    const panelWidth = 0.40; // Increase width to ensure all buttons fit
+    const panelHeight = 0.15; // Taller panel for larger buttons
     const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
     
     // Create a texture for the selector panel
@@ -812,10 +746,10 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
     // BIGGER button size for better touch targets
-        const smallButtonSize = buttonSize * 1.3; // Increase from 1.2 to 1.3 (larger)
-        const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
+    const smallButtonSize = buttonSize * 1.3; // Increase from 1.2 to 1.3 (larger)
+    const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
     const startX = -spacing * 1.5; // Starting position for first button
-        const buttonY = 0; // Center buttons vertically
+    const buttonY = 0; // Center buttons vertically
     
     buttonTypes.forEach((type, index) => {
         // Create button canvas for gradient effect
@@ -823,23 +757,23 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         buttonCanvas.width = 128;
         buttonCanvas.height = 128;
         const buttonCtx = buttonCanvas.getContext('2d');
-            
-            // First, create a solid background fill to ensure the entire button is visible and clickable
-            buttonCtx.fillStyle = "#333333"; // Dark grey background
-            buttonCtx.beginPath();
-            buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
-            buttonCtx.fill();
+        
+        // First, create a solid background fill to ensure the entire button is visible and clickable
+        buttonCtx.fillStyle = "#333333"; // Dark grey background
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        buttonCtx.fill();
         
         // Create gradient fill
-            const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
         const baseColor = new THREE.Color(buttonColors[index]);
         const r = Math.floor(baseColor.r * 255);
         const g = Math.floor(baseColor.g * 255);
         const b = Math.floor(baseColor.b * 255);
         
         buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-            buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
-            buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
+        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
         
         buttonCtx.fillStyle = buttonGradient;
         buttonCtx.beginPath();
@@ -858,12 +792,12 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         
         const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
         
-            // Create button with texture - make sure it's a full circle, not just an outline
+        // Create button with texture - make sure it's a full circle, not just an outline
         const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             map: buttonTexture,
-                transparent: true, // Keep transparent for proper texture display
-                opacity: 1.0, // Full opacity
+            transparent: true, // Keep transparent for proper texture display
+            opacity: 1.0, // Full opacity
             side: THREE.DoubleSide
         });
         
@@ -894,11 +828,11 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
         shadowMesh.position.z = -0.001;
         shadowMesh.renderOrder = 1004;
-            // Link shadow mesh to button for interaction
-            shadowMesh.userData = {
-                type: 'buttonPart',
-                parentButton: button
-            };
+        // Link shadow mesh to button for interaction
+        shadowMesh.userData = {
+            type: 'buttonPart',
+            parentButton: button
+        };
         button.add(shadowMesh);
         
         // Add icon to button - LARGER
@@ -914,11 +848,11 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
         iconMesh.position.z = 0.004;
         iconMesh.renderOrder = 1006;
-            // Link icon mesh to button for interaction
-            iconMesh.userData = {
-                type: 'buttonPart',
-                parentButton: button
-            };
+        // Link icon mesh to button for interaction
+        iconMesh.userData = {
+            type: 'buttonPart',
+            parentButton: button
+        };
         button.add(iconMesh);
         
         // Add label for each button with text shadow for better readability
@@ -969,147 +903,147 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     });
     
     // Position the selector panel relative to the parent
-        selectorGroup.position.set(offsetX, offsetY - 0.08, 0.01); // Reduce gap between panels
+    selectorGroup.position.set(offsetX, offsetY - 0.08, 0.01); // Reduce gap between panels
     parent.add(selectorGroup);
     
     return selectorGroup;
-    } catch (error) {
-        console.error("Error creating screen type selector:", error);
-        return null;
-    }
 }
 
-// Create a virtual keyboard for text input
-export function createVirtualKeyboard(sceneRef) {
-    try {
-        console.log("Creating virtual keyboard with scene:", sceneRef);
-        // Get a valid scene reference
-        const sceneToUse = sceneRef || window.arScene || scene;
-        
-        if (!sceneToUse) {
-            console.error("Cannot create virtual keyboard: no scene reference available");
-            return null;
-        }
-        
-        // Create the keyboard group
+// Create a virtual keyboard
+export function createVirtualKeyboard() {
     virtualKeyboard = new THREE.Group();
-        virtualKeyboard.visible = false; // Initially hidden
-        
-        // Add userData
-        virtualKeyboard.userData = {
-            type: 'virtualKeyboard',
-            isActive: false
-        };
-        
-        // Create the keyboard base
-        const keyboardWidth = 0.6;
-        const keyboardHeight = 0.25;
-        
-        // Create keyboard background directly here instead of using a separate function
-        const keyboardGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
-        
-        // Create keyboard texture
-        const keyboardCanvas = document.createElement('canvas');
-        keyboardCanvas.width = 1024;
-        keyboardCanvas.height = 512;
-        const ctx = keyboardCanvas.getContext('2d');
-        
-        // Draw keyboard background
-        ctx.fillStyle = 'rgba(30, 35, 60, 0.85)';
-        ctx.fillRect(0, 0, keyboardCanvas.width, keyboardCanvas.height);
-        
-        // Add border
-        ctx.strokeStyle = 'rgba(120, 140, 220, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(2, 2, keyboardCanvas.width - 4, keyboardCanvas.height - 4);
-        
-        const keyboardTexture = new THREE.CanvasTexture(keyboardCanvas);
+    
+    // Keyboard background
+    const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
     const keyboardMaterial = new THREE.MeshBasicMaterial({
-            map: keyboardTexture,
+        color: 0x333333,
         transparent: true,
-            opacity: 0.9
+        opacity: 0.8,
+        side: THREE.DoubleSide
     });
-        
     const keyboardMesh = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
     virtualKeyboard.add(keyboardMesh);
     
+    // Add glow border
+    const borderGeometry = new THREE.PlaneGeometry(0.82, 0.32);
+    const borderMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4FC3F7,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide
+    });
+    const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderMesh.position.z = -0.001;
+    virtualKeyboard.add(borderMesh);
+    
     // Create keys
-        const keys = [
-            '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-            'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P',
-            'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '.',
-            'Z', 'X', 'C', 'V', 'B', 'N', 'M', '_', '←', '✓'
-        ];
+    const keyRows = [
+        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '.'],
+        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '?', '!']
+    ];
+    
+    const keySize = 0.07;
+    const keyMargin = 0.005;
+    const rowOffsetY = 0.12;
+    
+    keyRows.forEach((row, rowIndex) => {
+        const offsetY = rowOffsetY - (rowIndex * (keySize + keyMargin));
         
-        const rows = 4;
-        const cols = 10;
-        const keySize = 0.055;
-        const padding = 0.005;
-        const startX = -(keyboardWidth / 2) + keySize / 2 + padding;
-        const startY = (keyboardHeight / 2) - keySize / 2 - padding;
-        
-        for (let i = 0; i < keys.length; i++) {
-            const row = Math.floor(i / cols);
-            const col = i % cols;
+        row.forEach((key, keyIndex) => {
+            // Calculate key position
+            const offsetX = -0.36 + (keyIndex * (keySize + keyMargin));
             
-            const x = startX + col * (keySize + padding);
-            const y = startY - row * (keySize + padding);
-            
-            // Create key
+            // Create key background
             const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
-            
-            // Create texture for key
-            const keyCanvas = document.createElement('canvas');
-            keyCanvas.width = 128;
-            keyCanvas.height = 128;
-            const keyCtx = keyCanvas.getContext('2d');
-            
-            // Key background
-            keyCtx.fillStyle = keys[i] === '←' || keys[i] === '✓' ? '#4285f4' : '#ffffff';
-            keyCtx.fillRect(0, 0, keyCanvas.width, keyCanvas.height);
-            
-            // Key border
-            keyCtx.strokeStyle = '#bbbbbb';
-            keyCtx.lineWidth = 2;
-            keyCtx.strokeRect(2, 2, keyCanvas.width - 4, keyCanvas.height - 4);
-            
-            // Key text
-            keyCtx.fillStyle = keys[i] === '←' || keys[i] === '✓' ? '#ffffff' : '#000000';
-            keyCtx.font = 'bold 48px Arial';
-            keyCtx.textAlign = 'center';
-            keyCtx.textBaseline = 'middle';
-            keyCtx.fillText(keys[i], keyCanvas.width / 2, keyCanvas.height / 2);
-            
-            const keyTexture = new THREE.CanvasTexture(keyCanvas);
-        const keyMaterial = new THREE.MeshBasicMaterial({
-                map: keyTexture,
-                transparent: false
+            const keyMaterial = new THREE.MeshBasicMaterial({
+                color: 0x555555,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide
             });
+            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
+            keyMesh.position.set(offsetX, offsetY, 0.001);
+            keyMesh.userData = {
+                type: 'key',
+                value: key
+            };
+            virtualKeyboard.add(keyMesh);
             
+            // Create key label
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 64;
+            labelCanvas.height = 64;
+            const labelCtx = labelCanvas.getContext('2d');
+            labelCtx.fillStyle = '#ffffff';
+            labelCtx.font = 'bold 48px Arial';
+            labelCtx.textAlign = 'center';
+            labelCtx.textBaseline = 'middle';
+            labelCtx.fillText(key, 32, 32);
+            
+            const labelTexture = new THREE.CanvasTexture(labelCanvas);
+            const labelGeometry = new THREE.PlaneGeometry(keySize * 0.8, keySize * 0.8);
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: labelTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+            labelMesh.position.z = 0.001;
+            keyMesh.add(labelMesh);
+        });
+    });
+    
+    // Add special keys
+    const specialKeys = [
+        { label: '⌫', value: 'Backspace', width: 0.15, x: 0.3, y: -0.12 },
+        { label: '↵', value: 'Enter', width: 0.15, x: 0.3, y: 0 },
+        { label: '␣', value: 'Space', width: 0.4, x: 0, y: -0.24 }
+    ];
+    
+    specialKeys.forEach(specialKey => {
+        const keyGeometry = new THREE.PlaneGeometry(specialKey.width, keySize);
+        const keyMaterial = new THREE.MeshBasicMaterial({
+            color: 0x2196F3,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide
+        });
         const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-            keyMesh.position.set(x, y, 0.001);
-            
-            // Add user data for interaction
+        keyMesh.position.set(specialKey.x, specialKey.y, 0.001);
         keyMesh.userData = {
-                type: 'keyboardKey',
-                key: keys[i],
-                isInteractive: true
+            type: 'key',
+            value: specialKey.value
         };
-            
         virtualKeyboard.add(keyMesh);
-        }
         
-        // Position the keyboard in front of camera
-        virtualKeyboard.position.set(0, -0.1, -0.5);
+        // Create key label
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 64;
+        labelCanvas.height = 64;
+        const labelCtx = labelCanvas.getContext('2d');
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = 'bold 48px Arial';
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        labelCtx.fillText(specialKey.label, 32, 32);
         
-        // Add to scene
-        sceneToUse.add(virtualKeyboard);
-        
-        return virtualKeyboard;
-    } catch (error) {
-        console.error("Error creating virtual keyboard:", error);
-        return null;
-    }
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(specialKey.width * 0.8, keySize * 0.8);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.z = 0.001;
+        keyMesh.add(labelMesh);
+    });
+    
+    // Hide keyboard initially
+    virtualKeyboard.visible = false;
+    scene.add(virtualKeyboard);
 }
 
 // Toggle mode buttons (move, rotate, resize)
@@ -1279,184 +1213,5 @@ export function floatAnimation() {
     if (glowMesh) {
         // Use a much more subtle glow
         glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
-    }
-}
-
-// Create a modern interactive button with customizable options
-export function createButton(options = {}) {
-    try {
-        console.log("Creating button with options:", options);
-        
-        // Extract options with defaults
-        const {
-            parent = null,
-            position = new THREE.Vector3(0, 0, 0),
-            width = 0.1,
-            height = 0.05,
-            color = 0x4285f4,
-            label = 'Button',
-            icon = null,
-            onClick = null
-        } = options;
-        
-        // Check if parent is provided
-        if (!parent) {
-            console.error("Parent object is required for createButton");
-            return null;
-        }
-        
-        // Log parent details for debugging
-        console.log("Button parent details:", {
-            type: parent.type || typeof parent,
-            isObject3D: parent instanceof THREE.Object3D,
-            hasAdd: typeof parent.add === 'function',
-            hasChildren: parent.children ? parent.children.length : 'no children property'
-        });
-        
-        // Create button group
-        const button = new THREE.Group();
-        button.position.copy(position);
-        
-        // Create button background
-        const buttonGeometry = new THREE.PlaneGeometry(width, height);
-        
-        // Create a canvas texture for the button
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw button background with rounded corners
-        const cornerRadius = 20;
-        ctx.beginPath();
-        ctx.moveTo(cornerRadius, 0);
-        ctx.lineTo(canvas.width - cornerRadius, 0);
-        ctx.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
-        ctx.lineTo(canvas.width, canvas.height - cornerRadius);
-        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
-        ctx.lineTo(cornerRadius, canvas.height);
-        ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
-        ctx.lineTo(0, cornerRadius);
-        ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
-        ctx.closePath();
-        
-        // Color format conversion and gradient
-        const threeColor = new THREE.Color(color);
-        const r = Math.floor(threeColor.r * 255);
-        const g = Math.floor(threeColor.g * 255);
-        const b = Math.floor(threeColor.b * 255);
-        
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, `rgb(${r + 30}, ${g + 30}, ${b + 30})`);
-        gradient.addColorStop(1, `rgb(${r - 20}, ${g - 20}, ${b - 20})`);
-        
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        // Add subtle border
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
-        ctx.stroke();
-        
-        // Add label
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, canvas.width/2, canvas.height/2);
-        
-        // Create button texture and material
-        const texture = new THREE.CanvasTexture(canvas);
-        const material = new THREE.MeshBasicMaterial({ 
-            map: texture,
-            transparent: true
-        });
-        
-        const buttonMesh = new THREE.Mesh(buttonGeometry, material);
-        button.add(buttonMesh);
-        
-        // Add userData for interaction
-        button.userData = {
-            type: 'button',
-            isInteractive: true,
-            originalColor: color,
-            hoverColor: new THREE.Color(color).offsetHSL(0, 0, 0.1),
-            activeColor: new THREE.Color(color).offsetHSL(0, 0, -0.1),
-            isHovered: false,
-            isPressed: false,
-            onClick: onClick
-        };
-        
-        // Try multiple approaches to add the button to the parent
-        let addSuccess = false;
-        
-        // Approach 1: Try normal parent.add()
-        try {
-            if (parent.add && typeof parent.add === 'function') {
-                parent.add(button);
-                console.log("Button added successfully via parent.add():", label);
-                addSuccess = true;
-            }
-        } catch (error) {
-            console.warn("Failed to add button via parent.add():", error);
-            // Continue to next approach
-        }
-        
-        // Approach 2: If parent has children, but add doesn't work, try direct array manipulation
-        if (!addSuccess && parent.children && Array.isArray(parent.children)) {
-            try {
-                parent.children.push(button);
-                button.parent = parent;
-                console.log("Button added successfully via children array:", label);
-                addSuccess = true;
-            } catch (error) {
-                console.warn("Failed to add button via children array:", error);
-            }
-        }
-        
-        // Approach 3: If parent is a mesh and has a parent, try adding to grandparent
-        if (!addSuccess && parent.parent && typeof parent.parent.add === 'function') {
-            try {
-                parent.parent.add(button);
-                console.log("Button added successfully to parent's parent:", label);
-                addSuccess = true;
-            } catch (error) {
-                console.warn("Failed to add button to parent's parent:", error);
-            }
-        }
-        
-        // If all approaches failed
-        if (!addSuccess) {
-            console.error("All attempts to add button to parent failed. Created button without adding to scene.");
-            // Return the button anyway - caller might be able to add it
-        }
-        
-        return button;
-    } catch (error) {
-        console.error("Error creating button:", error);
-        return null;
-    }
-}
-
-// Helper function to draw rounded rectangles
-function roundRect(ctx, x, y, width, height, radius, fill = true, stroke = false) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    
-    if (fill) {
-        ctx.fill();
-    }
-    
-    if (stroke) {
-        ctx.stroke();
     }
 }

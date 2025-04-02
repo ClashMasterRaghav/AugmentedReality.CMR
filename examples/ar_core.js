@@ -49,130 +49,106 @@ export function initAR() {
 
 // Initialize the AR environment
 function initAREnvironment() {
-    try {
-        // Initialize scene FIRST to ensure it exists for all other functions
-        scene = new THREE.Scene();
-        
-        // Make scene globally available as a fallback
-        window.arScene = scene;
-        
-        const container = document.createElement('div');
-        document.body.appendChild(container);
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+    // Lighting
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+    light.position.set(0.5, 1, 0.25);
+    scene.add(light);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // AR Button with session end event handling
+    const arButton = ARButton.createButton(renderer, {
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+    });
     
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        
-        // Make camera globally available
-        window.arCamera = camera;
-        
-        // Lighting
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-        light.position.set(0.5, 1, 0.25);
-        scene.add(light);
+    document.body.appendChild(arButton);
+    
+    // Add event listener for session start
+    renderer.xr.addEventListener('sessionstart', function() {
+        console.log("AR session started - showing panel instructions");
+        // Show instructions for draggable panel after a short delay
+        showControlPanelInstructions();
+    });
+    
+    // Add event listener for session end
+    renderer.xr.addEventListener('sessionend', function() {
+        console.log("AR session ended");
+        // Reload the page to return to initial state
+        window.location.reload();
+    });
 
-        // Renderer
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
-        container.appendChild(renderer.domElement);
+    // Load font for text
+    const fontLoader = new FontLoader();
+    fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
+        font = loadedFont;
+        // Create UI controls once font is loaded
+        createControlPanel();
+        createVirtualKeyboard();
+    });
 
-        // AR Button with session end event handling
-        const arButton = ARButton.createButton(renderer, {
-            optionalFeatures: ['dom-overlay'],
-            domOverlay: { root: document.body }
-        });
-        
-        document.body.appendChild(arButton);
-        
-        // Add event listener for session start
-        renderer.xr.addEventListener('sessionstart', function() {
-            console.log("AR session started - showing panel instructions");
-            // Show instructions for draggable panel after a short delay
-            showControlPanelInstructions();
-        });
-        
-        // Add event listener for session end
-        renderer.xr.addEventListener('sessionend', function() {
-            console.log("AR session ended");
-            // Reload the page to return to initial state
-            window.location.reload();
-        });
+    // Controller setup
+    controller = renderer.xr.getController(0);
+    
+    // Add controller event listeners
+    controller.addEventListener('selectstart', function() {
+        controller.userData.isSelecting = true;
+    });
+    
+    controller.addEventListener('selectend', function() {
+        controller.userData.isSelecting = false;
+    });
+    
+    scene.add(controller);
 
-        // Load font for text
-        const fontLoader = new FontLoader();
-        fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
-            font = loadedFont;
-            // Create UI controls once font is loaded
-            if (scene) {
-                createControlPanel(scene);
-                createVirtualKeyboard(scene);
-            } else {
-                console.error("Cannot create UI elements - scene is undefined");
-            }
-        });
+    // Controller model
+    const controllerModelFactory = new XRControllerModelFactory();
+    controllerGrip = renderer.xr.getControllerGrip(0);
+    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+    scene.add(controllerGrip);
 
-        // Controller setup
-        controller = renderer.xr.getController(0);
-        
-        // Make controller and renderer globally available for other modules
-        window.arController = controller;
-        window.arRenderer = renderer;
-        
-        // Add controller event listeners
-        controller.addEventListener('selectstart', function() {
-            controller.userData.isSelecting = true;
-        });
-        
-        controller.addEventListener('selectend', function() {
-            controller.userData.isSelecting = false;
-        });
-        
-        scene.add(controller);
+    // Pointer for interaction - SMALLER SIZE
+    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+    const pointer = new THREE.Mesh(geometry, material);
+    pointer.position.z = -0.1;
+    controller.add(pointer);
 
-        // Controller model
-        const controllerModelFactory = new XRControllerModelFactory();
-        controllerGrip = renderer.xr.getControllerGrip(0);
-        controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-        scene.add(controllerGrip);
+    // Window resize handler
+    window.addEventListener('resize', onWindowResize);
 
-        // Pointer for interaction - SMALLER SIZE
-        const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-        const pointer = new THREE.Mesh(geometry, material);
-        pointer.position.z = -0.1;
-        controller.add(pointer);
-
-        // Window resize handler
-        window.addEventListener('resize', onWindowResize);
-
-        // Initialize UI elements - make sure scene exists first
-        if (scene) {
-            initUI(scene);
-        } else {
-            console.error("Cannot initialize UI - scene is undefined");
-        }
-        
-        // Preload video texture right after scene setup
-        console.log("Initializing video functionality");
-        const videoTexture = loadVideoTexture();
-        
-        // Connect video controls to the interaction module
-        setupVideoControls({
-            toggleVideoPlayback,
-            toggleVideoMute
-        });
-        
-        // Setup event listeners
-        setupEventListeners();
-        
-        // Start animation loop
-        renderer.setAnimationLoop(animate);
-        
-        // Create initial screen
-        createStartScreen();
-    } catch (error) {
-        console.error("Error initializing AR environment:", error);
-    }
+    // Initialize UI elements
+    initUI();
+    
+    // Preload video texture right after scene setup
+    console.log("Initializing video functionality");
+    const videoTexture = loadVideoTexture();
+    
+    // Connect video controls to the interaction module
+    setupVideoControls({
+        toggleVideoPlayback,
+        toggleVideoMute
+    });
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Start animation loop
+    renderer.setAnimationLoop(animate);
+    
+    // Create initial screen
+    createStartScreen();
 }
 
 // Handle window resize
@@ -307,24 +283,8 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    try {
-        console.log("Creating start screen...");
-        
-        // Make sure scene is globally available
-        if (scene) {
-            window.arScene = scene;
-        }
-        
-        // Call the function with a default position
-        const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
-        
-        if (!startScreen) {
-            console.warn("Could not create start screen - this might be normal in some environments");
-        }
-        
-        // Set up control panel initial position
-        setTimeout(setupControlPanel, 500);
-    } catch (error) {
-        console.error("Error creating start screen:", error);
-    }
+    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    
+    // Set up control panel initial position
+    setTimeout(setupControlPanel, 500);
 }

@@ -7,9 +7,6 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0"
 		/>
-		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-		<meta http-equiv="Pragma" content="no-cache">
-		<meta http-equiv="Expires" content="0">
 		<link type="text/css" rel="stylesheet" href="main.css" />
 		<style>
 			#info {
@@ -110,153 +107,7 @@
 			#errorMessage p {
 				margin-bottom: 20px;
 			}
-			/* Error display for JavaScript errors */
-			#errorDisplay {
-				position: absolute;
-				bottom: 10px;
-				left: 10px;
-				background-color: rgba(255, 0, 0, 0.7);
-				color: white;
-				font-family: monospace;
-				padding: 10px;
-				border-radius: 5px;
-				font-size: 12px;
-				max-width: 90%;
-				max-height: 150px;
-				overflow: auto;
-				z-index: 1000;
-				display: none;
-			}
-			body {
-				margin: 0;
-				padding: 0;
-				font-family: Arial, sans-serif;
-				overflow: hidden;
-			}
-			
-			#ar-content {
-				width: 100%;
-				height: 100vh;
-				position: relative;
-			}
-			
-			/* Fix for content overlays that block interaction */
-			.content-type-overlay {
-				display: none !important;
-				visibility: hidden !important;
-				pointer-events: none !important;
-				opacity: 0 !important;
-			}
 		</style>
-		<script>
-			// AR DOM Helper - runs on page load to ensure AR controls work
-			document.addEventListener('DOMContentLoaded', function() {
-				console.log("AR DOM Helper initialized");
-				
-				// Remove any content overlays that block interaction
-				function removeContentOverlays() {
-					try {
-						const overlays = document.querySelectorAll('.content-type-overlay');
-						overlays.forEach(overlay => {
-							overlay.remove();
-						});
-						console.log(`Removed ${overlays.length} content overlays`);
-					} catch (error) {
-						console.error("Error removing content overlays:", error);
-					}
-				}
-				
-				// Create fallback buttons for common AR actions
-				function createFallbackButtons() {
-					try {
-						const actions = [
-							'createNewScreen',
-							'createNewWebScreen',
-							'createNewImageScreen',
-							'deleteScreen'
-						];
-						
-						// Create container for buttons
-						const container = document.createElement('div');
-						container.id = 'ar-fallback-controls';
-						container.style.cssText = `
-							position: fixed;
-							bottom: 10px;
-							left: 10px;
-							z-index: 9997;
-							display: flex;
-							flex-direction: row;
-							gap: 10px;
-						`;
-						
-						actions.forEach((action, index) => {
-							const button = document.createElement('button');
-							button.id = `ar-fallback-${action}`;
-							button.className = 'ar-fallback-button';
-							button.dataset.action = action;
-							button.textContent = action.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-							button.style.cssText = `
-								background: rgba(30, 144, 255, 0.8);
-								color: white;
-								border: none;
-								border-radius: 20px;
-								padding: 8px 15px;
-								font-family: Arial, sans-serif;
-								cursor: pointer;
-								margin: 5px;
-								box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-							`;
-							
-							// Add click handler that will trigger event for AR app to catch
-							button.addEventListener('click', function() {
-								console.log(`Fallback button clicked: ${this.dataset.action}`);
-								// Create and dispatch a custom event that the AR app can listen for
-								const event = new CustomEvent('ar-fallback-action', {
-									detail: { action: this.dataset.action }
-								});
-								document.dispatchEvent(event);
-								
-								// Remove any overlays
-								removeContentOverlays();
-								
-								// Visual feedback
-								this.style.backgroundColor = 'rgba(255, 165, 0, 0.9)';
-								setTimeout(() => {
-									this.style.backgroundColor = 'rgba(30, 144, 255, 0.8)';
-								}, 300);
-							});
-							
-							container.appendChild(button);
-						});
-						
-						document.body.appendChild(container);
-						console.log("Created fallback AR control buttons");
-					} catch (error) {
-						console.error("Error creating fallback buttons:", error);
-					}
-				}
-				
-				// Initial cleanup
-				removeContentOverlays();
-				
-				// Create fallback controls
-				createFallbackButtons();
-				
-				// Set up interval to continuously remove overlays
-				setInterval(removeContentOverlays, 2000);
-				
-				// Add listener for page content changes
-				const observer = new MutationObserver(function(mutations) {
-					removeContentOverlays();
-				});
-				
-				// Start observing the document for content changes
-				observer.observe(document.body, { 
-					childList: true,
-					subtree: true
-				});
-			});
-		</script>
 	</head>
 	<body>
 		<div id="info">
@@ -292,13 +143,6 @@
 			<h2>Tap to Enable Video</h2>
 			<p>Tap anywhere to start your AR experience with video and audio.</p>
 		</div>
-		
-		<!-- Error display for JavaScript errors -->
-		<div id="errorDisplay"></div>
-
-		<div id="ar-content">
-			<!-- Web content will be displayed here -->
-		</div>
 
 		<script type="importmap">
 			{
@@ -309,64 +153,7 @@
 			}
 		</script>
 
-		<!-- Main script with cache busting -->
-		<script type="module">
-			// Add a cache busting timestamp to prevent browser caching
-			const timestamp = Date.now();
-			
-			// Remove any content type overlays that might be present from previous runs
-			document.addEventListener('DOMContentLoaded', () => {
-				const removeOverlays = () => {
-					const overlays = document.querySelectorAll('.content-type-overlay');
-					overlays.forEach(overlay => {
-						console.log("Removing overlay:", overlay);
-						overlay.remove();
-					});
-				};
-				
-				// Remove on load
-				removeOverlays();
-				
-				// And periodically check for new ones (in case they're added dynamically)
-				setInterval(removeOverlays, 2000);
-			});
-			
-			// Set up error tracking
-			window.addEventListener('error', function(event) {
-				const errorDisplay = document.getElementById('errorDisplay');
-				if (errorDisplay) {
-					errorDisplay.style.display = 'block';
-					errorDisplay.innerHTML += `<div>${event.message} at ${event.filename}:${event.lineno}</div>`;
-					console.error("Caught error:", event);
-				}
-			});
-			
-			// Prevent duplicate initialization
-			if (!window.arInitialized) {
-				window.arInitialized = true;
-				console.log("Starting AR application...");
-				
-				// Import modules with cache busting
-				import(`./ar_main.js?v=${timestamp}`).then(module => {
-					// Call init function directly if available
-					if (module.init && typeof module.init === 'function') {
-						// Only load once
-						console.log("Directly calling init function");
-						module.init();
-					}
-				}).catch(error => {
-					console.error("Failed to load ar_main.js:", error);
-					
-					// Show error in UI
-					const errorDisplay = document.getElementById('errorDisplay');
-					if (errorDisplay) {
-						errorDisplay.style.display = 'block';
-						errorDisplay.innerHTML += `<div>Failed to load ar_main.js: ${error.message}</div>`;
-					}
-				});
-			} else {
-				console.warn("AR application already initialized. Preventing duplicate initialization.");
-			}
-		</script>
+		<!-- Use the main entry point file instead of ar_web.js -->
+		<script type="module" src="ar_main.js"></script>
 	</body>
 </html>
