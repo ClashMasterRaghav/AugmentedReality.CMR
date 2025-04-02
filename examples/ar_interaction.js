@@ -1006,7 +1006,7 @@ function onTouchMove(event) {
         const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
         
         // Scale factor for more responsive movement - INCREASED
-        const moveScale = 1.5; // Much more responsive movement
+        const moveScale = 0.75; // Same speed as screen dragging
         
         // Create movement vector
         const movement = new THREE.Vector3()
