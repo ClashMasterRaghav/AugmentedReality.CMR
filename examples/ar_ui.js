@@ -461,6 +461,9 @@ export function createControlPanel() {
     // Add screen type selector below the main panel
     createScreenTypeSelector(controlPanel, 0, -0.08, 0.04);
     
+    // Add mode toggle switch for screen interaction/dragging
+    createModeToggleSwitch(controlPanel);
+    
     return controlPanel;
 }
 
@@ -1149,4 +1152,237 @@ export function floatAnimation() {
         // Use a much more subtle glow
         glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
     }
+}
+
+// Create a toggle switch for screen interaction/drag mode
+function createModeToggleSwitch(parent) {
+    // Create a container for the toggle switch
+    const toggleGroup = new THREE.Group();
+    
+    // Position the toggle at the bottom portion of the control panel
+    toggleGroup.position.set(0, -0.04, 0.005);
+    
+    // Create toggle track (the background/base of the switch)
+    const trackWidth = 0.08;
+    const trackHeight = 0.03;
+    const trackGeometry = new THREE.PlaneGeometry(trackWidth, trackHeight);
+    
+    // Create a rounded track using canvas
+    const trackCanvas = document.createElement('canvas');
+    trackCanvas.width = 128;
+    trackCanvas.height = 48;
+    const trackCtx = trackCanvas.getContext('2d');
+    
+    // Draw track with rounded ends
+    const radius = trackCanvas.height / 2;
+    trackCtx.beginPath();
+    trackCtx.moveTo(radius, 0);
+    trackCtx.lineTo(trackCanvas.width - radius, 0);
+    trackCtx.arcTo(trackCanvas.width, 0, trackCanvas.width, radius, radius);
+    trackCtx.arcTo(trackCanvas.width, trackCanvas.height, trackCanvas.width - radius, trackCanvas.height, radius);
+    trackCtx.lineTo(radius, trackCanvas.height);
+    trackCtx.arcTo(0, trackCanvas.height, 0, trackCanvas.height - radius, radius);
+    trackCtx.arcTo(0, 0, radius, 0, radius);
+    trackCtx.closePath();
+    
+    // Fill with gradient
+    const trackGradient = trackCtx.createLinearGradient(0, 0, 0, trackCanvas.height);
+    trackGradient.addColorStop(0, 'rgba(60, 60, 70, 0.9)');
+    trackGradient.addColorStop(1, 'rgba(40, 40, 50, 0.9)');
+    trackCtx.fillStyle = trackGradient;
+    trackCtx.fill();
+    
+    // Add subtle border
+    trackCtx.strokeStyle = 'rgba(180, 190, 255, 0.6)';
+    trackCtx.lineWidth = 1;
+    trackCtx.stroke();
+    
+    const trackTexture = new THREE.CanvasTexture(trackCanvas);
+    const trackMaterial = new THREE.MeshBasicMaterial({
+        map: trackTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+    trackMesh.renderOrder = 1008;
+    toggleGroup.add(trackMesh);
+    
+    // Create toggle knob (the sliding part)
+    const knobSize = trackHeight * 0.9;
+    const knobGeometry = new THREE.CircleGeometry(knobSize / 2, 32);
+    
+    // Create a fancy knob using canvas
+    const knobCanvas = document.createElement('canvas');
+    knobCanvas.width = 64;
+    knobCanvas.height = 64;
+    const knobCtx = knobCanvas.getContext('2d');
+    
+    // Draw knob with gradient and shadow
+    knobCtx.beginPath();
+    knobCtx.arc(32, 32, 30, 0, Math.PI * 2);
+    
+    // Radial gradient
+    const knobGradient = knobCtx.createRadialGradient(32, 28, 0, 32, 32, 30);
+    knobGradient.addColorStop(0, '#ffffff');
+    knobGradient.addColorStop(1, '#e0e0e0');
+    knobCtx.fillStyle = knobGradient;
+    knobCtx.fill();
+    
+    // Add subtle shadow
+    knobCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    knobCtx.shadowBlur = 5;
+    knobCtx.shadowOffsetX = 2;
+    knobCtx.shadowOffsetY = 2;
+    knobCtx.beginPath();
+    knobCtx.arc(32, 32, 29, 0, Math.PI * 2);
+    knobCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    knobCtx.lineWidth = 1;
+    knobCtx.stroke();
+    
+    const knobTexture = new THREE.CanvasTexture(knobCanvas);
+    const knobMaterial = new THREE.MeshBasicMaterial({
+        map: knobTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const knobMesh = new THREE.Mesh(knobGeometry, knobMaterial);
+    knobMesh.position.set(-trackWidth/2 + knobSize/2 + 0.005, 0, 0.001); // Start position (OFF)
+    knobMesh.renderOrder = 1009;
+    toggleGroup.add(knobMesh);
+    
+    // Create labels showing what each side means
+    const createLabel = (text, x, isActive) => {
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 128;
+        labelCanvas.height = 32;
+        const labelCtx = labelCanvas.getContext('2d');
+        
+        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        
+        // Add shadow for better visibility
+        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        labelCtx.shadowBlur = 2;
+        labelCtx.shadowOffsetX = 1;
+        labelCtx.shadowOffsetY = 1;
+        
+        labelCtx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)';
+        labelCtx.font = '600 12px Inter, SF Pro Display, Arial';
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        labelCtx.fillText(text, labelCanvas.width / 2, labelCanvas.height / 2);
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(0.06, 0.02);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(x, -trackHeight, 0.001);
+        labelMesh.renderOrder = 1008;
+        
+        return labelMesh;
+    };
+    
+    // Create ON/OFF labels
+    const interactLabel = createLabel('Interact', -trackWidth/2 + 0.03, true); // Left side - initially active
+    const dragLabel = createLabel('Drag', trackWidth/2 - 0.03, false); // Right side
+    
+    toggleGroup.add(interactLabel);
+    toggleGroup.add(dragLabel);
+    
+    // Add state indicators (colored blocks at each end)
+    const createStateIndicator = (x, color) => {
+        const indicatorSize = 0.008;
+        const indicatorGeometry = new THREE.CircleGeometry(indicatorSize, 16);
+        const indicatorMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        
+        const indicatorMesh = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+        indicatorMesh.position.set(x, 0, 0.0005);
+        indicatorMesh.renderOrder = 1007;
+        
+        return indicatorMesh;
+    };
+    
+    // Add state indicators (left blue, right green)
+    const leftIndicator = createStateIndicator(-trackWidth/2 + 0.015, 0x4FC3F7); // Blue for interact
+    const rightIndicator = createStateIndicator(trackWidth/2 - 0.015, 0x4CAF50); // Green for drag
+    
+    toggleGroup.add(leftIndicator);
+    toggleGroup.add(rightIndicator);
+    
+    // Add title above the toggle
+    const titleCanvas = document.createElement('canvas');
+    titleCanvas.width = 256;
+    titleCanvas.height = 32;
+    const titleCtx = titleCanvas.getContext('2d');
+    
+    titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
+    titleCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    titleCtx.font = '600 12px Inter, SF Pro Display, Arial';
+    titleCtx.textAlign = 'center';
+    titleCtx.textBaseline = 'middle';
+    titleCtx.fillText('SCREEN MODE', titleCanvas.width / 2, titleCanvas.height / 2);
+    
+    const titleTexture = new THREE.CanvasTexture(titleCanvas);
+    const titleGeometry = new THREE.PlaneGeometry(0.1, 0.015);
+    const titleMaterial = new THREE.MeshBasicMaterial({
+        map: titleTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
+    titleMesh.position.set(0, trackHeight * 1.2, 0.001);
+    titleMesh.renderOrder = 1008;
+    toggleGroup.add(titleMesh);
+    
+    // Make toggle clickable
+    const hitAreaGeometry = new THREE.PlaneGeometry(trackWidth + 0.02, trackHeight + 0.02);
+    const hitAreaMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.001,
+        side: THREE.DoubleSide
+    });
+    
+    const hitAreaMesh = new THREE.Mesh(hitAreaGeometry, hitAreaMaterial);
+    hitAreaMesh.position.z = 0.002;
+    hitAreaMesh.renderOrder = 1010;
+    hitAreaMesh.userData = {
+        type: 'button',
+        action: 'toggleScreenMode',
+        isToggle: true,
+        isActive: false,
+        originalColor: 0xffffff,
+        activeColor: 0xffffff,
+        inactiveColor: 0xffffff,
+        hoverColor: 0xffffff
+    };
+    
+    toggleGroup.add(hitAreaMesh);
+    
+    // Store all parts that need to be updated when toggled
+    toggleGroup.userData = {
+        knob: knobMesh,
+        interactLabel: interactLabel,
+        dragLabel: dragLabel,
+        trackWidth: trackWidth,
+        knobSize: knobSize,
+        isScreenDragMode: false
+    };
+    
+    // Add to parent
+    parent.add(toggleGroup);
+    
+    return toggleGroup;
 }

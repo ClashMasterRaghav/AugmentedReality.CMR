@@ -82,7 +82,7 @@ function onSelectStart(event) {
 }
 
 // Get button from an intersected object
-function getButtonFromIntersect(object) {
+function getButtonFromIntersect(object, type = null) {
     // If object is a button, return it directly
     if (object.userData && object.userData.type === 'button') {
         console.log("Direct button hit:", object.userData.action);
@@ -304,151 +304,199 @@ function getScreenFromIntersect(object) {
 
 // Handle different button actions
 function handleButtonAction(button) {
-    if (!button || !button.userData) {
-        console.log("Invalid button object");
-        return;
-    }
-    
-    console.log("Handling button action:", button.userData.action);
-    
-    // Extract the button action
-    const action = button.userData.action;
-    
-    // Provide haptic feedback for button press
-    if (navigator.vibrate) {
-        navigator.vibrate(30);
-    }
+    const buttonAction = button.userData.action;
+    console.log("Handling button action:", buttonAction);
     
     // Handle different button actions
-    switch (action) {
+    switch(buttonAction) {
         case 'newScreen':
-            console.log("New screen button pressed");
-            // Create a new screen positioned in front of the camera
             createNewScreenInFrontOfCamera();
             break;
             
         case 'deleteScreen':
-            console.log("Delete screen button pressed - calling deleteLastScreen()");
-            // Delete the last interacted screen
             deleteLastScreen();
-            
-            // Add haptic feedback for destructive action
-            if (navigator.vibrate) {
-                navigator.vibrate([30, 20, 80]);
-            }
-            
-            // Create visual indicator
-            createModeChangeIndicator('Screen Deleted');
             break;
             
         case 'selectScreenType':
-            console.log("Screen type button pressed:", button.userData.screenType);
-            // Get camera position and direction
-            const cameraPosition = new THREE.Vector3();
-            camera.getWorldPosition(cameraPosition);
-            
-            const cameraDirection = new THREE.Vector3(0, 0, -1);
-            cameraDirection.applyQuaternion(camera.quaternion);
-            
-            // Position screen in front of camera
-            const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
-            
-            // Create the appropriate screen type
-            let newScreen;
-            const screenType = button.userData.screenType;
-            
-            switch(screenType) {
-                case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
-                    break;
-                case 'duckduckgo':
-                    newScreen = createDuckDuckGoScreen(screenPosition);
-                    break;
-                case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
-                    break;
-                case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
-                    break;
-                default:
-                    newScreen = createNewBrowserScreen(screenPosition);
-                    break;
-            }
-            
-            // Make it face the camera
-            newScreen.lookAt(camera.position);
-            
-            // Add visual feedback
-            createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
-            
-            // Select this screen
-            selectScreen(newScreen);
+            selectScreenType(button);
             break;
             
-        case 'moveMode':
-            console.log("Move mode button pressed");
-            // Toggle move mode
-            isMoveModeActive = !isMoveModeActive;
-            isRotateModeActive = false; // Disable rotate mode
-            
-            // Update button state
-            button.material.color.set(isMoveModeActive ? button.userData.activeColor : button.userData.inactiveColor);
-            
-            // Create visual indicator
-            createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
+        case 'moveScreen':
+            toggleMoveMode(button);
             break;
             
-        case 'rotateMode':
-            console.log("Rotate mode button pressed");
-            // Toggle rotate mode
-            isRotateModeActive = !isRotateModeActive;
-            isMoveModeActive = false; // Disable move mode
-            
-            // Update button state
-            button.material.color.set(isRotateModeActive ? button.userData.activeColor : button.userData.inactiveColor);
-            
-            // Create visual indicator
-            createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
+        case 'rotateScreen':
+            toggleRotateMode(button);
             break;
             
-        // FIXED: Add explicit handling for playButton and volumeButton from screens
+        case 'resizeScreen':
+            if (selectedScreen) toggleResize(selectedScreen);
+            break;
+            
+        case 'fullscreen':
+            if (selectedScreen) toggleFullscreen(selectedScreen);
+            break;
+            
         case 'playButton':
-            console.log("Play/pause button pressed");
-            // Toggle video playback
-            if (videoControlFunctions.togglePlayback) {
-                videoControlFunctions.togglePlayback();
-            }
+            toggleVideoPlayback();
             break;
             
         case 'volumeButton':
-            console.log("Mute/unmute button pressed");
-            // Toggle video mute
-            if (videoControlFunctions.toggleMute) {
-                videoControlFunctions.toggleMute();
-            }
+            toggleVideoMute();
             break;
             
-        // Keep generic play/pause and mute/unmute handlers for compatibility
-        case 'play':
-        case 'pause':
-            console.log("Play/pause button pressed");
-            if (videoControlFunctions.togglePlayback) {
-                videoControlFunctions.togglePlayback();
-            }
-            break;
-            
-        case 'mute':
-        case 'unmute':
-            console.log("Mute/unmute button pressed");
-            if (videoControlFunctions.toggleMute) {
-                videoControlFunctions.toggleMute();
-            }
+        case 'toggleScreenMode':
+            toggleScreenDragMode(button);
             break;
             
         default:
-            console.log("Unknown button action:", action);
-            break;
+            console.log("Unhandled button action:", buttonAction);
     }
+}
+
+// Toggle between screen drag mode and interaction mode
+function toggleScreenDragMode(button) {
+    // Check if this is our toggle button
+    if (!button || !button.parent || !button.parent.userData) return;
+    
+    const toggleGroup = button.parent;
+    const knob = toggleGroup.userData.knob;
+    const interactLabel = toggleGroup.userData.interactLabel;
+    const dragLabel = toggleGroup.userData.dragLabel;
+    const trackWidth = toggleGroup.userData.trackWidth;
+    const knobSize = toggleGroup.userData.knobSize;
+    
+    // Toggle the state
+    const newState = !toggleGroup.userData.isScreenDragMode;
+    toggleGroup.userData.isScreenDragMode = newState;
+    
+    // Update visual state of button elements
+    if (newState) {
+        // Dragging mode ON - move knob to right side
+        knob.position.x = trackWidth/2 - knobSize/2 - 0.005;
+        
+        // Update label visibility
+        updateLabelState(interactLabel, false);
+        updateLabelState(dragLabel, true);
+        
+        // Set userData of the button to reflect active state
+        button.userData.isActive = true;
+        
+        // Create visual indicator for mode change
+        createModeChangeIndicator('Drag Mode Enabled - Screens Can Be Moved');
+        
+    } else {
+        // Interaction mode ON - move knob to left side
+        knob.position.x = -trackWidth/2 + knobSize/2 + 0.005;
+        
+        // Update label visibility
+        updateLabelState(interactLabel, true);
+        updateLabelState(dragLabel, false);
+        
+        // Set userData of the button to reflect inactive state
+        button.userData.isActive = false;
+        
+        // Create visual indicator for mode change
+        createModeChangeIndicator('Interact Mode Enabled - Content Can Be Used');
+    }
+    
+    // Update drag mode in all screens
+    updateScreenDragMode(newState);
+}
+
+// Update the visual state of a toggle label
+function updateLabelState(labelMesh, isActive) {
+    if (!labelMesh || !labelMesh.material || !labelMesh.material.map) return;
+    
+    // Get the canvas from the texture
+    const texture = labelMesh.material.map;
+    const canvas = texture.image;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear and redraw the label with appropriate style
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Add shadow for better visibility
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    
+    // Set the color based on active state
+    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '600 12px Inter, SF Pro Display, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Get the original text
+    let text = '';
+    if (labelMesh.name) {
+        text = labelMesh.name;
+    } else if (labelMesh.userData && labelMesh.userData.labelText) {
+        text = labelMesh.userData.labelText;
+    } else {
+        // Fall back to hardcoded values based on position
+        text = isActive ? 'Interact' : 'Drag';
+    }
+    
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+    // Update the texture
+    texture.needsUpdate = true;
+}
+
+// Update drag mode for all screens
+function updateScreenDragMode(isDragModeActive) {
+    screens.forEach(screen => {
+        // Update screen's drag mode state
+        if (!screen.userData) screen.userData = {};
+        screen.userData.dragModeActive = isDragModeActive;
+        
+        // Find any drag handles in the screen
+        for (const child of screen.children) {
+            if (child.userData && child.userData.type === 'dragHandle') {
+                // Check if this is a full-screen drag handle or top-bar drag handle
+                const isFullScreenDrag = child.userData.isFullScreenDrag || false;
+                
+                if (isFullScreenDrag) {
+                    // This is the full-screen drag handle
+                    if (isDragModeActive) {
+                        // In drag mode, bring handle to front
+                        child.position.z = 0.01; // Move in front of content
+                        child.renderOrder = 1100; // Ensure it renders in front
+                        child.material.opacity = 0.1; // Make slightly visible for feedback
+                    } else {
+                        // In interact mode, put handle behind content
+                        child.position.z = -0.001; // Move behind content
+                        child.renderOrder = 900; // Ensure it renders behind
+                        child.material.opacity = 0.001; // Make fully invisible
+                    }
+                } else {
+                    // This is a regular drag handle (likely top bar)
+                    // Keep it active in both modes but adjust its priority
+                    if (isDragModeActive) {
+                        child.renderOrder = 1101; // Above the full-screen drag
+                    } else {
+                        child.renderOrder = 1015; // Normal ordering
+                    }
+                }
+            } else if (child.userData && child.userData.type === 'contentArea') {
+                // Content interaction area - adjust based on mode
+                if (isDragModeActive) {
+                    // Disable content interaction in drag mode
+                    child.position.z = -0.005; // Move behind content
+                    child.renderOrder = 900; // Ensure it's behind
+                } else {
+                    // Enable content interaction in interact mode
+                    child.position.z = 0.004; // In front of content
+                    child.renderOrder = 1020; // Higher than content
+                }
+            }
+        }
+    });
+    
+    // Store global state for reference in touch handlers
+    window.screenDragModeActive = isDragModeActive;
 }
 
 // Create a new screen in front of camera - helper for button action
@@ -686,115 +734,40 @@ function findAllButtons() {
 
 // Touch start handler
 function onTouchStart(event) {
-    event.preventDefault();
-    
-    console.log("Touch start detected in AR");
-    
-    // Single touch handling
+    // Get touch position
     const touch = event.touches[0];
-    
-    if (!touch) {
-        console.log("No valid touch point");
-        return;
-    }
-    
-    // Convert touch to normalized device coordinates
-    initialTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    initialTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-    currentTouchPosition.copy(initialTouchPosition);
-    
-    console.log("Touch position:", initialTouchPosition.x.toFixed(3), initialTouchPosition.y.toFixed(3));
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
     
     // Update raycaster
-    raycaster.setFromCamera(initialTouchPosition, camera);
+    updateTouchRaycaster(touch);
     
-    // Double tap detection
-    const now = performance.now();
-    const doubleTapDetected = (now - lastTapTime) < 300;
-    lastTapTime = now;
-    
-    // PRIORITY 0: Check for control panel dragging
+    // First, check for control panel drag
     if (controlPanel) {
-        const panelIntersects = raycaster.intersectObject(controlPanel, true);
-        
-        if (panelIntersects.length > 0) {
-            // Get info about intersection
-            const hitPoint = panelIntersects[0].point.clone();
-            const localPoint = controlPanel.worldToLocal(hitPoint.clone());
-            const hitObject = panelIntersects[0].object;
+        // Check for drag handle
+        const dragIntersects = raycaster.intersectObject(controlPanel, true);
+        if (dragIntersects.length > 0) {
+            const dragHandle = getButtonFromIntersect(dragIntersects[0].object, 'dragHandle');
             
-            console.log("Hit panel object:", hitObject.uuid.slice(0, 8), 
-                      "userData:", hitObject.userData ? JSON.stringify(hitObject.userData) : 'none');
-            
-            // Enhanced drag detection - check if we hit:
-            // 1. The explicit drag handle or grip lines
-            // 2. The top portion of the panel
-            // 3. Any object marked as part of drag handle
-            const isDragHandle = hitObject.userData && (
-                hitObject.userData.isDragArea || 
-                hitObject.userData.isPartOfDragHandle ||
-                hitObject.userData.type === 'dragHandle' ||
-                (hitObject.parent && hitObject.parent.userData && 
-                 (hitObject.parent.userData.isDragArea || hitObject.parent.userData.type === 'dragHandle'))
-            );
-            
-            // First check if this is a button
-            const isButton = hitObject.userData && hitObject.userData.type === 'button';
-            
-            // If it's a button, handle the button click
-            if (isButton) {
-                console.log("Touch detected on panel button:", hitObject.userData.action);
+            if (dragHandle) {
+                console.log("Starting control panel drag");
+                isDraggingPanel = true;
                 
-                // Visual feedback
-                const originalColor = hitObject.material.color.clone();
-                hitObject.material.color.set(0x4FC3F7);
+                // Store original position for the current drag operation
+                if (!panelDragData) panelDragData = {};
+                panelDragData.startPosition = controlPanel.position.clone();
+                panelDragData.startRotation = controlPanel.rotation.clone();
                 
-                // Scale effect
-                const originalScale = hitObject.scale.clone();
-                hitObject.scale.multiplyScalar(1.1);
+                // Store touch start position
+                panelDragData.touchStartX = touchStartX;
+                panelDragData.touchStartY = touchStartY;
                 
-                setTimeout(() => {
-                    hitObject.material.color.copy(originalColor);
-                    hitObject.scale.copy(originalScale);
-                }, 150);
+                // Get the camera orientation
+                const cameraDirection = new THREE.Vector3(0, 0, -1);
+                cameraDirection.applyQuaternion(camera.quaternion);
+                panelDragData.cameraDirection = cameraDirection;
                 
-                // Haptic feedback
-                if (navigator.vibrate) {
-                    navigator.vibrate(40);
-                }
-                
-                // Handle button click and return
-                handleButtonAction(hitObject);
-                return;
-            }
-            
-            // More generous y-position check for the top section
-            const isInDragArea = localPoint.y > 0.0;
-            
-            if (isDragHandle || isInDragArea) {
-                console.log("Starting control panel drag - detected via:", isDragHandle ? "drag handle" : "top area");
-                
-                // Store initial panel position and rotation
-                initialPanelPosition.copy(controlPanel.position);
-                initialPanelQuaternion.copy(controlPanel.quaternion);
-                
-                // Calculate offset for more natural dragging
-                panelDragOffset.copy(hitPoint).sub(controlPanel.position);
-                
-                // Set flag to indicate panel is being dragged
-                isPanelBeingDragged = true;
-                controlPanel.userData.isDragging = true;
-                
-                // Provide strong haptic feedback like screen dragging
-                if (navigator.vibrate) {
-                    navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel, same as screen dragging
-                }
-                
-                // Visual feedback - highlight the drag handle if available
-                const dragHandle = controlPanel.children.find(
-                    child => child.userData && (child.userData.isDragArea || child.userData.type === 'dragHandle')
-                );
-                
+                // Highlight the drag handle visually
                 if (dragHandle && dragHandle.material) {
                     // Store original color if not already stored
                     if (!dragHandle.userData.originalColor) {
@@ -841,142 +814,154 @@ function onTouchStart(event) {
     // Sort by distance so we prioritize closer screens
     screenIntersections.sort((a, b) => a.distance - b.distance);
     
-    // PRIORITY 1: Check for button interactions
-    const buttons = findAllButtons();
-    console.log("Checking", buttons.length, "buttons for intersection");
-    const buttonIntersects = raycaster.intersectObjects(buttons, true);
+    // Check the global drag mode state
+    const isDragModeActive = window.screenDragModeActive || false;
     
-    if (buttonIntersects.length > 0) {
-        const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
-        if (buttonObj) {
-            console.log("Button touched:", buttonObj.userData.action);
+    // PRIORITY 1: Check for button interactions (only in interact mode)
+    if (!isDragModeActive) {
+        const buttons = findAllButtons();
+        console.log("Checking", buttons.length, "buttons for intersection");
+        const buttonIntersects = raycaster.intersectObjects(buttons, true);
+        
+        if (buttonIntersects.length > 0) {
+            // Find the first valid button
+            for (const intersect of buttonIntersects) {
+                const button = getButtonFromIntersect(intersect.object);
+                if (button) {
+                    isButtonPressed = true;
+                    selectedButton = button;
+                    lastTouchTime = Date.now();
+                    
+                    // Visual feedback
+                    setButtonPressed(button, true);
+                    
+                    // Provide haptic feedback if available
+                    if (navigator.vibrate) {
+                        navigator.vibrate(20);
+                    }
+                    
+                    console.log("Button touched:", button.userData.action);
+                    return;
+                }
+            }
+        }
+    }
+    
+    // PRIORITY 2: Check for screen drag handles
+    // We prioritize drag handles in drag mode, but still allow top bar dragging in interact mode
+    for (const intersection of screenIntersections) {
+        const screen = intersection.screen;
+        const hitObject = intersection.object;
+        
+        // Check if the hit object is a drag handle
+        let dragHandle = null;
+        if (hitObject.userData && hitObject.userData.type === 'dragHandle') {
+            dragHandle = hitObject;
+        } else if (hitObject.parent && hitObject.parent.userData && hitObject.parent.userData.type === 'dragHandle') {
+            dragHandle = hitObject.parent;
+        }
+        
+        if (dragHandle) {
+            // In drag mode, any drag handle works
+            // In interact mode, only top bar drags work (unless explicitly allowed)
+            const isTopBarDrag = dragHandle.userData.isVisibleHandle || false;
+            const isFullScreenDrag = dragHandle.userData.isFullScreenDrag || false;
             
-            // Visual feedback
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7);
-            
-            // Scale up and back for button press effect
-            const originalScale = buttonObj.scale.clone();
-            buttonObj.scale.multiplyScalar(1.2);
-            
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-                buttonObj.scale.copy(originalScale);
-            }, 200);
-            
-            // Provide haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(40);
+            // Only allow full screen drag in drag mode
+            if (isFullScreenDrag && !isDragModeActive) {
+                continue;
             }
             
-            // Handle the button action
-            handleButtonAction(buttonObj);
-            return;
-        }
-    }
-    
-    // PRIORITY 2: Check closest screen for progress bar interaction
-    if (screenIntersections.length > 0) {
-        const closestHit = screenIntersections[0];
-        const screen = closestHit.screen;
-        
-        // Check if we hit the progress bar
-        if (handleProgressBarTouch(screen, closestHit.point)) {
-            console.log("Progress bar touched on screen:", screen.userData.id);
-            return;
-        }
-    }
-    
-    // PRIORITY 3: Check for draggable areas on screens
-    let draggableAreaHit = false;
-    let intersectedScreen = null;
-    
-    // Check for draggable area hits on the closest screens first
-    for (const hit of screenIntersections) {
-        const screen = hit.screen;
-        // Get position relative to the screen
-        let localPoint = hit.point.clone();
-        if (screen.worldToLocal) {
-            localPoint = screen.worldToLocal(localPoint.clone());
-        }
-        
-        // Screen dimensions
-        const screenHeight = 0.75; // Standard screen height
-        
-        // Check if we're in the top 2/3 of the screen
-        // The top of the screen is at y = screenHeight/2
-        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
-            // We hit the draggable area
-            intersectedScreen = screen;
-            draggableAreaHit = true;
-            break;
-        }
-    }
-    
-    // If we found a draggable area, set up for dragging
-    if (draggableAreaHit && intersectedScreen) {
-        console.log("Starting drag on screen:", intersectedScreen.userData.id, "via draggable area");
-        
-        // Set up drag state
-        isDraggingHandle = true;
-        draggedScreen = intersectedScreen;
-        
-        // Preserve original scale
-        if (!intersectedScreen.userData.originalScale) {
-            intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
-        } else {
-            // Restore original scale when starting drag
-            intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
-        }
-        
-        // Select this screen
-        selectScreen(intersectedScreen);
-        
-        // Calculate offset - use a fixed offset for better positioning
-        dragOffset.set(0, 0, 0);
-        
-        // Visual feedback - highlight the top bar if available
-        if (intersectedScreen.userData.dragHandle) {
-            intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
-        }
-        
-        // Strong haptic feedback to confirm grab
-        if (navigator.vibrate) {
-            navigator.vibrate([40, 30, 60]); // Pattern for "grab" feel
-        }
-        
-        createModeChangeIndicator('Dragging Screen');
-        return;
-    }
-    
-    // PRIORITY 4: Regular screen selection - use the closest screen from our sorted list
-    if (screenIntersections.length > 0) {
-        const closestHit = screenIntersections[0];
-        const screen = closestHit.screen;
-        
-        console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
-        
-        // Select the screen
-        selectScreen(screen);
-        
-        // Double tap to toggle resize
-        if (doubleTapDetected) {
-            console.log("Double tap detected, toggling resize");
-            toggleResize(screen);
+            // We found a valid drag handle
+            console.log("Starting screen drag");
+            isDraggingScreen = true;
             
-            // Provide haptic feedback
-            if (navigator.vibrate) {
-                navigator.vibrate([30, 20, 30]);
+            // Select the screen
+            setSelectedScreen(screen);
+            
+            // Store drag start information
+            dragScreenData = {
+                screen: screen,
+                startPosition: screen.position.clone(),
+                startRotation: screen.rotation.clone(),
+                touchStartX: touchStartX,
+                touchStartY: touchStartY,
+                lastTouchX: touchStartX,
+                lastTouchY: touchStartY,
+                dragType: 'move',
+                handle: dragHandle
+            };
+            
+            // Visual feedback for drag handle
+            if (dragHandle.material) {
+                // Store original color if not already stored
+                if (!dragHandle.userData.originalColor) {
+                    dragHandle.userData.originalColor = dragHandle.material.color.getHex();
+                }
+                
+                // Highlight with hover color
+                if (dragHandle.userData.hoverColor) {
+                    dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
+                } else {
+                    // Default to a light blue for visibility
+                    dragHandle.material.color.set(0x81D4FA);
+                }
+                
+                // Make drag handle more visible during drag
+                if (dragHandle.material.opacity < 0.2) {
+                    dragHandle.material.opacity = 0.2;
+                }
             }
             
-            createModeChangeIndicator('Size Changed');
+            // Strong haptic feedback for drag starts
+            if (navigator.vibrate) {
+                navigator.vibrate([20, 10, 30]);
+            }
+            
+            // Add visual indicator
+            createModeChangeIndicator(isDragModeActive ? 'Dragging Screen' : 'Moving Screen - Use Toggle for Full Drag');
+            
             return;
         }
+    }
+    
+    // PRIORITY 3: Check for content interaction (only in interact mode)
+    if (!isDragModeActive && screenIntersections.length > 0) {
+        const intersection = screenIntersections[0]; // Get closest screen
+        const screen = intersection.screen;
+        const hitObject = intersection.object;
         
-        // Flash highlight around selected screen
+        // Check if this is a content area
+        if (hitObject.userData && hitObject.userData.type === 'contentArea') {
+            console.log("Content area interaction");
+            
+            // Select this screen
+            setSelectedScreen(screen);
+            
+            // Add visual feedback
+            flashScreenHighlight(screen);
+            
+            // Check for different interactions based on screen type
+            if (screen.userData.contentType === 'video') {
+                // Check if this might be a progress bar interaction
+                if (handleProgressBarTouch(screen, intersection.point)) {
+                    return;
+                }
+            }
+            
+            // Handle other content interactions as needed
+            return;
+        }
+    }
+    
+    // If no other interaction detected, just select the closest screen
+    if (screenIntersections.length > 0) {
+        const screen = screenIntersections[0].screen;
+        setSelectedScreen(screen);
         flashScreenHighlight(screen);
-        createModeChangeIndicator('Screen Selected');
+    } else {
+        // Deselect if tapping empty space
+        setSelectedScreen(null);
     }
 }
 
