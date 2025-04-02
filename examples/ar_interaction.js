@@ -10,21 +10,8 @@ import {
     createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, 
     createElectronAppScreen, createScreenFromButton, css3dScene
 } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton, controlPanel, setButtonHover, setButtonPressed } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
-import { camera, scene, renderer, raycaster, hoverLabel, lastIntersected, 
-         buttons, screenIndicator, controlPanel, glowMaterials } from './ar_setup.js';
-import { Vector3, Quaternion, Matrix4, Clock, Color, AudioListener, 
-         Group, CylinderGeometry, MeshStandardMaterial, Mesh, 
-         SphereGeometry, Euler, MeshBasicMaterial, Object3D,
-         LoadingManager, FrontSide, PlaneGeometry } from 'three';
-import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
-import { addHapticFeedback, setVirtualDragPlane, worldToScreenPosition } from './ar_utils.js';
-import { screens, createNewScreen, updateScreenPosition, screenHeight, screenWidth, 
-         createScreenFromButton, useScreenColor } from './ar_screens.js';
-import { css3dScene } from './ar_screens.js';
-import { createHint, showGrabHandsHint, showTouchScreenHint, hideHint } from './ar_tutorial.js';
-import { showTooltip, hideTooltip } from './ar_ui.js';
 
 // Touch interaction variables
 let touchEnabled = true;
