@@ -610,8 +610,8 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const selectorGroup = new THREE.Group();
     
     // Create a background panel for the selector
-    const panelWidth = 0.26;
-    const panelHeight = 0.12; // Taller panel for larger buttons
+    const panelWidth = 0.32; // Increase width to ensure all buttons fit
+    const panelHeight = 0.15; // Taller panel for larger buttons
     const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
     
     // Create a texture for the selector panel
@@ -730,10 +730,10 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
     // BIGGER button size for better touch targets
-    const smallButtonSize = buttonSize * 1.1; // Increase from 1.0 to 1.1 (larger)
-    const spacing = smallButtonSize * 2.2; // Space between buttons
+    const smallButtonSize = buttonSize * 1.2; // Increase from 1.1 to 1.2 (larger)
+    const spacing = smallButtonSize * 2.1; // Slightly reduce spacing to fit all buttons
     const startX = -spacing * 1.5; // Starting position for first button
-    const buttonY = -0.01; // Move buttons down slightly within the panel
+    const buttonY = 0; // Center buttons vertically
     
     buttonTypes.forEach((type, index) => {
         // Create button canvas for gradient effect
@@ -869,7 +869,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     });
     
     // Position the selector panel relative to the parent
-    selectorGroup.position.set(offsetX, offsetY - 0.13, 0.01); // Lower position
+    selectorGroup.position.set(offsetX, offsetY - 0.08, 0.01); // Reduce gap between panels
     parent.add(selectorGroup);
     
     return selectorGroup;
