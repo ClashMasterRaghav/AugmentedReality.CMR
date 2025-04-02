@@ -11,6 +11,12 @@ import * as WebOverlay from './ar_web_overlay.js?v=4';
 import * as WebMessaging from './ar_web_messaging.js?v=4';
 import { createInteractivePlane } from './ar_interaction_plane.js?v=4';
 
+// Define startAR function as a placeholder if not imported
+const startAR = window.startAR || function() {
+    console.log("Using placeholder startAR function - no AR session will be started");
+    return Promise.resolve();
+};
+
 // Wait for DOM content to be loaded before initializing
 document.addEventListener('DOMContentLoaded', () => {
     // Flag to track if user has interacted
@@ -181,6 +187,7 @@ async function init() {
         // Add demo controls
         createDemoControls();
         
+        // Start AR
         await startAR();
         
         // Animation loop
@@ -192,45 +199,61 @@ async function init() {
 
 // Function to create demo controls for different web content approaches
 function createDemoControls() {
-    try {
-        // Create the main control panel first to hold our buttons
-        const controlPanel = createControlPanel(scene);
-        
-        if (!controlPanel) {
-            console.error("Failed to create control panel for demo");
-            return null;
-        }
-        
-        // Add buttons for each approach - check if controlPanel exists first
-        const addButton = (position, label, onClick) => {
-            try {
-                // In our implementation, controlPanel itself is the parent (not controlPanel.mesh)
-                return createButton({
-                    parent: controlPanel,
-                    position: position,
-                    width: 0.25,
-                    height: 0.07,
-                    label: label,
-                    onClick: onClick
-                });
-            } catch (error) {
-                console.error(`Error adding button "${label}":`, error);
-                return null;
-            }
-        };
-        
-        // Add each button with error handling
-        addButton(new THREE.Vector3(-0.15, 0.05, 0.01), "DOM Injection", createDOMDemo);
-        addButton(new THREE.Vector3(0.15, 0.05, 0.01), "HTML Texture", createTextureDemo);
-        addButton(new THREE.Vector3(-0.15, -0.05, 0.01), "DOM Overlay", createOverlayDemo);
-        addButton(new THREE.Vector3(0.15, -0.05, 0.01), "Web Messaging", createMessagingDemo);
-        addButton(new THREE.Vector3(0, -0.15, 0.01), "Reset All Demos", resetAllDemos);
-        
-        return controlPanel;
-    } catch (error) {
-        console.error("Error creating demo controls:", error);
-        return null;
+    // Create the main control panel first to hold our buttons
+    const controlPanel = createControlPanel(scene);
+    
+    if (!controlPanel) {
+        console.error("Failed to create control panel for demo");
+        return;
     }
+    
+    // Add buttons for each approach
+    createButton({
+        parent: controlPanel.mesh,
+        position: new THREE.Vector3(-0.15, 0.05, 0.01),
+        width: 0.25,
+        height: 0.07,
+        label: "DOM Injection",
+        onClick: () => createDOMDemo()
+    });
+    
+    createButton({
+        parent: controlPanel.mesh,
+        position: new THREE.Vector3(0.15, 0.05, 0.01),
+        width: 0.25,
+        height: 0.07,
+        label: "HTML Texture",
+        onClick: () => createTextureDemo()
+    });
+    
+    createButton({
+        parent: controlPanel.mesh,
+        position: new THREE.Vector3(-0.15, -0.05, 0.01),
+        width: 0.25,
+        height: 0.07,
+        label: "DOM Overlay",
+        onClick: () => createOverlayDemo()
+    });
+    
+    createButton({
+        parent: controlPanel.mesh,
+        position: new THREE.Vector3(0.15, -0.05, 0.01),
+        width: 0.25,
+        height: 0.07,
+        label: "Web Messaging",
+        onClick: () => createMessagingDemo()
+    });
+    
+    createButton({
+        parent: controlPanel.mesh,
+        position: new THREE.Vector3(0, -0.15, 0.01),
+        width: 0.5,
+        height: 0.07,
+        label: "Reset All Demos",
+        onClick: resetAllDemos
+    });
+    
+    return controlPanel;
 }
 
 // Demo functions for each approach

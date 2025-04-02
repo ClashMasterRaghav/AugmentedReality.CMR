@@ -46,27 +46,32 @@ let videoControlFunctions = {
 
 // Setup event listeners
 export function setupEventListeners() {
-    // Check if controller and renderer are defined
-    if (!controller) {
-        console.error("Cannot setup event listeners: controller is undefined");
-        return false;
-    }
-    
-    if (!renderer || !renderer.domElement) {
-        console.error("Cannot setup event listeners: renderer or domElement is undefined");
-        return false;
-    }
-    
     try {
+        // Get the global controller reference
+        const controllerRef = window.arController || controller;
+        
+        if (!controllerRef) {
+            console.error("Cannot set up event listeners: controller is undefined");
+            return false;
+        }
+        
+        // Get the renderer reference
+        const rendererRef = window.arRenderer || renderer;
+        
+        if (!rendererRef || !rendererRef.domElement) {
+            console.error("Cannot set up touch events: renderer or domElement is undefined");
+            return false;
+        }
+        
         // Controller events
-        controller.addEventListener('select', onSelect);
-        controller.addEventListener('selectstart', onSelectStart);
-        controller.addEventListener('selectend', onSelectEnd);
+        controllerRef.addEventListener('select', onSelect);
+        controllerRef.addEventListener('selectstart', onSelectStart);
+        controllerRef.addEventListener('selectend', onSelectEnd);
         
         // Touch events
-        renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-        renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-        renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+        rendererRef.domElement.addEventListener('touchstart', onTouchStart, false);
+        rendererRef.domElement.addEventListener('touchmove', onTouchMove, false);
+        rendererRef.domElement.addEventListener('touchend', onTouchEnd, false);
         
         console.log("Event listeners set up successfully");
         return true;

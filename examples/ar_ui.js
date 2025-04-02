@@ -499,11 +499,7 @@ export function createControlPanel(sceneRef) {
         }
         
         // Add screen type selector below the main panel
-        try {
-            createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
-        } catch (error) {
-            console.error("Error creating screen type selector:", error);
-        }
+        createScreenTypeSelector(controlPanel, 0, -0.08, 0.04, scene);
         
         return controlPanel;
     } catch (error) {
@@ -957,142 +953,125 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
 // Create a virtual keyboard for text input
 export function createVirtualKeyboard(sceneRef) {
     try {
-        // Get scene reference
-        const scene = sceneRef || window.arScene;
+        // Get a valid scene reference
+        const sceneToUse = sceneRef || window.arScene || scene;
         
-        if (!scene) {
-            console.error("Cannot create virtual keyboard: scene is undefined");
+        if (!sceneToUse) {
+            console.error("Cannot create virtual keyboard: no scene reference available");
             return null;
         }
         
-        console.log("Creating virtual keyboard with scene:", scene);
-        
-        // Create keyboard group
+        // Create the keyboard group
         virtualKeyboard = new THREE.Group();
-        virtualKeyboard.name = "virtualKeyboard";
+        virtualKeyboard.visible = false; // Initially hidden
         
-        // Define keyboard layout
-        const layout = [
-            '1234567890',
-            'QWERTYUIOP',
-            'ASDFGHJKL',
-            'ZXCVBNM_.',
-            '⌫ SPACE ENTER'
-        ];
+        // Add userData
+        virtualKeyboard.userData = {
+            type: 'virtualKeyboard',
+            isActive: false
+        };
         
-        // Keyboard dimensions
+        // Create the keyboard base
         const keyboardWidth = 0.6;
-        const keyboardHeight = 0.3;
-        const rows = layout.length;
-        const keyPadding = 0.005;
+        const keyboardHeight = 0.25;
+        const keyboardGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
         
-        // Calculate key size
-        const rowWidths = layout.map(row => row.length);
-        const maxCols = Math.max(...rowWidths);
-        const keyWidth = (keyboardWidth - (keyPadding * (maxCols + 1))) / maxCols;
-        const keyHeight = (keyboardHeight - (keyPadding * (rows + 1))) / rows;
+        // Create keyboard texture
+        const keyboardCanvas = document.createElement('canvas');
+        keyboardCanvas.width = 1024;
+        keyboardCanvas.height = 512;
+        const ctx = keyboardCanvas.getContext('2d');
         
-        // Create keyboard background
-        const bgGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
-        const bgTexture = createKeyboardBackground(keyboardWidth * 500, keyboardHeight * 500);
-        const bgMaterial = new THREE.MeshBasicMaterial({
-            map: bgTexture,
+        // Draw keyboard background
+        ctx.fillStyle = 'rgba(30, 35, 60, 0.85)';
+        ctx.fillRect(0, 0, keyboardCanvas.width, keyboardCanvas.height);
+        
+        // Add border
+        ctx.strokeStyle = 'rgba(120, 140, 220, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(2, 2, keyboardCanvas.width - 4, keyboardCanvas.height - 4);
+        
+        const keyboardTexture = new THREE.CanvasTexture(keyboardCanvas);
+        const keyboardMaterial = new THREE.MeshBasicMaterial({
+            map: keyboardTexture,
             transparent: true,
             opacity: 0.9
         });
-        const background = new THREE.Mesh(bgGeometry, bgMaterial);
-        virtualKeyboard.add(background);
         
-        // Store the last created key mesh for the output display
-        let lastKeyMesh = null;
+        const keyboardMesh = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
+        virtualKeyboard.add(keyboardMesh);
         
         // Create keys
-        layout.forEach((row, rowIndex) => {
-            const rowWidth = row.length * keyWidth + (row.length + 1) * keyPadding;
-            const rowStartX = -keyboardWidth / 2 + (keyboardWidth - rowWidth) / 2 + keyWidth / 2 + keyPadding;
-            
-            [...row].forEach((key, colIndex) => {
-                // Special handling for space and other special keys
-                let keyLabel = key;
-                let keyTextWidth = keyWidth;
-                let specialKeyWidth = keyWidth;
-                
-                if (key === ' ') {
-                    // Space key
-                    keyLabel = 'SPACE';
-                    specialKeyWidth = keyWidth * 5;
-                } else if (key === '⌫') {
-                    // Backspace key
-                    keyLabel = '⌫';
-                    specialKeyWidth = keyWidth * 1.5;
-                } else if (key === 'ENTER') {
-                    // Enter key
-                    specialKeyWidth = keyWidth * 2;
-                }
-                
-                // Calculate key position
-                let posX = rowStartX + colIndex * (keyWidth + keyPadding);
-                
-                // Adjust for special key widths
-                if (key === 'SPACE' && colIndex > 0) {
-                    posX += (specialKeyWidth - keyWidth) / 2;
-                } else if (key === 'ENTER' && colIndex > 0) {
-                    posX += (specialKeyWidth - keyWidth) / 2;
-                }
-                
-                const posY = keyboardHeight / 2 - keyHeight / 2 - rowIndex * (keyHeight + keyPadding) - keyPadding;
-                
-                const keyGeometry = new THREE.PlaneGeometry(
-                    key === 'SPACE' || key === 'ENTER' || key === '⌫' ? specialKeyWidth : keyWidth,
-                    keyHeight
-                );
-                
-                const keyTexture = createKeyTexture(keyLabel, keyLabel === 'SPACE' ? specialKeyWidth * 300 : keyWidth * 300, keyHeight * 300);
-                const keyMaterial = new THREE.MeshBasicMaterial({
-                    map: keyTexture,
-                    transparent: true
-                });
-                
-                const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-                keyMesh.position.set(posX, posY, 0.001);
-                
-                // Add user data for interaction
-                keyMesh.userData = {
-                    type: 'key',
-                    key: key === 'SPACE' ? ' ' : key,
-                    label: keyLabel,
-                    originalPosition: new THREE.Vector3(posX, posY, 0.001)
-                };
-                
-                virtualKeyboard.add(keyMesh);
-                lastKeyMesh = keyMesh;
-            });
-        });
+        const keys = [
+            '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+            'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P',
+            'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '.',
+            'Z', 'X', 'C', 'V', 'B', 'N', 'M', '_', '←', '✓'
+        ];
         
-        // Create a simple label for the output display - add to keyboard background instead of last key
-        if (background) {
-            const labelGeometry = new THREE.PlaneGeometry(keyboardWidth - keyPadding * 2, keyHeight);
-            const labelTexture = createOutputDisplay(keyboardWidth * 500 - keyPadding * 2 * 500, keyHeight * 300);
-            const labelMaterial = new THREE.MeshBasicMaterial({
-                map: labelTexture,
-                transparent: true
+        const rows = 4;
+        const cols = 10;
+        const keySize = 0.055;
+        const padding = 0.005;
+        const startX = -(keyboardWidth / 2) + keySize / 2 + padding;
+        const startY = (keyboardHeight / 2) - keySize / 2 - padding;
+        
+        for (let i = 0; i < keys.length; i++) {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            
+            const x = startX + col * (keySize + padding);
+            const y = startY - row * (keySize + padding);
+            
+            // Create key
+            const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
+            
+            // Create texture for key
+            const keyCanvas = document.createElement('canvas');
+            keyCanvas.width = 128;
+            keyCanvas.height = 128;
+            const keyCtx = keyCanvas.getContext('2d');
+            
+            // Key background
+            keyCtx.fillStyle = keys[i] === '←' || keys[i] === '✓' ? '#4285f4' : '#ffffff';
+            keyCtx.fillRect(0, 0, keyCanvas.width, keyCanvas.height);
+            
+            // Key border
+            keyCtx.strokeStyle = '#bbbbbb';
+            keyCtx.lineWidth = 2;
+            keyCtx.strokeRect(2, 2, keyCanvas.width - 4, keyCanvas.height - 4);
+            
+            // Key text
+            keyCtx.fillStyle = keys[i] === '←' || keys[i] === '✓' ? '#ffffff' : '#000000';
+            keyCtx.font = 'bold 48px Arial';
+            keyCtx.textAlign = 'center';
+            keyCtx.textBaseline = 'middle';
+            keyCtx.fillText(keys[i], keyCanvas.width / 2, keyCanvas.height / 2);
+            
+            const keyTexture = new THREE.CanvasTexture(keyCanvas);
+            const keyMaterial = new THREE.MeshBasicMaterial({
+                map: keyTexture,
+                transparent: false
             });
             
-            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-            labelMesh.position.set(0, keyboardHeight/2 + keyHeight/2, 0.001);
-            virtualKeyboard.add(labelMesh);
+            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
+            keyMesh.position.set(x, y, 0.001);
+            
+            // Add user data for interaction
+            keyMesh.userData = {
+                type: 'keyboardKey',
+                key: keys[i],
+                isInteractive: true
+            };
+            
+            virtualKeyboard.add(keyMesh);
         }
         
-        // Hide keyboard initially
-        virtualKeyboard.visible = false;
+        // Position the keyboard in front of camera
+        virtualKeyboard.position.set(0, -0.1, -0.5);
         
         // Add to scene
-        if (scene && scene.add) {
-            scene.add(virtualKeyboard);
-            console.log("Virtual keyboard added to scene");
-        } else {
-            console.error("Cannot add virtual keyboard: scene is invalid");
-        }
+        sceneToUse.add(virtualKeyboard);
         
         return virtualKeyboard;
     } catch (error) {
@@ -1271,110 +1250,109 @@ export function floatAnimation() {
     }
 }
 
-// Create a button with given parameters
+// Create a modern interactive button with customizable options
 export function createButton(options = {}) {
-    const {
-        parent,
-        position = new THREE.Vector3(0, 0, 0),
-        width = 0.2,
-        height = 0.05,
-        label = 'Button',
-        onClick = null,
-        color = 0x4285f4,
-        hoverColor = 0x5a95f5,
-        textColor = 0xffffff
-    } = options;
-    
-    if (!parent) {
-        console.error("Parent object is required for createButton");
+    try {
+        // Extract options with defaults
+        const {
+            parent = null,
+            position = new THREE.Vector3(0, 0, 0),
+            width = 0.1,
+            height = 0.05,
+            color = 0x4285f4,
+            label = 'Button',
+            icon = null,
+            onClick = null
+        } = options;
+        
+        // Check if parent is provided and valid
+        if (!parent) {
+            console.error("Parent object is required for createButton");
+            return null;
+        }
+        
+        // Create button group
+        const button = new THREE.Group();
+        button.position.copy(position);
+        
+        // Create button background
+        const buttonGeometry = new THREE.PlaneGeometry(width, height);
+        
+        // Create a canvas texture for the button
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw button background with rounded corners
+        const cornerRadius = 20;
+        ctx.beginPath();
+        ctx.moveTo(cornerRadius, 0);
+        ctx.lineTo(canvas.width - cornerRadius, 0);
+        ctx.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
+        ctx.lineTo(canvas.width, canvas.height - cornerRadius);
+        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
+        ctx.lineTo(cornerRadius, canvas.height);
+        ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
+        ctx.lineTo(0, cornerRadius);
+        ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+        ctx.closePath();
+        
+        // Color format conversion and gradient
+        const threeColor = new THREE.Color(color);
+        const r = Math.floor(threeColor.r * 255);
+        const g = Math.floor(threeColor.g * 255);
+        const b = Math.floor(threeColor.b * 255);
+        
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, `rgb(${r + 30}, ${g + 30}, ${b + 30})`);
+        gradient.addColorStop(1, `rgb(${r - 20}, ${g - 20}, ${b - 20})`);
+        
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // Add subtle border
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
+        ctx.stroke();
+        
+        // Add label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, canvas.width/2, canvas.height/2);
+        
+        // Create button texture and material
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.MeshBasicMaterial({ 
+            map: texture,
+            transparent: true
+        });
+        
+        const buttonMesh = new THREE.Mesh(buttonGeometry, material);
+        button.add(buttonMesh);
+        
+        // Add userData for interaction
+        button.userData = {
+            type: 'button',
+            isInteractive: true,
+            originalColor: color,
+            hoverColor: new THREE.Color(color).offsetHSL(0, 0, 0.1),
+            activeColor: new THREE.Color(color).offsetHSL(0, 0, -0.1),
+            isHovered: false,
+            isPressed: false,
+            onClick: onClick
+        };
+        
+        // Add to parent
+        parent.add(button);
+        
+        return button;
+    } catch (error) {
+        console.error("Error creating button:", error);
         return null;
     }
-    
-    // Create button group
-    const buttonGroup = new THREE.Group();
-    buttonGroup.position.copy(position);
-    
-    // Create button background with rounded corners using canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Draw button background with gradient
-    const cornerRadius = Math.min(20, canvas.height / 4);
-    
-    // Convert THREE.Color to RGB format
-    const buttonColor = new THREE.Color(color);
-    const r = Math.floor(buttonColor.r * 255);
-    const g = Math.floor(buttonColor.g * 255);
-    const b = Math.floor(buttonColor.b * 255);
-    
-    // Draw a solid base color first (important for hit detection)
-    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    roundRect(ctx, 0, 0, canvas.width, canvas.height, cornerRadius);
-    
-    // Add gradient overlay
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, `rgba(255, 255, 255, 0.2)`);
-    gradient.addColorStop(1, `rgba(0, 0, 0, 0.1)`);
-    ctx.fillStyle = gradient;
-    roundRect(ctx, 0, 0, canvas.width, canvas.height, cornerRadius);
-    
-    // Add subtle border
-    ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
-    ctx.lineWidth = 2;
-    roundRect(ctx, 1, 1, canvas.width - 2, canvas.height - 2, cornerRadius, false, true);
-    
-    // Add text
-    ctx.fillStyle = `rgb(${textColor})`;
-    ctx.font = 'bold 40px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Add text shadow for better readability
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 1;
-    
-    ctx.fillText(label, canvas.width / 2, canvas.height / 2);
-    
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 4;
-    
-    // Create button geometry and material
-    const buttonGeometry = new THREE.PlaneGeometry(width, height);
-    const buttonMaterial = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    
-    // Create button mesh
-    const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    button.renderOrder = 1000;
-    
-    // Add user data for interaction
-    button.userData = {
-        type: 'button',
-        action: 'customButton',
-        originalColor: color,
-        hoverColor: hoverColor,
-        isHovered: false,
-        isPressed: false,
-        isToggle: false,
-        isActive: true,
-        onClick: onClick
-    };
-    
-    // Add to group
-    buttonGroup.add(button);
-    
-    // Add to parent
-    parent.add(buttonGroup);
-    
-    return buttonGroup;
 }
 
 // Helper function to draw rounded rectangles
