@@ -251,10 +251,58 @@ export function createControlPanel() {
     fullPanelDrag.userData = {
         type: 'dragHandle',
         isDragArea: true,
+        isPartOfDragHandle: true,
         originalColor: 0xffffff,
         hoverColor: 0xffffff
     };
     controlPanel.add(fullPanelDrag);
+    
+    // Add a smaller, more obvious drag handle at the top
+    const topDragWidth = panelSize.width * 0.5;
+    const topDragHeight = 0.02;
+    const topDragGeometry = new THREE.PlaneGeometry(topDragWidth, topDragHeight);
+    const topDragMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4FC3F7,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    const topDragHandle = new THREE.Mesh(topDragGeometry, topDragMaterial);
+    topDragHandle.position.set(0, panelSize.height/2 - topDragHeight/2 - 0.01, 0.005);
+    topDragHandle.renderOrder = 1002;
+    topDragHandle.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        isPartOfDragHandle: true,
+        originalColor: 0x4FC3F7,
+        hoverColor: 0x81D4FA
+    };
+    controlPanel.add(topDragHandle);
+    
+    // Create visual indicator for dragging (three dots)
+    const dotsCanvas = document.createElement('canvas');
+    dotsCanvas.width = 128;
+    dotsCanvas.height = 16;
+    const dotsCtx = dotsCanvas.getContext('2d');
+    dotsCtx.fillStyle = '#FFFFFF';
+    
+    // Draw three dots
+    [32, 64, 96].forEach(x => {
+        dotsCtx.beginPath();
+        dotsCtx.arc(x, 8, 3, 0, Math.PI * 2);
+        dotsCtx.fill();
+    });
+    
+    const dotsTexture = new THREE.CanvasTexture(dotsCanvas);
+    const dotsGeometry = new THREE.PlaneGeometry(topDragWidth * 0.6, topDragHeight * 0.6);
+    const dotsMaterial = new THREE.MeshBasicMaterial({
+        map: dotsTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const dotsMesh = new THREE.Mesh(dotsGeometry, dotsMaterial);
+    dotsMesh.renderOrder = 1003;
+    topDragHandle.add(dotsMesh);
     
     // Define button parameters - preserve original functionality
     const buttonSize = 0.055;
@@ -416,26 +464,26 @@ function createButtonIcon(buttonIndex) {
     // Determine which icon to draw
     if (buttonIndex === 0) { // New Screen button
         // Draw a modern plus sign
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.moveTo(64, 128);
         ctx.lineTo(192, 128);
-        ctx.stroke();
-        
-        ctx.beginPath();
+            ctx.stroke();
+            
+            ctx.beginPath();
         ctx.moveTo(128, 64);
         ctx.lineTo(128, 192);
-        ctx.stroke();
+            ctx.stroke();
     } else if (buttonIndex === 1) { // Delete button
         // Draw a modern 'X'
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.moveTo(80, 80);
         ctx.lineTo(176, 176);
-        ctx.stroke();
-        
-        ctx.beginPath();
+            ctx.stroke();
+            
+            ctx.beginPath();
         ctx.moveTo(176, 80);
         ctx.lineTo(80, 176);
-        ctx.stroke();
+            ctx.stroke();
     } else if (buttonIndex === 2) { // YouTube icon
         // Red circle with play button
         ctx.fillStyle = '#FF0000';
@@ -445,7 +493,7 @@ function createButtonIcon(buttonIndex) {
         
         // White play button
         ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.moveTo(100, 90);
         ctx.lineTo(180, 128);
         ctx.lineTo(100, 166);
@@ -460,12 +508,12 @@ function createButtonIcon(buttonIndex) {
         
         // Duck silhouette (simplified)
         ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.arc(148, 108, 30, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.fillStyle = '#DE5833';
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.arc(158, 98, 8, 0, Math.PI * 2);
         ctx.fill();
         
@@ -510,17 +558,17 @@ function createButtonIcon(buttonIndex) {
         // Orbit 1
         ctx.beginPath();
         ctx.ellipse(128, 128, 70, 30, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        
+            ctx.stroke();
+            
         // Orbit 2
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.ellipse(128, 128, 70, 30, Math.PI/3, 0, Math.PI * 2);
-        ctx.stroke();
-        
+            ctx.stroke();
+            
         // Orbit 3
-        ctx.beginPath();
+            ctx.beginPath();
         ctx.ellipse(128, 128, 70, 30, -Math.PI/3, 0, Math.PI * 2);
-        ctx.stroke();
+            ctx.stroke();
         
         // Nucleus
         ctx.fillStyle = '#FFFFFF';
@@ -543,13 +591,13 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     
     // Create a background panel for the selector
     const panelWidth = 0.24;
-    const panelHeight = 0.08;
+    const panelHeight = 0.12; // Taller panel for larger buttons
     const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
     
     // Create a texture for the selector panel
     const panelCanvas = document.createElement('canvas');
     panelCanvas.width = 512;
-    panelCanvas.height = 128;
+    panelCanvas.height = 256; // Taller canvas
     const panelCtx = panelCanvas.getContext('2d');
     
     // Draw panel background with subtle gradient
@@ -577,7 +625,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     panelCtx.fillStyle = '#ffffff';
     panelCtx.font = 'bold 16px Arial';
     panelCtx.textAlign = 'center';
-    panelCtx.fillText('SCREEN TYPES', panelCanvas.width/2, 20);
+    panelCtx.fillText('SCREEN TYPES', panelCanvas.width/2, 24);
     
     // Add subtle border
     panelCtx.strokeStyle = 'rgba(120, 120, 200, 0.3)';
@@ -603,12 +651,14 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
-    const smallButtonSize = buttonSize * 0.7; // Make buttons smaller than main buttons
+    // BIGGER button size for better touch targets
+    const smallButtonSize = buttonSize * 1.0; // Increase from 0.7 to 1.0 (larger)
     const spacing = smallButtonSize * 2.2; // Space between buttons
     const startX = -spacing * 1.5; // Starting position for first button
+    const buttonY = -0.01; // Move buttons down slightly within the panel
     
     buttonTypes.forEach((type, index) => {
-        // Create the button
+        // Create the button - LARGER circle geometry
         const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             color: buttonColors[index],
@@ -617,7 +667,8 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         });
         
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.set(startX + spacing * index, 0, 0.003);
+        // Position with adjusted Y coordinate
+        button.position.set(startX + spacing * index, buttonY, 0.003);
         button.renderOrder = 1005;
         button.userData = {
             type: 'button',
@@ -631,9 +682,9 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
             isActive: true
         };
         
-        // Add icon to button
+        // Add icon to button - LARGER
         const iconTexture = createButtonIcon(buttonIcons[index]);
-        const iconSize = smallButtonSize * 0.75;
+        const iconSize = smallButtonSize * 0.8; // Increase from 0.75 to 0.8
         const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
             map: iconTexture,
@@ -675,15 +726,15 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         highlightMesh.renderOrder = 1005;
         button.add(highlightMesh);
         
-        // Add tiny labels below buttons
+        // Add larger, more visible labels below buttons
         const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 64;
-        labelCanvas.height = 16;
+        labelCanvas.width = 128;
+        labelCanvas.height = 32; // Doubled height
         const labelCtx = labelCanvas.getContext('2d');
         
         labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
         labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = 'bold 10px Arial';
+        labelCtx.font = 'bold 14px Arial'; // Larger font (10px → 14px)
         labelCtx.textAlign = 'center';
         labelCtx.textBaseline = 'middle';
         
@@ -692,7 +743,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         labelCtx.fillText(label, labelCanvas.width / 2, labelCanvas.height / 2);
         
         const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.3, smallButtonSize * 0.4);
+        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.6, smallButtonSize * 0.6); // Wider and taller
         const labelMaterial = new THREE.MeshBasicMaterial({
             map: labelTexture,
             transparent: true,
@@ -707,8 +758,8 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         selectorGroup.add(button);
     });
     
-    // Position the selector below the main buttons
-    selectorGroup.position.set(offsetX, offsetY, 0.001);
+    // Position the selector below the main buttons - moved down further
+    selectorGroup.position.set(offsetX, offsetY - 0.02, 0.001);
     parent.add(selectorGroup);
     
     return selectorGroup;

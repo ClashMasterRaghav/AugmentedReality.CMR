@@ -723,6 +723,9 @@ function onTouchStart(event) {
             const localPoint = controlPanel.worldToLocal(hitPoint.clone());
             const hitObject = panelIntersects[0].object;
             
+            console.log("Hit panel object:", hitObject.uuid.slice(0, 8), 
+                      "userData:", hitObject.userData ? JSON.stringify(hitObject.userData) : 'none');
+            
             // Enhanced drag detection - check if we hit:
             // 1. The explicit drag handle or grip lines
             // 2. The top portion of the panel
@@ -730,8 +733,40 @@ function onTouchStart(event) {
             const isDragHandle = hitObject.userData && (
                 hitObject.userData.isDragArea || 
                 hitObject.userData.isPartOfDragHandle ||
-                (hitObject.parent && hitObject.parent.userData && hitObject.parent.userData.isDragArea)
+                hitObject.userData.type === 'dragHandle' ||
+                (hitObject.parent && hitObject.parent.userData && 
+                 (hitObject.parent.userData.isDragArea || hitObject.parent.userData.type === 'dragHandle'))
             );
+            
+            // First check if this is a button
+            const isButton = hitObject.userData && hitObject.userData.type === 'button';
+            
+            // If it's a button, handle the button click
+            if (isButton) {
+                console.log("Touch detected on panel button:", hitObject.userData.action);
+                
+                // Visual feedback
+                const originalColor = hitObject.material.color.clone();
+                hitObject.material.color.set(0x4FC3F7);
+                
+                // Scale effect
+                const originalScale = hitObject.scale.clone();
+                hitObject.scale.multiplyScalar(1.1);
+                
+                setTimeout(() => {
+                    hitObject.material.color.copy(originalColor);
+                    hitObject.scale.copy(originalScale);
+                }, 150);
+                
+                // Haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(40);
+                }
+                
+                // Handle button click and return
+                handleButtonAction(hitObject);
+                return;
+            }
             
             // More generous y-position check for the top section
             const isInDragArea = localPoint.y > 0.0;
@@ -757,17 +792,21 @@ function onTouchStart(event) {
                 
                 // Visual feedback - highlight the drag handle if available
                 const dragHandle = controlPanel.children.find(
-                    child => child.userData && child.userData.isDragArea
+                    child => child.userData && (child.userData.isDragArea || child.userData.type === 'dragHandle')
                 );
                 
-                if (dragHandle && dragHandle.userData.hoverColor) {
+                if (dragHandle && dragHandle.material) {
                     // Store original color if not already stored
                     if (!dragHandle.userData.originalColor) {
                         dragHandle.userData.originalColor = dragHandle.material.color.getHex();
                     }
                     
                     // Highlight with hover color
-                    dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
+                    if (dragHandle.userData.hoverColor) {
+                        dragHandle.material.color.setHex(dragHandle.userData.hoverColor);
+                    } else {
+                        dragHandle.material.color.set(0x81D4FA);
+                    }
                     
                     // Add slight scale-up effect
                     dragHandle.scale.set(1.05, 1.05, 1.05);
@@ -1044,28 +1083,29 @@ function onTouchMove(event) {
         const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
         
-        // Scale factor for more responsive movement
-        const moveScale = 0.6; // Slightly less than screen movement for finer control
+        // Scale factor for more responsive movement - INCREASED
+        const moveScale = 1.5; // Much more responsive movement
         
         // Create movement vector
         const movement = new THREE.Vector3()
             .addScaledVector(cameraRight, deltaX * moveScale)
             .addScaledVector(cameraUp, deltaY * moveScale);
         
-        // Apply movement with smooth lerping
-        const newPosition = controlPanel.position.clone().add(movement);
+        // Apply movement directly for more responsive feel
+        controlPanel.position.add(movement);
         
         // Keep y position within reasonable bounds
-        newPosition.y = THREE.MathUtils.clamp(newPosition.y, -0.4, 0.5);
+        controlPanel.position.y = THREE.MathUtils.clamp(controlPanel.position.y, -0.3, 0.4);
         
-        // Smoothly move panel to new position
-        controlPanel.position.lerp(newPosition, 0.8); // More direct movement (0.8 vs 0.7)
-        
-        // Make panel always face the camera
+        // Always face the camera for better visibility
         controlPanel.lookAt(camera.position);
         
-        // Optional visual feedback for movement (like screens)
-        createMoveIndicator(controlPanel.position.clone(), 0.02);
+        // Mark that the user has manually positioned the panel
+        controlPanel.userData.manuallyPositioned = true;
+        
+        // Visual feedback - show tiny movement indicator
+        const moveIndicatorSize = 0.01;
+        createMoveIndicator(controlPanel.position.clone(), moveIndicatorSize);
         
         return;
     }
