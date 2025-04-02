@@ -81,98 +81,28 @@ function onSelectStart(event) {
     }
 }
 
-// Get button from an intersected object
+// Find the actual button from an intersection
 function getButtonFromIntersect(object) {
-    // If object is a button, return it directly
+    // Case 1: Direct hit on button
     if (object.userData && object.userData.type === 'button') {
-        console.log("Direct button hit:", object.userData.action);
         return object;
     }
     
-    // Check if the parent is a button (common for icon meshes)
-    if (object.parent && object.parent.userData && object.parent.userData.type === 'button') {
-        console.log("Parent button hit:", object.parent.userData.action);
-        return object.parent;
+    // Case 2: Hit on a part of the button (icon, shadow, etc)
+    if (object.userData && object.userData.type === 'buttonPart' && object.userData.parentButton) {
+        return object.userData.parentButton;
     }
     
-    // Check if the grandparent is a button (for nested structures)
-    if (object.parent && object.parent.parent && 
-        object.parent.parent.userData && object.parent.parent.userData.type === 'button') {
-        console.log("Grandparent button hit:", object.parent.parent.userData.action);
-        return object.parent.parent;
-    }
-    
-    // Traverse up to find a button (up to 5 levels)
-    let current = object;
-    let level = 0;
-    
-    while (current.parent && level < 5) {
-        current = current.parent;
-        level++;
-        
-        if (current.userData && current.userData.type === 'button') {
-            console.log(`Found button at level ${level}:`, current.userData.action);
-            return current;
+    // Case 3: Hit on child of a button
+    let parent = object.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'button') {
+            return parent;
         }
+        parent = parent.parent;
     }
     
-    // Special handling for screen video control buttons
-    if (object.parent) {
-        // Check if we're inside a screen
-        let screen = null;
-        let target = object.parent;
-        
-        // Traverse up to find the screen
-        for (let i = 0; i < 5; i++) {
-            if (!target) break;
-            
-            if (target.userData && target.userData.type === 'screen') {
-                screen = target;
-                break;
-            }
-            target = target.parent;
-        }
-        
-        if (screen) {
-            // If we found a screen, check its direct children for buttons
-            for (let i = 0; i < screen.children.length; i++) {
-                const child = screen.children[i];
-                if (child.userData && child.userData.type === 'button') {
-                    // Check if this button contains our hit object
-                    let foundObject = false;
-                    
-                    // Check if the hit object is this button or a descendant
-                    child.traverse((obj) => {
-                        if (obj === object) {
-                            foundObject = true;
-                        }
-                    });
-                    
-                    if (foundObject) {
-                        console.log("Found screen button via traversal:", child.userData.action);
-                        return child;
-                    }
-                    
-                    // Check distance from hit point to button (for near misses)
-                    if (object.worldToLocal && child.getWorldPosition) {
-                        const hitPoint = new THREE.Vector3();
-                        object.getWorldPosition(hitPoint);
-                        
-                        const buttonPoint = new THREE.Vector3();
-                        child.getWorldPosition(buttonPoint);
-                        
-                        const distance = hitPoint.distanceTo(buttonPoint);
-                        if (distance < 0.05) { // If within 5cm
-                            console.log("Found nearby button:", child.userData.action, "distance:", distance);
-                            return child;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    console.log("No button found from intersect");
+    // No button found
     return null;
 }
 

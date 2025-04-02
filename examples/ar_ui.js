@@ -351,15 +351,22 @@ export function createControlPanel() {
         buttonCanvas.height = 128;
         const buttonCtx = buttonCanvas.getContext('2d');
         
+        // First, create a solid background fill to ensure the entire button is visible and clickable
+        buttonCtx.fillStyle = "#333333"; // Dark grey background
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        buttonCtx.fill();
+        
         // Create gradient fill
-        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 20, 64, 50, 64);
+        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
         const baseColor = new THREE.Color(buttonColors[index]);
         const r = Math.floor(baseColor.r * 255);
         const g = Math.floor(baseColor.g * 255);
         const b = Math.floor(baseColor.b * 255);
         
         buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-        buttonGradient.addColorStop(1, `rgb(${r}, ${g}, ${b})`); // Original color at edges
+        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
         
         buttonCtx.fillStyle = buttonGradient;
         buttonCtx.beginPath();
@@ -367,10 +374,10 @@ export function createControlPanel() {
         buttonCtx.fill();
         
         // Add subtle inner shadow
-        buttonCtx.shadowBlur = 15;
+        buttonCtx.shadowBlur = 10;
         buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        buttonCtx.shadowOffsetX = 3;
-        buttonCtx.shadowOffsetY = 3;
+        buttonCtx.shadowOffsetX = 2;
+        buttonCtx.shadowOffsetY = 2;
         buttonCtx.beginPath();
         buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
         buttonCtx.stroke();
@@ -380,7 +387,7 @@ export function createControlPanel() {
         const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             map: buttonTexture,
-            transparent: false,
+            transparent: true,
             side: THREE.DoubleSide
         });
         
@@ -751,15 +758,22 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         buttonCanvas.height = 128;
         const buttonCtx = buttonCanvas.getContext('2d');
         
+        // First, create a solid background fill to ensure the entire button is visible and clickable
+        buttonCtx.fillStyle = "#333333"; // Dark grey background
+        buttonCtx.beginPath();
+        buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
+        buttonCtx.fill();
+        
         // Create gradient fill
-        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 20, 64, 50, 64);
+        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
         const baseColor = new THREE.Color(buttonColors[index]);
         const r = Math.floor(baseColor.r * 255);
         const g = Math.floor(baseColor.g * 255);
         const b = Math.floor(baseColor.b * 255);
         
         buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
-        buttonGradient.addColorStop(1, `rgb(${r}, ${g}, ${b})`); // Original color at edges
+        buttonGradient.addColorStop(0.7, `rgb(${r}, ${g}, ${b})`); // Original color
+        buttonGradient.addColorStop(1, `rgb(${Math.floor(r*0.7)}, ${Math.floor(g*0.7)}, ${Math.floor(b*0.7)})`); // Darker edge
         
         buttonCtx.fillStyle = buttonGradient;
         buttonCtx.beginPath();
@@ -778,11 +792,12 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         
         const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
         
-        // Create button with texture
+        // Create button with texture - make sure it's a full circle, not just an outline
         const buttonGeometry = new THREE.CircleGeometry(smallButtonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             map: buttonTexture,
-            transparent: false,
+            transparent: true, // Keep transparent for proper texture display
+            opacity: 1.0, // Full opacity
             side: THREE.DoubleSide
         });
         
@@ -813,6 +828,11 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
         shadowMesh.position.z = -0.001;
         shadowMesh.renderOrder = 1004;
+        // Link shadow mesh to button for interaction
+        shadowMesh.userData = {
+            type: 'buttonPart',
+            parentButton: button
+        };
         button.add(shadowMesh);
         
         // Add icon to button - LARGER
@@ -828,6 +848,11 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
         iconMesh.position.z = 0.004;
         iconMesh.renderOrder = 1006;
+        // Link icon mesh to button for interaction
+        iconMesh.userData = {
+            type: 'buttonPart',
+            parentButton: button
+        };
         button.add(iconMesh);
         
         // Add label for each button with text shadow for better readability
