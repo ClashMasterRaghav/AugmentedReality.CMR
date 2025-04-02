@@ -490,134 +490,44 @@ function createButtonIcon(buttonIndex) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Set up shared styling - more modern look
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Load and use actual PNG icons instead of drawing them
+    const iconLoader = new THREE.TextureLoader();
+    let iconPath = '';
     
-    // Determine which icon to draw
-    if (buttonIndex === 0) { // New Screen button
-        // Draw a modern plus sign
+    // Determine which icon to load
+    switch(buttonIndex) {
+        case 0: // New Screen button
+            iconPath = 'examples/textures/ar_icons/add.png';
+            break;
+        case 1: // Delete button
+            iconPath = 'examples/textures/ar_icons/delete.png';
+            break;
+        case 2: // YouTube icon
+            iconPath = 'examples/textures/ar_icons/youtube.png';
+            break;
+        case 3: // DuckDuckGo icon
+            iconPath = 'examples/textures/ar_icons/DuckDuckGo_logo.png';
+            break;
+        case 4: // Google Maps icon
+            iconPath = 'examples/textures/ar_icons/maps.png';
+            break;
+        case 5: // Electron icon
+            iconPath = 'examples/textures/ar_icons/electron_app.png';
+            break;
+        default:
+            // If no matching icon, create a placeholder
+            ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-        ctx.moveTo(64, 128);
-        ctx.lineTo(192, 128);
-            ctx.stroke();
+            ctx.arc(128, 128, 90, 0, Math.PI * 2);
+            ctx.fill();
             
-            ctx.beginPath();
-        ctx.moveTo(128, 64);
-        ctx.lineTo(128, 192);
-            ctx.stroke();
-    } else if (buttonIndex === 1) { // Delete button
-        // Draw a modern 'X'
-            ctx.beginPath();
-        ctx.moveTo(80, 80);
-        ctx.lineTo(176, 176);
-            ctx.stroke();
-            
-            ctx.beginPath();
-        ctx.moveTo(176, 80);
-        ctx.lineTo(80, 176);
-            ctx.stroke();
-    } else if (buttonIndex === 2) { // YouTube icon
-        // Red circle with play button
-        ctx.fillStyle = '#FF0000';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // White play button
-        ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-        ctx.moveTo(100, 90);
-        ctx.lineTo(180, 128);
-        ctx.lineTo(100, 166);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 3) { // DuckDuckGo icon
-        // Orange circle
-        ctx.fillStyle = '#DE5833';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Duck silhouette (simplified)
-        ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-        ctx.arc(148, 108, 30, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#DE5833';
-            ctx.beginPath();
-        ctx.arc(158, 98, 8, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(130, 130);
-        ctx.lineTo(180, 170);
-        ctx.lineTo(130, 170);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 4) { // Google Maps icon
-        // Blue-ish background
-        ctx.fillStyle = '#4285F4';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Maps pin
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(128, 108, 40, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#EA4335';
-        ctx.beginPath();
-        ctx.moveTo(128, 108);
-        ctx.lineTo(128, 188);
-        ctx.lineTo(108, 168);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 5) { // Electron icon
-        // Teal background
-        ctx.fillStyle = '#47848F';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Electron orbits and nucleus
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 8;
-        
-        // Orbit 1
-        ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            
-        // Orbit 2
-            ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, Math.PI/3, 0, Math.PI * 2);
-            ctx.stroke();
-            
-        // Orbit 3
-            ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, -Math.PI/3, 0, Math.PI * 2);
-            ctx.stroke();
-        
-        // Nucleus
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(128, 128, 20, 0, Math.PI * 2);
-        ctx.fill();
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
     }
     
-    // Create a texture from the canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    
-    return texture;
+    // Return the loaded texture directly
+    return iconLoader.load(iconPath);
 }
 
 // Create a screen type selector with buttons for different content types
