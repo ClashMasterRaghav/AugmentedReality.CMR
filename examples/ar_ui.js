@@ -696,6 +696,20 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     panelMesh.renderOrder = 1004;
     selectorGroup.add(panelMesh);
     
+    // Add a solid background blocking plane behind the panel to fix interaction issues
+    const blockingGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+    const blockingMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: false,
+        opacity: 1.0,
+        side: THREE.DoubleSide
+    });
+    const blockingMesh = new THREE.Mesh(blockingGeometry, blockingMaterial);
+    blockingMesh.position.z = -0.003;
+    blockingMesh.renderOrder = 1002; // Below panel but above glow
+    blockingMesh.visible = false; // Invisible but still blocks raycasts
+    selectorGroup.add(blockingMesh);
+    
     // Add subtle glow behind the panel
     const glowGeometry = new THREE.PlaneGeometry(panelWidth + 0.01, panelHeight + 0.01);
     const glowMaterial = new THREE.MeshBasicMaterial({
@@ -765,7 +779,7 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
         // Position with adjusted Y coordinate
-        button.position.set(startX + spacing * index, buttonY, 0.003);
+        button.position.set(startX + spacing * index, buttonY, 0.004); // Increased z position to ensure it's in front of blocking plane
         button.renderOrder = 1005;
         button.userData = {
             type: 'button',
