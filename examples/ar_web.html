@@ -191,17 +191,32 @@
 				}
 			});
 			
-			// Import modules with cache busting
-			import(`./ar_main.js?v=${timestamp}`).catch(error => {
-				console.error("Failed to load ar_main.js:", error);
+			// Prevent duplicate initialization
+			if (!window.arInitialized) {
+				window.arInitialized = true;
+				console.log("Starting AR application...");
 				
-				// Show error in UI
-				const errorDisplay = document.getElementById('errorDisplay');
-				if (errorDisplay) {
-					errorDisplay.style.display = 'block';
-					errorDisplay.innerHTML += `<div>Failed to load ar_main.js: ${error.message}</div>`;
-				}
-			});
+				// Import modules with cache busting
+				import(`./ar_main.js?v=${timestamp}`).then(module => {
+					// Call init function directly if available
+					if (module.init && typeof module.init === 'function') {
+						// Only load once
+						console.log("Directly calling init function");
+						module.init();
+					}
+				}).catch(error => {
+					console.error("Failed to load ar_main.js:", error);
+					
+					// Show error in UI
+					const errorDisplay = document.getElementById('errorDisplay');
+					if (errorDisplay) {
+						errorDisplay.style.display = 'block';
+						errorDisplay.innerHTML += `<div>Failed to load ar_main.js: ${error.message}</div>`;
+					}
+				});
+			} else {
+				console.warn("AR application already initialized. Preventing duplicate initialization.");
+			}
 		</script>
 	</body>
 </html>

@@ -11,14 +11,44 @@ import * as WebOverlay from './ar_web_overlay.js?v=4';
 import * as WebMessaging from './ar_web_messaging.js?v=4';
 import { createInteractivePlane } from './ar_interaction_plane.js?v=4';
 
+// Flag to track if AR has been initialized
+let hasInitialized = false;
+
 // Define startAR function as a placeholder if not imported
 const startAR = window.startAR || function() {
     console.log("Using placeholder startAR function - no AR session will be started");
     return Promise.resolve();
 };
 
+// Initialize function mapping for web content loading
+const contentLoaders = {
+    'fixed': createDOMDemo,
+    'responsive': createTextureDemo,
+    'vr-optimized': createMessagingDemo
+};
+
+// Export a global function for content loading
+window.loadWebContent = function(type) {
+    console.log(`Loading web content type: ${type}`);
+    // Reset any existing content
+    resetAllDemos();
+    
+    // Call the appropriate loader function
+    if (contentLoaders[type]) {
+        contentLoaders[type]();
+    } else {
+        console.error(`Unknown content type: ${type}`);
+    }
+};
+
 // Wait for DOM content to be loaded before initializing
 document.addEventListener('DOMContentLoaded', () => {
+    // Skip initialization if already done through direct init() call
+    if (hasInitialized) {
+        console.log("Skipping DOMContentLoaded initialization as AR has already been initialized");
+        return;
+    }
+    
     // Flag to track if user has interacted
     let userHasInteracted = false;
     const interactionHelper = document.getElementById('interactionHelper');
@@ -70,100 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Check if WebXR is supported
-    const isWebXRSupported = () => {
-        if ('xr' in navigator) {
-            // Check if AR is supported
-            return navigator.xr.isSessionSupported('immersive-ar')
-                .then(supported => {
-                    console.log('WebXR AR supported:', supported);
-                    return supported;
-                })
-                .catch(error => {
-                    console.error('Error checking AR support:', error);
-                    return false;
-                });
-        } else {
-            console.log('WebXR not supported in this browser');
-            return Promise.resolve(false);
-        }
-    };
-    
     // Initialize AR experience
     function initializeAR() {
-        // Check WebXR and AR support
-        isWebXRSupported().then(supported => {
-            const loadingMessage = document.getElementById('loadingMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            if (!supported) {
-                // Show error message for unsupported browsers
-                if (loadingMessage) loadingMessage.style.display = 'none';
-                if (errorMessage) {
-                    errorMessage.style.display = 'block';
-                    console.error('WebXR AR is not supported on this device or browser');
-                } else {
-                    // If error message element doesn't exist, create one
-                    const errorDiv = document.createElement('div');
-                    errorDiv.id = 'errorMessage';
-                    errorDiv.style.position = 'absolute';
-                    errorDiv.style.top = '50%';
-                    errorDiv.style.left = '50%';
-                    errorDiv.style.transform = 'translate(-50%, -50%)';
-                    errorDiv.style.color = '#fff';
-                    errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
-                    errorDiv.style.padding = '20px';
-                    errorDiv.style.borderRadius = '10px';
-                    errorDiv.style.fontFamily = 'Arial, sans-serif';
-                    errorDiv.style.fontSize = '18px';
-                    errorDiv.style.textAlign = 'center';
-                    errorDiv.style.zIndex = '1000';
-                    
-                    errorDiv.innerHTML = `
-                        <h2>WebXR AR Not Supported</h2>
-                        <p>Your browser or device does not support WebXR Augmented Reality.</p>
-                        <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
-                    `;
-                    
-                    document.body.appendChild(errorDiv);
-                }
-                return;
-            }
-            
-            // Initialize the AR experience
-            try {
-                // Initialize video texture
-                loadVideoTexture();
-                
-                // Initialize AR
-                initAR();
-                
-                // Set up event listeners
-                setupEventListeners();
-                
-                // Start animation loop
-                animate();
-                
-                // Hide loading message once everything is initialized
-                if (loadingMessage) {
-                    loadingMessage.style.display = 'none';
-                }
-            } catch (error) {
-                // Handle initialization errors
-                console.error('Failed to initialize AR experience:', error);
-                
-                // Hide loading message and show error
-                if (loadingMessage) loadingMessage.style.display = 'none';
-                if (errorMessage) {
-                    errorMessage.innerHTML = `
-                        <h2>AR Initialization Failed</h2>
-                        <p>There was a problem starting the AR experience: ${error.message}</p>
-                        <p>Please try reloading the page or using a different device.</p>
-                    `;
-                    errorMessage.style.display = 'block';
-                }
-            }
-        });
+        // Use the exported init function to avoid code duplication
+        init();
     }
     
     // On desktop or WebXR-supported devices, initialize immediately
@@ -176,24 +116,121 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // AR Main - Interactive Web Content Demo
-async function init() {
+export async function init() {
+    // Prevent multiple initializations
+    if (hasInitialized) {
+        console.log("AR already initialized, skipping duplicate initialization");
+        return;
+    }
+    
+    hasInitialized = true;
+    console.log("Initializing AR from init() function");
+    
     try {
+        // Check if WebXR is supported
+        const isSupported = await checkWebXRSupport();
+        if (!isSupported) {
+            displayARNotSupportedMessage();
+            return;
+        }
+        
         // Initialize AR
         await initAR();
         
         // Make sure global scene is set for UI components
         window.arScene = scene;
         
+        // Initialize video texture
+        loadVideoTexture();
+        
+        // Set up event listeners
+        setupEventListeners();
+        
         // Add demo controls
         createDemoControls();
         
-        // Skip startAR since it's not available 
-        console.log("AR has been initialized successfully");
+        // Start animation loop
+        animate();
         
-        // Animation loop will be started by initAR
-        // No need to call startAR or set animation loop here
+        // Hide loading message
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.style.display = 'none';
+        }
+        
+        console.log("AR has been initialized successfully");
     } catch (error) {
         console.error("Failed to initialize AR:", error);
+        displayErrorMessage(error.message);
+    }
+}
+
+// Check if WebXR is supported
+async function checkWebXRSupport() {
+    if ('xr' in navigator) {
+        try {
+            const supported = await navigator.xr.isSessionSupported('immersive-ar');
+            console.log('WebXR AR supported:', supported);
+            return supported;
+        } catch (error) {
+            console.error('Error checking AR support:', error);
+            return false;
+        }
+    } else {
+        console.log('WebXR not supported in this browser');
+        return false;
+    }
+}
+
+// Display AR not supported message
+function displayARNotSupportedMessage() {
+    const loadingMessage = document.getElementById('loadingMessage');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    if (loadingMessage) loadingMessage.style.display = 'none';
+    if (errorMessage) {
+        errorMessage.style.display = 'block';
+        console.error('WebXR AR is not supported on this device or browser');
+    } else {
+        // If error message element doesn't exist, create one
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'errorMessage';
+        errorDiv.style.position = 'absolute';
+        errorDiv.style.top = '50%';
+        errorDiv.style.left = '50%';
+        errorDiv.style.transform = 'translate(-50%, -50%)';
+        errorDiv.style.color = '#fff';
+        errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.borderRadius = '10px';
+        errorDiv.style.fontFamily = 'Arial, sans-serif';
+        errorDiv.style.fontSize = '18px';
+        errorDiv.style.textAlign = 'center';
+        errorDiv.style.zIndex = '1000';
+        
+        errorDiv.innerHTML = `
+            <h2>WebXR AR Not Supported</h2>
+            <p>Your browser or device does not support WebXR Augmented Reality.</p>
+            <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+        `;
+        
+        document.body.appendChild(errorDiv);
+    }
+}
+
+// Display error message
+function displayErrorMessage(message) {
+    const loadingMessage = document.getElementById('loadingMessage');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    if (loadingMessage) loadingMessage.style.display = 'none';
+    if (errorMessage) {
+        errorMessage.innerHTML = `
+            <h2>AR Initialization Failed</h2>
+            <p>There was a problem starting the AR experience: ${message}</p>
+            <p>Please try reloading the page or using a different device.</p>
+        `;
+        errorMessage.style.display = 'block';
     }
 }
 
@@ -318,7 +355,14 @@ export function createDemoControls() {
                 ...buttonConfig,
                 position: new THREE.Vector3(0, 0.07, 0.01),
                 label: 'Fixed Content',
-                onClick: () => loadWebContent('fixed')
+                onClick: () => {
+                    console.log("Fixed Content button clicked");
+                    if (window.loadWebContent) {
+                        window.loadWebContent('fixed');
+                    } else {
+                        console.error("loadWebContent function not available");
+                    }
+                }
             });
             
             if (fixedButton) {
@@ -335,7 +379,14 @@ export function createDemoControls() {
                 ...buttonConfig,
                 position: new THREE.Vector3(0, 0, 0.01),
                 label: 'Responsive Content',
-                onClick: () => loadWebContent('responsive')
+                onClick: () => {
+                    console.log("Responsive Content button clicked");
+                    if (window.loadWebContent) {
+                        window.loadWebContent('responsive');
+                    } else {
+                        console.error("loadWebContent function not available");
+                    }
+                }
             });
             
             if (responsiveButton) {
@@ -352,7 +403,14 @@ export function createDemoControls() {
                 ...buttonConfig,
                 position: new THREE.Vector3(0, -0.07, 0.01),
                 label: 'VR Optimized Content',
-                onClick: () => loadWebContent('vr-optimized')
+                onClick: () => {
+                    console.log("VR Optimized Content button clicked");
+                    if (window.loadWebContent) {
+                        window.loadWebContent('vr-optimized');
+                    } else {
+                        console.error("loadWebContent function not available");
+                    }
+                }
             });
             
             if (virtualButton) {
@@ -616,68 +674,6 @@ function resetAllDemos() {
     
     // Clear the active screens array
     activeScreens = [];
-}
-
-// Display an error message in AR
-function displayErrorMessage(message) {
-    const geometry = new THREE.PlaneGeometry(1.6, 0.4);
-    const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 200;
-    
-    // Draw the error message
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = "#ffcdd2";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#e57373";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-    
-    ctx.fillStyle = "#d32f2f";
-    ctx.font = "bold 24px Arial";
-    ctx.fillText("Error", 20, 40);
-    
-    ctx.fillStyle = "#212121";
-    ctx.font = "18px Arial";
-    const words = message.split(' ');
-    let line = '';
-    let y = 80;
-    const maxWidth = canvas.width - 40;
-    
-    for (let i = 0; i < words.length; i++) {
-        const testLine = line + words[i] + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && i > 0) {
-            ctx.fillText(line, 20, y);
-            line = words[i] + ' ';
-            y += 30;
-        } else {
-            line = testLine;
-        }
-    }
-    ctx.fillText(line, 20, y);
-    
-    // Create texture and mesh
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({ map: texture });
-    const mesh = new THREE.Mesh(geometry, material);
-    
-    // Position in front of user
-    mesh.position.set(0, 0, -2);
-    scene.add(mesh);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        if (mesh.parent) {
-            mesh.parent.remove(mesh);
-        }
-        if (mesh.material) {
-            mesh.material.dispose();
-        }
-        if (mesh.geometry) {
-            mesh.geometry.dispose();
-        }
-    }, 5000);
 }
 
 // Update function for animation loop
