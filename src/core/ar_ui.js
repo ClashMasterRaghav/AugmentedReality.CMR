@@ -71,7 +71,7 @@ export function createControlPanel() {
         
         // Position control panel in front of camera
         const panelPosition = cameraPosition.clone().add(
-            cameraDirection.multiplyScalar(1)
+            cameraDirection.multiplyScalar(1.8)
         );
         
         // Position slightly below eye level

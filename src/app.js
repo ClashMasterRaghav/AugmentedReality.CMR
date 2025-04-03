@@ -89,7 +89,7 @@ function init() {
                     cameraDirection.applyQuaternion(camera.quaternion);
                     
                     const screenPosition = camera.position.clone().add(
-                        cameraDirection.multiplyScalar(1.5)
+                        cameraDirection.multiplyScalar(2.3)
                     );
                     
                     screen.position.copy(screenPosition);
@@ -118,7 +118,7 @@ function onSelect() {
         
         const position = new THREE.Vector3();
         position.copy(raycaster.ray.origin);
-        position.addScaledVector(raycaster.ray.direction, 1.5);
+        position.addScaledVector(raycaster.ray.direction, 2.3);
         
         // Create a basic test plane
         const testScreen = createYouTubeScreen('dQw4w9WgXcQ', position);
