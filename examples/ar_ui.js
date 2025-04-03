@@ -245,8 +245,8 @@ export function createControlPanel() {
     
     // Create icons
     const icons = [
-        { action: 'newScreen', position: new THREE.Vector2(-buttonSpacing, 0), iconSrc: 'examples/textures/ar_icons/add-screen.png' },
-        { action: 'deleteScreen', position: new THREE.Vector2(0, 0), iconSrc: 'examples/textures/ar_icons/delete-screen.png' },
+        { action: 'newScreen', position: new THREE.Vector2(-buttonSpacing, 0), iconSrc: 'examples/textures/ar_icons/add.png' },
+        { action: 'deleteScreen', position: new THREE.Vector2(0, 0), iconSrc: 'examples/textures/ar_icons/delete.png' },
         { action: 'moveMode', position: new THREE.Vector2(buttonSpacing, 0), iconSrc: 'examples/textures/ar_icons/move.png' }
     ];
     
@@ -323,6 +323,11 @@ export function createControlPanel() {
     // Run entrance animation
     animateScreenEntrance(panel);
     
+    // Add control panel to scene
+    scene.add(controlPanel);
+    
+    console.log("Control panel created and added to scene");
+    
     return controlPanel;
 }
 
@@ -349,6 +354,9 @@ function createButtonIconWithImg(type, iconPath) {
     // Clear canvas with transparency
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Immediately create a fallback icon since some images might be missing
+    createFallbackButtonIcon(type, ctx);
+    
     // Create a new image
     const img = new Image();
     
@@ -357,22 +365,22 @@ function createButtonIconWithImg(type, iconPath) {
     
     // Handle image load
     img.onload = function() {
+        // Clear the fallback icon
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         // Draw image centered on canvas
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        console.log("Successfully loaded icon for:", type);
         
         if (iconMaterial) {
             iconMaterial.map.needsUpdate = true;
         }
     };
     
-    // Handle image load error with fallback
+    // Handle image load error with fallback - already drawn, just log the error
     img.onerror = function() {
-        console.error(`Failed to load icon: ${iconPath}, creating fallback for type: ${type}`);
-        createFallbackButtonIcon(type, ctx);
-        
-        if (iconMaterial) {
-            iconMaterial.map.needsUpdate = true;
-        }
+        console.error(`Failed to load icon: ${iconPath}, using fallback for type: ${type}`);
     };
     
     // Create texture from canvas
@@ -1006,10 +1014,18 @@ export function setButtonPressed(button, isPressed) {
 
 // Position control panel in front of user
 export function setupControlPanel() {
-    if (!controlPanel) return;
+    if (!controlPanel) {
+        console.error("Cannot set up control panel - control panel is null");
+        return;
+    }
+    
+    console.log("Setting up control panel position");
     
     // Only reposition if not being dragged AND not previously manually positioned
-    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
+    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) {
+        console.log("Control panel is being dragged or was manually positioned - not repositioning");
+        return;
+    }
     
     // Position in front and below the user
     const cameraDirection = new THREE.Vector3(0, 0, -1);
@@ -1019,7 +1035,7 @@ export function setupControlPanel() {
     position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
     
     // Position BELOW the default screen position
-    position.y -= 0.4; // Position it much lower to appear below the screen
+    position.y -= 0.3; // Position it a bit higher than before to ensure it's visible
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
@@ -1031,7 +1047,10 @@ export function setupControlPanel() {
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
-    console.log("Control panel positioned below screen");
+    // Ensure the control panel is visible
+    controlPanel.visible = true;
+    
+    console.log("Control panel positioned at:", position);
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive

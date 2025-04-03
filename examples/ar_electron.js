@@ -170,10 +170,17 @@ function createElectronAppTexture() {
     iframe.width = canvas.width;
     iframe.height = canvas.height - 40; // Allow for title bar
     iframe.src = 'https://www.youtube.com/';
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
+    iframe.allowFullscreen = true;
     iframe.frameBorder = "0";
     iframe.id = `electron-youtube-${Date.now()}`;
     document.body.appendChild(iframe);
+    
+    // Add viewport meta tag for better interactivity  
+    const viewportMeta = document.createElement('meta');
+    viewportMeta.name = 'viewport';
+    viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.head.appendChild(viewportMeta);
     
     // Create electron app window frame
     function drawElectronFrame() {
@@ -223,6 +230,33 @@ function createElectronAppTexture() {
     // Draw the electron frame
     drawElectronFrame();
     
+    // Try to forward user interactions to the iframe
+    function forwardInteraction(event) {
+        try {
+            if (iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    type: 'interaction',
+                    event: {
+                        type: event.type,
+                        x: event.clientX,
+                        y: event.clientY
+                    }
+                }, '*');
+            }
+        } catch (e) {
+            console.warn('Unable to forward interaction:', e);
+        }
+    }
+    
+    // Listen for messages from the iframe
+    window.addEventListener('message', function(event) {
+        // Check if message is from our iframe
+        if (event.source === iframe.contentWindow) {
+            console.log('Received message from iframe:', event.data);
+            // Handle specific messages if needed
+        }
+    });
+    
     // Function to capture iframe content to texture
     function captureIframeToTexture() {
         try {
@@ -253,7 +287,7 @@ function createElectronAppTexture() {
                 ctx.textBaseline = 'middle';
                 ctx.fillText('YouTube running in Electron', canvas.width / 2, canvas.height / 2);
                 ctx.font = '16px Arial';
-                ctx.fillText('(Content will display when you interact with the app)', canvas.width / 2, canvas.height / 2 + 40);
+                ctx.fillText('Tap the screen to interact with YouTube', canvas.width / 2, canvas.height / 2 + 40);
                 
                 // Redraw frame
                 drawElectronFrame();

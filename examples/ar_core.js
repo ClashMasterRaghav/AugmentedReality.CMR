@@ -4,7 +4,7 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
-import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
+import { createNewBrowserScreen, createNewDefaultScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
@@ -93,8 +93,17 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
+        console.log("Font loaded - creating UI controls");
+        
         // Create UI controls once font is loaded
-        createControlPanel();
+        const panel = createControlPanel();
+        if (panel) {
+            console.log("Control panel created successfully");
+            setupControlPanel(); // Initialize position
+        } else {
+            console.error("Failed to create control panel");
+        }
+        
         createVirtualKeyboard();
     });
 
@@ -283,8 +292,9 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
     
+    console.log("Initial screen created, setting up control panel in 500ms");
     // Set up control panel initial position
     setTimeout(setupControlPanel, 500);
 }

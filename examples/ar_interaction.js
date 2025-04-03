@@ -3,13 +3,17 @@ import * as THREE from 'three';
 import { 
     camera, scene, controller, renderer, raycaster, 
     isPlacingScreen, newScreen, isMoveModeActive,
-    isRotateModeActive, selectedScreen, selectedKey
+    isRotateModeActive, selectedScreen, selectedKey, workingMatrix, 
+    setSelectedScreen
 } from './ar_core.js';
 import { 
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
-    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
+    createNewYouTubeScreen, createNewGoogleMapsScreen, createNewElectronAppScreen
 } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
+import { 
+    virtualKeyboard, showNotification, toggleModeButton, controlPanel,
+    setupControlPanel
+} from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
@@ -55,6 +59,18 @@ export function setupEventListeners() {
     renderer.domElement.addEventListener('touchstart', onTouchStart, false);
     renderer.domElement.addEventListener('touchmove', onTouchMove, false);
     renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+
+    console.log("Setting up event listeners");
+    
+    // Add debug log to check control panel on first interaction
+    setTimeout(() => {
+        console.log("Control panel status check:", controlPanel ? "exists" : "null");
+        if (controlPanel) {
+            console.log("Control panel position:", controlPanel.position);
+            console.log("Control panel visible:", controlPanel.visible);
+        }
+        setupControlPanel();
+    }, 2000);
 }
 
 // Handle controller selection start
@@ -381,16 +397,16 @@ function handleButtonAction(button) {
             
             switch(screenType) {
                 case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
+                    newScreen = createNewYouTubeScreen(screenPosition);
                     break;
                 case 'duckduckgo':
-                    newScreen = createDuckDuckGoScreen(screenPosition);
+                    newScreen = createNewElectronAppScreen(screenPosition);
                     break;
                 case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
+                    newScreen = createNewGoogleMapsScreen(screenPosition);
                     break;
                 case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
+                    newScreen = createNewElectronAppScreen(screenPosition);
                     break;
                 default:
                     newScreen = createNewBrowserScreen(screenPosition);
