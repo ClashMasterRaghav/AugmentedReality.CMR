@@ -986,9 +986,7 @@ function createControlIcon(type) {
     play: "examples/textures/ar_icons/play-buttton.png",
     pause: "examples/textures/ar_icons/pause-button.png",
     volume: "examples/textures/ar_icons/unmute.png",
-    muted: "examples/textures/ar_icons/mute.png",
-    fullscreen: "examples/textures/ar_icons/fullscreen.png", // Note: This file wasn't in the list, will need fallback
-    resize: "examples/textures/ar_icons/resize.png", // Note: This file wasn't in the list, will need fallback
+    muted: "examples/textures/ar_icons/mute.png"
   };
 
   // Create a new image
@@ -1259,7 +1257,7 @@ function createYouTubeVideoTexture(videoId) {
   canvas.width = 1024;
   canvas.height = 768;
   const ctx = canvas.getContext("2d");
-
+  
   // Fill with background initially
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1267,7 +1265,30 @@ function createYouTubeVideoTexture(videoId) {
   ctx.font = "24px Arial";
   ctx.textAlign = "center";
   ctx.fillText("Loading YouTube video...", canvas.width / 2, canvas.height / 2);
-
+  
+  // Use YouTube thumbnail as the video placeholder
+  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  const thumbnailImg = new Image();
+  thumbnailImg.crossOrigin = "Anonymous";
+  thumbnailImg.src = thumbnailUrl;
+  thumbnailImg.onload = () => {
+    // Draw the thumbnail in the center, maintaining proper aspect ratio
+    const aspectRatio = thumbnailImg.width / thumbnailImg.height;
+    let drawWidth = canvas.width - 40;
+    let drawHeight = drawWidth / aspectRatio;
+    
+    if (drawHeight > canvas.height - 100) {
+      drawHeight = canvas.height - 100;
+      drawWidth = drawHeight * aspectRatio;
+    }
+    
+    const x = (canvas.width - drawWidth) / 2;
+    const y = 70; // Below the header
+    
+    ctx.drawImage(thumbnailImg, x, y, drawWidth, drawHeight);
+    texture.needsUpdate = true;
+  };
+  
   // Create hidden video element for YouTube
   const videoElement = document.createElement("video");
   videoElement.id = "youtubeVideo_" + videoId;
@@ -1278,29 +1299,25 @@ function createYouTubeVideoTexture(videoId) {
   videoElement.playsInline = true;
   videoElement.style.display = "none";
   document.body.appendChild(videoElement);
-
-  // Use the YouTube embed iframe URL converted to a direct video URL if possible
-  // Since we can't directly get the video source from YouTube easily in a client-side app,
-  // we'll create a proper YouTube frame in the UI but hidden, and draw the video to our canvas
-
+  
   // Create an iframe containing the YouTube player
   const youtubeIframe = document.createElement("iframe");
   youtubeIframe.id = "youtubeIframe_" + videoId;
   youtubeIframe.style.display = "none";
   youtubeIframe.width = canvas.width;
   youtubeIframe.height = canvas.height;
-
+  
   // Set YouTube URL with autoplay and loop parameters
   youtubeIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=1&loop=1&enablejsapi=1&origin=${window.location.origin}`;
   youtubeIframe.allow =
     "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
   document.body.appendChild(youtubeIframe);
-
+  
   // Create the texture from the canvas
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
-
+  
   // Store references to the video and iframe in the texture's userData
   texture.userData = {
     videoElement: videoElement,
@@ -1309,32 +1326,30 @@ function createYouTubeVideoTexture(videoId) {
     videoId: videoId,
     isYouTube: true,
   };
-
-  // Update the canvas with the YouTube iframe content
-  // This won't fully work due to cross-origin restrictions, but provides a decent representation
+  
+  // Update the canvas with the YouTube interface
   function updateCanvas() {
     try {
-      // Use a fallback method: draw YouTube-like UI with a play button icon
-      // Note: Due to CORS restrictions, we can't directly capture the iframe content
+      // Draw YouTube-like UI with a play button icon
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+      
       // Draw YouTube interface elements
       // Red header
       ctx.fillStyle = "#FF0000";
       ctx.fillRect(0, 0, canvas.width, 50);
-
+      
       // YouTube logo
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "bold 24px Arial";
       ctx.textAlign = "left";
       ctx.fillText("YouTube", 20, 32);
-
+      
       // Title of video
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "16px Arial";
       ctx.fillText("YouTube Video - " + videoId, 200, 32);
-
+      
       // Create a "live" effect by adding the current time
       const date = new Date();
       const timeString = date.toLocaleTimeString();
@@ -1343,56 +1358,57 @@ function createYouTubeVideoTexture(videoId) {
       ctx.textAlign = "right";
       ctx.fillText(timeString, canvas.width - 20, 32);
 
-      // Draw the YT icon on the video - red play button
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      // Draw a YouTube play button
-      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 50, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#FF0000";
-      ctx.beginPath();
-      ctx.moveTo(centerX - 15, centerY - 20);
-      ctx.lineTo(centerX + 25, centerY);
-      ctx.lineTo(centerX - 15, centerY + 20);
-      ctx.closePath();
-      ctx.fill();
-
-      // Draw some video controls at the bottom
+      // Draw a YouTube play button in the center if thumbnail not loaded
+      if (!thumbnailImg.complete || thumbnailImg.naturalHeight === 0) {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 50, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FF0000";
+        ctx.beginPath();
+        ctx.moveTo(centerX - 15, centerY - 20);
+        ctx.lineTo(centerX + 25, centerY);
+        ctx.lineTo(centerX - 15, centerY + 20);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Draw video controls at the bottom
       ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
       ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-
+      
       // Add text suggesting interactivity
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "18px Arial";
       ctx.textAlign = "center";
       ctx.fillText(
-        "Click on YouTube screen to view on youtube.com",
+        "Double-tap to open YouTube video",
         canvas.width / 2,
         canvas.height - 15
       );
-
+      
       // Update the texture
       texture.needsUpdate = true;
     } catch (e) {
       console.error("Error updating YouTube canvas:", e);
     }
-
+    
     // Continue updating
     requestAnimationFrame(updateCanvas);
   }
-
+  
   // Start updating the canvas
   updateCanvas();
-
+  
   // Add a click handler for the texture to open the video in a new tab
   texture.userData.onClick = function () {
     window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
   };
-
+  
   return texture;
 }
 

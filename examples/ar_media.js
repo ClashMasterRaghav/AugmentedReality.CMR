@@ -191,8 +191,7 @@ function createControlIcon(type) {
         'play': 'examples/textures/ar_icons/play-buttton.png',
         'pause': 'examples/textures/ar_icons/pause-button.png',
         'volume': 'examples/textures/ar_icons/unmute.png',
-        'muted': 'examples/textures/ar_icons/mute.png',
-        'fullscreen': 'examples/textures/ar_icons/fullscreen.png' // Note: This file wasn't in the list, will need fallback
+        'muted': 'examples/textures/ar_icons/mute.png'
     };
     
     // Create a new image

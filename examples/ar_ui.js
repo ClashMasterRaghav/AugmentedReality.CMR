@@ -774,13 +774,58 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         iconMesh.renderOrder = 1006;
         button.add(iconMesh);
         
-        // Load the icon texture asynchronously
-        createButtonIcon(buttonIcons[index]).then(iconTexture => {
-            iconMaterial.map = iconTexture;
+        // Direct loading of icons using image files rather than indices
+        const iconPaths = {
+            0: 'examples/textures/ar_icons/youtube.png',
+            1: 'examples/textures/ar_icons/DuckDuckGo_logo.png',
+            2: 'examples/textures/ar_icons/maps.png',
+            3: 'examples/textures/ar_icons/electron_app.png'
+        };
+        
+        // Load the icon texture directly using the file path
+        const img = new Image();
+        img.onload = function() {
+            // Create a canvas to draw the icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw image centered on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            // Apply to icon material
+            iconMaterial.map = texture;
             iconMaterial.needsUpdate = true;
-        }).catch(error => {
-            console.error("Error loading button icon:", error);
-        });
+        };
+        
+        img.onerror = function() {
+            console.error("Error loading icon image for button: " + index);
+            // Fallback to text icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '80px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(buttonTypes[index].substring(0, 1).toUpperCase(), 128, 128);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            iconMaterial.map = texture;
+            iconMaterial.needsUpdate = true;
+        };
+        
+        // Set image source to the appropriate path for this button
+        img.src = iconPaths[index];
         
         // Add label for each button with text shadow for better readability
         const labelCanvas = document.createElement('canvas');
