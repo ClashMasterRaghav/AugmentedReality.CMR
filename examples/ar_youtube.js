@@ -1,7 +1,7 @@
 // YouTube screen component for AR
 import * as THREE from "three";
 import { scene } from "./ar_core.js";
-import { selectScreen } from "./ar_screens.js";
+import { selectScreen, screens } from "./ar_screens.js";
 import { enhancedCreateScreen, addDropShadow, animateScreenEntrance } from "./ar_default_screen.js";
 
 // Create a YouTube screen with embedded video player
@@ -10,7 +10,7 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5), sc
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
-    const title = `YouTube ${screenId || screens.length + 1}`;
+    const title = `YouTube ${screenId || ""}`;
     
     console.log("Creating YouTube screen with embedded video");
     
@@ -75,158 +75,295 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5), sc
 
 // Create a YouTube video texture with interactive player
 function createYouTubeVideoTexture(videoId) {
-    // Use canvas to simulate YouTube player
+    // Create a canvas element to render iframe content
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 768;
     const ctx = canvas.getContext('2d');
     
+    // Create an invisible iframe to load YouTube embed
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '-9999px';
+    iframe.width = canvas.width;
+    iframe.height = canvas.height;
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&enablejsapi=1`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.frameBorder = "0";
+    iframe.id = `youtube-player-${Date.now()}`;
+    document.body.appendChild(iframe);
+    
+    // Initial blank state with loading message
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading YouTube video...', canvas.width / 2, canvas.height / 2);
+    
     // YouTube logo
     const logo = new Image();
     logo.src = 'examples/textures/ar_icons/youtube.png';
     
-    // YouTube colors
-    const youtubeRed = '#FF0000';
-    const youtubeDarkRed = '#CC0000';
-    
-    // Draw initial state
-    function drawYouTubePlayer() {
-        // Black background
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Create YouTube logo directly if the image isn't found
+    logo.onerror = function() {
+        console.warn("YouTube logo image not found - creating a canvas version");
         
-        // Draw player area (dark gray)
-        ctx.fillStyle = '#0F0F0F';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Create a temporary canvas for the logo
+        const logoCanvas = document.createElement('canvas');
+        logoCanvas.width = 200;
+        logoCanvas.height = 100;
+        const logoCtx = logoCanvas.getContext('2d');
         
-        // Draw YouTube logo if loaded
-        if (logo.complete) {
-            const logoWidth = 200;
-            const logoHeight = 100;
-            ctx.drawImage(
-                logo, 
-                canvas.width / 2 - logoWidth / 2,
-                canvas.height / 2 - logoHeight / 2,
-                logoWidth, 
-                logoHeight
-            );
-        } else {
-            // Placeholder for logo
-            ctx.fillStyle = youtubeRed;
-            ctx.fillRect(
-                canvas.width / 2 - 100,
-                canvas.height / 2 - 50,
-                200, 
-                100
-            );
+        // Draw red box with rounded corners
+        logoCtx.fillStyle = '#FF0000'; // YouTube red
+        logoCtx.beginPath();
+        roundedRect(logoCtx, 0, 0, 200, 70, 20);
+        logoCtx.fill();
+        
+        // Draw play button triangle
+        logoCtx.fillStyle = '#FFFFFF';
+        logoCtx.beginPath();
+        logoCtx.moveTo(85, 15);
+        logoCtx.lineTo(85, 55);
+        logoCtx.lineTo(130, 35);
+        logoCtx.closePath();
+        logoCtx.fill();
+        
+        // Draw "YouTube" text
+        logoCtx.fillStyle = '#FFFFFF';
+        logoCtx.font = 'bold 24px Arial';
+        logoCtx.textAlign = 'left';
+        logoCtx.textBaseline = 'middle';
+        logoCtx.fillText('YouTube', 40, 85);
+        
+        // Helper function for rounded rectangle
+        function roundedRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
         }
         
-        // Draw video title
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 28px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText("Sample YouTube Video", canvas.width / 2, canvas.height / 2 + 100);
+        // Store the image data
+        const logoImage = new Image();
+        logoImage.src = logoCanvas.toDataURL();
         
-        // Draw player controls at bottom
-        ctx.fillStyle = '#282828';
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-        
-        // Draw play button
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(30, canvas.height - 25 - 10);
-        ctx.lineTo(30, canvas.height - 25 + 10);
-        ctx.lineTo(50, canvas.height - 25);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Draw progress bar
-        ctx.fillStyle = '#636363';
-        ctx.fillRect(70, canvas.height - 25, canvas.width - 140, 5);
-        ctx.fillStyle = youtubeRed;
-        ctx.fillRect(70, canvas.height - 25, (canvas.width - 140) * 0.3, 5);
-        
-        // Draw volume icon
-        ctx.beginPath();
-        ctx.moveTo(canvas.width - 50, canvas.height - 30);
-        ctx.lineTo(canvas.width - 40, canvas.height - 30);
-        ctx.lineTo(canvas.width - 30, canvas.height - 40);
-        ctx.lineTo(canvas.width - 30, canvas.height - 10);
-        ctx.lineTo(canvas.width - 40, canvas.height - 20);
-        ctx.lineTo(canvas.width - 50, canvas.height - 20);
-        ctx.closePath();
-        ctx.fill();
+        // Replace the original logo reference
+        logo.src = logoImage.src;
+    };
+    
+    // Initial draw with YouTube logo
+    if (logo.complete) {
+        const logoWidth = 200;
+        const logoHeight = 100;
+        ctx.drawImage(
+            logo, 
+            canvas.width / 2 - logoWidth / 2,
+            canvas.height / 2 - logoHeight / 2 - 50,
+            logoWidth, 
+            logoHeight
+        );
     }
     
-    // Draw initial player
-    drawYouTubePlayer();
+    // Add a play button overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, 50, 0, Math.PI * 2);
+    ctx.fill();
     
-    // Create canvas animation loop
-    let animationId;
-    let progress = 0;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2 - 15, canvas.height / 2 - 25);
+    ctx.lineTo(canvas.width / 2 - 15, canvas.height / 2 + 25);
+    ctx.lineTo(canvas.width / 2 + 25, canvas.height / 2);
+    ctx.closePath();
+    ctx.fill();
     
-    function updateCanvas() {
-        // Update progress
-        progress += 0.0005;
-        if (progress > 1) progress = 0;
+    // Create a DOM element for YouTube iframe controls
+    const youtubeControls = document.createElement('div');
+    youtubeControls.style.position = 'absolute';
+    youtubeControls.style.left = '-9999px';
+    youtubeControls.style.top = '-9999px';
+    youtubeControls.style.width = '300px';
+    youtubeControls.style.background = 'rgba(0,0,0,0.7)';
+    youtubeControls.style.borderRadius = '5px';
+    youtubeControls.style.padding = '10px';
+    youtubeControls.style.display = 'flex';
+    youtubeControls.style.justifyContent = 'space-between';
+    
+    const playButton = document.createElement('button');
+    playButton.textContent = 'Play';
+    playButton.style.backgroundColor = '#FF0000';
+    playButton.style.color = '#FFFFFF';
+    playButton.style.border = 'none';
+    playButton.style.padding = '5px 10px';
+    playButton.style.borderRadius = '3px';
+    
+    const pauseButton = document.createElement('button');
+    pauseButton.textContent = 'Pause';
+    pauseButton.style.backgroundColor = '#666666';
+    pauseButton.style.color = '#FFFFFF';
+    pauseButton.style.border = 'none';
+    pauseButton.style.padding = '5px 10px';
+    pauseButton.style.borderRadius = '3px';
+    
+    const muteButton = document.createElement('button');
+    muteButton.textContent = 'Mute';
+    muteButton.style.backgroundColor = '#444444';
+    muteButton.style.color = '#FFFFFF';
+    muteButton.style.border = 'none';
+    muteButton.style.padding = '5px 10px';
+    muteButton.style.borderRadius = '3px';
+    
+    youtubeControls.appendChild(playButton);
+    youtubeControls.appendChild(pauseButton);
+    youtubeControls.appendChild(muteButton);
+    document.body.appendChild(youtubeControls);
+    
+    // Setup YouTube API
+    let player = null;
+    let isPlaying = false;
+    
+    // Add YouTube API script if not already added
+    if (!window.YT) {
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         
-        // Redraw player with updated progress
-        ctx.fillStyle = '#282828';
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-        
-        // Draw play button
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(30, canvas.height - 25 - 10);
-        ctx.lineTo(30, canvas.height - 25 + 10);
-        ctx.lineTo(50, canvas.height - 25);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Draw progress bar
-        ctx.fillStyle = '#636363';
-        ctx.fillRect(70, canvas.height - 25, canvas.width - 140, 5);
-        ctx.fillStyle = youtubeRed;
-        ctx.fillRect(70, canvas.height - 25, (canvas.width - 140) * progress, 5);
-        
-        // Draw volume icon
-        ctx.beginPath();
-        ctx.moveTo(canvas.width - 50, canvas.height - 30);
-        ctx.lineTo(canvas.width - 40, canvas.height - 30);
-        ctx.lineTo(canvas.width - 30, canvas.height - 40);
-        ctx.lineTo(canvas.width - 30, canvas.height - 10);
-        ctx.lineTo(canvas.width - 40, canvas.height - 20);
-        ctx.lineTo(canvas.width - 50, canvas.height - 20);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Request next frame
-        animationId = requestAnimationFrame(updateCanvas);
+        window.onYouTubeIframeAPIReady = function() {
+            setupYouTubePlayer();
+        };
+    } else {
+        setupYouTubePlayer();
     }
     
-    // Start animation
-    animationId = requestAnimationFrame(updateCanvas);
+    function setupYouTubePlayer() {
+        player = new YT.Player(iframe.id, {
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
+    
+    function onPlayerReady(event) {
+        console.log('YouTube player ready');
+        
+        // Setup button event listeners
+        playButton.addEventListener('click', function() {
+            player.playVideo();
+        });
+        
+        pauseButton.addEventListener('click', function() {
+            player.pauseVideo();
+        });
+        
+        muteButton.addEventListener('click', function() {
+            if (player.isMuted()) {
+                player.unMute();
+                muteButton.textContent = 'Mute';
+            } else {
+                player.mute();
+                muteButton.textContent = 'Unmute';
+            }
+        });
+    }
+    
+    function onPlayerStateChange(event) {
+        switch(event.data) {
+            case YT.PlayerState.PLAYING:
+                isPlaying = true;
+                break;
+            case YT.PlayerState.PAUSED:
+            case YT.PlayerState.ENDED:
+                isPlaying = false;
+                break;
+        }
+    }
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
-    // Add functions and metadata to texture
+    // Add properties and methods to the texture
     texture.userData = {
         isYouTube: true,
         videoId: videoId,
+        iframe: iframe,
         canvas: canvas,
-        ctx: ctx,
-        animationId: animationId,
-        onClick: () => {
-            // Simulate opening YouTube video in new window
-            const url = `https://www.youtube.com/watch?v=${videoId}`;
-            window.open(url, '_blank');
+        player: player,
+        isPlaying: false,
+        controls: youtubeControls,
+        
+        // Methods to control video
+        playVideo: function() {
+            if (player && player.playVideo) {
+                player.playVideo();
+            }
+        },
+        
+        pauseVideo: function() {
+            if (player && player.pauseVideo) {
+                player.pauseVideo();
+            }
+        },
+        
+        togglePlayback: function() {
+            if (!player) return;
+            
+            if (this.isPlaying) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+        },
+        
+        // Cleanup resources
+        dispose: function() {
+            if (iframe && iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+            }
+            if (youtubeControls && youtubeControls.parentNode) {
+                youtubeControls.parentNode.removeChild(youtubeControls);
+            }
+        },
+        
+        // Method to handle click interactions
+        onClick: function(x, y) {
+            // Central play/pause button area
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            
+            if (distance < 50) {
+                // Clicked on the center play button
+                this.togglePlayback();
+                return true;
+            }
+            
+            // Volume control area (bottom right)
+            if (x > canvas.width - 100 && y > canvas.height - 50) {
+                if (player && player.isMuted) {
+                    if (player.isMuted()) {
+                        player.unMute();
+                    } else {
+                        player.mute();
+                    }
+                }
+                return true;
+            }
+            
+            return false;
         }
-    };
-    
-    // Update texture on animation frame
-    texture.update = function() {
-        this.needsUpdate = true;
     };
     
     return texture;

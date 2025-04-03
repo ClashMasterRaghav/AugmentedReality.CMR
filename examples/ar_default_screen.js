@@ -279,139 +279,181 @@ function addControlButton(screen, type, x, y, size) {
     return button;
 }
 
-// Create a control icon using a canvas
+// Create control button icons
 function createControlIcon(type) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128; // Increased size for better quality
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Map icon types to local file paths
+    const logoURLs = {
+        play: "examples/textures/ar_icons/play-buttton.png",
+        pause: "examples/textures/ar_icons/pause-button.png",
+        volume: "examples/textures/ar_icons/unmute.png",
+        muted: "examples/textures/ar_icons/mute.png"
+    };
+    
+    // Create a promise to handle async loading
     return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        
-        // Draw icon based on type
-        switch (type) {
-            case 'play':
-                ctx.beginPath();
-                ctx.moveTo(40, 30);
-                ctx.lineTo(100, 64);
-                ctx.lineTo(40, 98);
-                ctx.closePath();
-                ctx.fill();
-                break;
-                
-            case 'pause':
-                ctx.fillRect(35, 30, 20, 68);
-                ctx.fillRect(75, 30, 20, 68);
-                break;
-                
-            case 'volume':
-                // Speaker cone
-                ctx.beginPath();
-                ctx.moveTo(40, 45);
-                ctx.lineTo(55, 45);
-                ctx.lineTo(80, 30);
-                ctx.lineTo(80, 98);
-                ctx.lineTo(55, 83);
-                ctx.lineTo(40, 83);
-                ctx.closePath();
-                ctx.fill();
-                
-                // Sound waves
-                ctx.beginPath();
-                ctx.arc(85, 64, 15, -Math.PI/3, Math.PI/3);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(85, 64, 25, -Math.PI/3, Math.PI/3);
-                ctx.stroke();
-                break;
-                
-            case 'muted':
-                // Speaker cone
-                ctx.beginPath();
-                ctx.moveTo(40, 45);
-                ctx.lineTo(55, 45);
-                ctx.lineTo(80, 30);
-                ctx.lineTo(80, 98);
-                ctx.lineTo(55, 83);
-                ctx.lineTo(40, 83);
-                ctx.closePath();
-                ctx.fill();
-                
-                // X mark
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(85, 45);
-                ctx.lineTo(105, 83);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(105, 45);
-                ctx.lineTo(85, 83);
-                ctx.stroke();
-                break;
-                
-            default:
-                // Default icon is a play button
-                ctx.beginPath();
-                ctx.moveTo(40, 30);
-                ctx.lineTo(100, 64);
-                ctx.lineTo(40, 98);
-                ctx.closePath();
-                ctx.fill();
+        // Create a fallback icon using canvas drawing
+        function createFallbackIcon() {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "30px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            // Draw different icons based on type
+            switch(type) {
+                case 'play':
+                    // Draw play triangle
+                    ctx.beginPath();
+                    ctx.moveTo(42, 32);
+                    ctx.lineTo(42, 96);
+                    ctx.lineTo(96, 64);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                case 'pause':
+                    // Draw pause bars
+                    ctx.fillRect(42, 32, 20, 64);
+                    ctx.fillRect(72, 32, 20, 64);
+                    break;
+                case 'volume':
+                    // Draw speaker icon
+                    ctx.beginPath();
+                    ctx.moveTo(40, 48);
+                    ctx.lineTo(56, 48);
+                    ctx.lineTo(72, 32);
+                    ctx.lineTo(72, 96);
+                    ctx.lineTo(56, 80);
+                    ctx.lineTo(40, 80);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw sound waves
+                    ctx.beginPath();
+                    ctx.arc(80, 64, 12, -Math.PI/3, Math.PI/3);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(80, 64, 24, -Math.PI/3, Math.PI/3);
+                    ctx.stroke();
+                    break;
+                case 'muted':
+                    // Draw muted speaker
+                    ctx.beginPath();
+                    ctx.moveTo(40, 48);
+                    ctx.lineTo(56, 48);
+                    ctx.lineTo(72, 32);
+                    ctx.lineTo(72, 96);
+                    ctx.lineTo(56, 80);
+                    ctx.lineTo(40, 80);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw X over it
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(80, 48);
+                    ctx.lineTo(104, 80);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(104, 48);
+                    ctx.lineTo(80, 80);
+                    ctx.stroke();
+                    break;
+                default:
+                    // Text fallback for unknown types
+                    ctx.fillText(type.toUpperCase(), canvas.width / 2, canvas.height / 2);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
         }
         
-        const texture = new THREE.CanvasTexture(canvas);
-        resolve(texture);
+        // Try to load image if URL exists
+        if (logoURLs[type]) {
+            const img = new Image();
+            img.onload = function() {
+                // Draw image centered on canvas
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Create texture from canvas
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.needsUpdate = true;
+                resolve(texture);
+            };
+            
+            img.onerror = function() {
+                console.warn(`Failed to load icon image for: ${type}, using fallback`);
+                createFallbackIcon();
+            };
+            
+            // Set image source
+            img.src = logoURLs[type];
+        } else {
+            // Fallback if no logo URL is available
+            console.warn(`No icon URL defined for type: ${type}, using fallback`);
+            createFallbackIcon();
+        }
     });
 }
 
-// Add a drop shadow to the screen for depth perception
-function addDropShadow(screen, width, height) {
-    const shadowCanvas = document.createElement('canvas');
-    shadowCanvas.width = 512;
-    shadowCanvas.height = 512;
-    const ctx = shadowCanvas.getContext('2d');
-    
-    // Draw a gradient shadow
-    const gradient = ctx.createRadialGradient(256, 256, 50, 256, 256, 256);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-    
-    // Create shadow texture and mesh
-    const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
-    const shadowGeometry = new THREE.PlaneGeometry(width * 1.5, height * 1.5);
+// Add a drop shadow for better depth perception
+export function addDropShadow(screen, width, height) {
+    // Create a larger, darker plane behind the screen
+    const shadowWidth = width + 0.06; 
+    const shadowHeight = height + 0.06;
+    const shadowGeometry = new THREE.PlaneGeometry(shadowWidth, shadowHeight);
     const shadowMaterial = new THREE.MeshBasicMaterial({
-        map: shadowTexture,
+        color: 0x000000,
         transparent: true,
-        depthWrite: false,
-        side: THREE.DoubleSide
+        opacity: 0.4,
+        side: THREE.DoubleSide,
+        depthTest: true
     });
     
-    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
-    shadow.position.z = -0.05;
-    shadow.renderOrder = 990;
-    screen.add(shadow);
+    const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowMesh.position.z = -0.005; // Behind the screen
+    shadowMesh.renderOrder = 980; // Even lower render order
+    shadowMesh.userData.type = "shadow";
     
-    return shadow;
+    screen.add(shadowMesh);
+    
+    // Add a subtle glow with darker blue color
+    const glowGeometry = new THREE.PlaneGeometry(width + 0.01, height + 0.01);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x1a237e, // Dark blue glow (indigo 900)
+        transparent: true,
+        opacity: 0.0, // Start invisible, will show when selected
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthTest: true
+    });
+    
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.003; // Between screen and shadow
+    glowMesh.renderOrder = 985; // Between shadow and border
+    glowMesh.userData.type = "glow";
+    
+    screen.add(glowMesh);
+    screen.userData.glowMesh = glowMesh;
 }
 
-// Animate screen entrance with a scale-in effect
-function animateScreenEntrance(screen) {
-    // Start with a small scale
-    screen.scale.set(0.01, 0.01, 0.01);
-    
+// Animate screen entrance with a scale-up and fade-in effect
+export function animateScreenEntrance(screen) {
     // Store original scale
-    const targetScale = new THREE.Vector3(1, 1, 1);
-    if (screen.userData && screen.userData.originalScale) {
-        targetScale.copy(screen.userData.originalScale);
-    }
+    const targetScale = screen.scale.clone();
     
-    // Animate to full scale
+    // Start small and scale up
+    screen.scale.set(0.5, 0.5, 0.5);
+    
+    // Animate to full size
     const duration = 300; // milliseconds
     const startTime = performance.now();
     
@@ -419,14 +461,16 @@ function animateScreenEntrance(screen) {
         const elapsed = performance.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
         
-        // Ease-out function
-        const scale = 1 - Math.pow(1 - progress, 3);
+        // Ease in-out for smoother animation
+        const easedProgress = progress < 0.5
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
         
-        // Apply scale
-        screen.scale.set(
-            scale * targetScale.x,
-            scale * targetScale.y,
-            scale * targetScale.z
+        // Scale up
+        screen.scale.lerpVectors(
+            new THREE.Vector3(0.5, 0.5, 0.5),
+            targetScale,
+            easedProgress
         );
         
         if (progress < 1) {
@@ -434,5 +478,5 @@ function animateScreenEntrance(screen) {
         }
     }
     
-    animate();
+    requestAnimationFrame(animate);
 } 

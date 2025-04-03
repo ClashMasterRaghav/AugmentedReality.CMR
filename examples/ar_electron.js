@@ -1,7 +1,7 @@
 // Electron app screen component for AR
 import * as THREE from "three";
 import { scene } from "./ar_core.js";
-import { selectScreen } from "./ar_screens.js";
+import { selectScreen, screens } from "./ar_screens.js";
 import { enhancedCreateScreen, addDropShadow, animateScreenEntrance } from "./ar_default_screen.js";
 
 // Create an Electron app screen
@@ -75,27 +75,112 @@ export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)
 
 // Create an Electron app texture simulating the app interface
 function createElectronAppTexture() {
-    // Use canvas to simulate Electron app
+    // Use canvas to draw Electron-like window
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 768;
     const ctx = canvas.getContext('2d');
     
+    // Create a loading message
+    ctx.fillStyle = '#2F3241'; // Electron dark background
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Loading Electron app...', canvas.width / 2, canvas.height / 2);
+    
     // Load Electron logo
     const logo = new Image();
     logo.src = 'examples/textures/ar_icons/electron_app.png';
     
-    // Draw Electron app interface
-    function drawElectronInterface() {
-        // App background (dark theme)
-        ctx.fillStyle = '#2F3241';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Create Electron logo directly if the image isn't found
+    logo.onerror = function() {
+        console.warn("Electron logo image not found - creating a canvas version");
         
+        // Create a temporary canvas for the logo
+        const logoCanvas = document.createElement('canvas');
+        logoCanvas.width = 120;
+        logoCanvas.height = 120;
+        const logoCtx = logoCanvas.getContext('2d');
+        
+        // Draw electron orbits
+        logoCtx.strokeStyle = '#9FEAF9'; // Electron blue
+        logoCtx.lineWidth = 6;
+        
+        // Draw electron nucleus
+        logoCtx.fillStyle = '#2F3241'; // Dark background
+        logoCtx.beginPath();
+        logoCtx.arc(60, 60, 20, 0, Math.PI * 2);
+        logoCtx.fill();
+        
+        // Draw electron orbits
+        logoCtx.beginPath();
+        logoCtx.ellipse(60, 60, 50, 15, 0, 0, Math.PI * 2);
+        logoCtx.stroke();
+        
+        logoCtx.beginPath();
+        logoCtx.ellipse(60, 60, 40, 50, Math.PI / 3, 0, Math.PI * 2);
+        logoCtx.stroke();
+        
+        logoCtx.beginPath();
+        logoCtx.ellipse(60, 60, 40, 50, -Math.PI / 3, 0, Math.PI * 2);
+        logoCtx.stroke();
+        
+        // Draw electrons
+        logoCtx.fillStyle = '#9FEAF9';
+        logoCtx.beginPath();
+        logoCtx.arc(60, 10, 7, 0, Math.PI * 2);
+        logoCtx.fill();
+        
+        logoCtx.beginPath();
+        logoCtx.arc(105, 85, 7, 0, Math.PI * 2);
+        logoCtx.fill();
+        
+        logoCtx.beginPath();
+        logoCtx.arc(15, 85, 7, 0, Math.PI * 2);
+        logoCtx.fill();
+        
+        // Store the image data
+        const logoImage = new Image();
+        logoImage.src = logoCanvas.toDataURL();
+        
+        // Replace the original logo reference
+        logo.src = logoImage.src;
+    };
+    
+    // Draw logo on loading screen
+    if (logo.complete) {
+        const logoSize = 120;
+        ctx.drawImage(
+            logo, 
+            canvas.width / 2 - logoSize / 2,
+            canvas.height / 2 - logoSize - 20,
+            logoSize, 
+            logoSize
+        );
+    }
+    
+    // Create an iframe for YouTube
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '-9999px';
+    iframe.width = canvas.width;
+    iframe.height = canvas.height - 40; // Allow for title bar
+    iframe.src = 'https://www.youtube.com/';
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.frameBorder = "0";
+    iframe.id = `electron-youtube-${Date.now()}`;
+    document.body.appendChild(iframe);
+    
+    // Create electron app window frame
+    function drawElectronFrame() {
         // Title bar
         ctx.fillStyle = '#1F2232';
         ctx.fillRect(0, 0, canvas.width, 40);
         
-        // Window controls
+        // Window controls (macOS style)
         // Close button
         ctx.fillStyle = '#FF5F57';
         ctx.beginPath();
@@ -119,188 +204,162 @@ function createElectronAppTexture() {
         ctx.font = '14px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Electron Demo App', canvas.width / 2, 20);
+        ctx.fillText('YouTube - Electron App', canvas.width / 2, 20);
         
-        // Sidebar
-        ctx.fillStyle = '#252830';
-        ctx.fillRect(0, 40, 200, canvas.height - 40);
-        
-        // Sidebar menu items
-        const menuItems = ['Dashboard', 'Projects', 'Tasks', 'Calendar', 'Settings'];
-        menuItems.forEach((item, index) => {
-            const y = 80 + index * 40;
-            
-            // Selected item highlight
-            if (index === 0) {
-                ctx.fillStyle = 'rgba(74, 144, 226, 0.3)';
-                ctx.fillRect(0, y - 10, 200, 40);
-                ctx.fillStyle = '#4A90E2';
-                ctx.fillRect(0, y - 10, 4, 40);
-            }
-            
-            // Menu item text
-            ctx.fillStyle = index === 0 ? '#FFFFFF' : '#A0A0A0';
-            ctx.font = index === 0 ? 'bold 14px Arial' : '14px Arial';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(item, 30, y);
-        });
-        
-        // Main content area
-        
-        // Dashboard title
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('Dashboard', 220, 60);
-        
-        // Summary cards
-        drawCard(220, 100, 250, 120, '#4A90E2', 'Projects', '12');
-        drawCard(490, 100, 250, 120, '#50E3C2', 'Tasks', '36');
-        drawCard(760, 100, 250, 120, '#F5A623', 'Completed', '24');
-        
-        // Recent activity section
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 18px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('Recent Activity', 220, 240);
-        
-        // Activity list
-        const activities = [
-            { title: 'Updated Project: AR Interface', time: '10 minutes ago' },
-            { title: 'Completed Task: Button Component', time: '2 hours ago' },
-            { title: 'Created New Project: VR Experience', time: '1 day ago' },
-            { title: 'Shared Project with Team', time: '2 days ago' },
-            { title: 'Merged Pull Request #42', time: '3 days ago' }
-        ];
-        
-        activities.forEach((activity, index) => {
-            const y = 280 + index * 60;
-            
-            // Activity item background
-            ctx.fillStyle = '#252830';
-            ctx.fillRect(220, y, 790, 50);
-            
-            // Activity title
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(activity.title, 240, y + 10);
-            
-            // Activity time
-            ctx.fillStyle = '#A0A0A0';
-            ctx.font = '12px Arial';
-            ctx.fillText(activity.time, 240, y + 30);
-        });
-        
-        // Project progress section
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 18px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('Project Progress', 220, 600);
-        
-        // Progress bars
-        drawProgressBar(220, 640, 'AR Interface', 75);
-        drawProgressBar(220, 680, 'VR Experience', 30);
-        drawProgressBar(220, 720, 'Mobile App', 90);
-        
-        // Draw Electron logo in top-right if available
+        // Draw small Electron logo in top right corner
         if (logo.complete) {
-            const logoSize = 120;
+            const logoSize = 30;
             ctx.drawImage(
                 logo, 
-                canvas.width - logoSize - 20, 
-                canvas.height - logoSize - 20,
+                canvas.width - logoSize - 10,
+                5,
                 logoSize, 
                 logoSize
             );
-        } else {
-            // Placeholder Electron logo
-            ctx.fillStyle = '#9FEAF9';
-            ctx.beginPath();
-            ctx.arc(canvas.width - 80, canvas.height - 80, 40, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.fillStyle = '#2F3241';
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('E', canvas.width - 80, canvas.height - 80);
         }
     }
     
-    // Helper function to draw a summary card
-    function drawCard(x, y, width, height, color, title, value) {
-        // Card background
-        ctx.fillStyle = '#252830';
-        ctx.fillRect(x, y, width, height);
-        
-        // Color indicator
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, 5, height);
-        
-        // Title
-        ctx.fillStyle = '#A0A0A0';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(title, x + 20, y + 20);
-        
-        // Value
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 36px Arial';
-        ctx.fillText(value, x + 20, y + 50);
+    // Draw the electron frame
+    drawElectronFrame();
+    
+    // Function to capture iframe content to texture
+    function captureIframeToTexture() {
+        try {
+            // Try to use html2canvas to capture the iframe content
+            if (window.html2canvas && iframe.contentDocument) {
+                html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
+                    // Clear canvas and draw electron frame
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                    
+                    // Draw captured content below title bar
+                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
+                    
+                    // Redraw the frame on top
+                    drawElectronFrame();
+                    
+                    texture.needsUpdate = true;
+                });
+            } else {
+                // Fallback - show a placeholder with message
+                ctx.fillStyle = '#2F3241'; // Electron dark background
+                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                
+                // Content message
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('YouTube running in Electron', canvas.width / 2, canvas.height / 2);
+                ctx.font = '16px Arial';
+                ctx.fillText('(Content will display when you interact with the app)', canvas.width / 2, canvas.height / 2 + 40);
+                
+                // Redraw frame
+                drawElectronFrame();
+                
+                texture.needsUpdate = true;
+            }
+        } catch (e) {
+            console.warn('Error capturing iframe content:', e);
+        }
     }
     
-    // Helper function to draw a progress bar
-    function drawProgressBar(x, y, label, progress) {
-        // Label
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(label, x, y);
-        
-        // Progress text
-        ctx.fillStyle = '#A0A0A0';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${progress}%`, x + 790, y);
-        
-        // Progress bar background
-        ctx.fillStyle = '#252830';
-        ctx.fillRect(x, y + 25, 790, 10);
-        
-        // Progress indicator
-        let barColor;
-        if (progress < 40) barColor = '#F5A623'; // Yellow
-        else if (progress < 70) barColor = '#4A90E2'; // Blue
-        else barColor = '#50E3C2'; // Green
-        
-        ctx.fillStyle = barColor;
-        ctx.fillRect(x, y + 25, 790 * (progress / 100), 10);
+    // Try to load html2canvas if not already available
+    if (!window.html2canvas) {
+        const script = document.createElement('script');
+        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        script.onload = function() {
+            console.log('html2canvas loaded for Electron app');
+            captureIframeToTexture();
+        };
+        document.head.appendChild(script);
     }
-    
-    // Draw initial app interface
-    drawElectronInterface();
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
-    // Add metadata and methods
+    // Update texture periodically to reflect iframe content
+    const updateInterval = setInterval(captureIframeToTexture, 1000);
+    
+    // Create electron app controls
+    const electronControls = document.createElement('div');
+    electronControls.style.position = 'absolute';
+    electronControls.style.left = '-9999px';
+    electronControls.style.top = '-9999px';
+    electronControls.style.width = '300px';
+    electronControls.style.background = 'rgba(47, 50, 65, 0.9)';
+    electronControls.style.borderRadius = '5px';
+    electronControls.style.padding = '10px';
+    electronControls.style.display = 'flex';
+    electronControls.style.justifyContent = 'space-between';
+    
+    // Add back, home, refresh buttons
+    const backButton = document.createElement('button');
+    backButton.textContent = '← Back';
+    backButton.style.backgroundColor = '#1F2232';
+    backButton.style.color = '#FFFFFF';
+    backButton.style.border = 'none';
+    backButton.style.padding = '5px 10px';
+    backButton.style.borderRadius = '3px';
+    
+    const homeButton = document.createElement('button');
+    homeButton.textContent = 'Home';
+    homeButton.style.backgroundColor = '#1F2232';
+    homeButton.style.color = '#FFFFFF';
+    homeButton.style.border = 'none';
+    homeButton.style.padding = '5px 10px';
+    homeButton.style.borderRadius = '3px';
+    
+    const refreshButton = document.createElement('button');
+    refreshButton.textContent = 'Refresh';
+    refreshButton.style.backgroundColor = '#1F2232';
+    refreshButton.style.color = '#FFFFFF';
+    refreshButton.style.border = 'none';
+    refreshButton.style.padding = '5px 10px';
+    refreshButton.style.borderRadius = '3px';
+    
+    // Add controls to the div
+    electronControls.appendChild(backButton);
+    electronControls.appendChild(homeButton);
+    electronControls.appendChild(refreshButton);
+    document.body.appendChild(electronControls);
+    
+    // Setup button functionality
+    backButton.addEventListener('click', function() {
+        iframe.contentWindow.history.back();
+    });
+    
+    homeButton.addEventListener('click', function() {
+        iframe.src = 'https://www.youtube.com/';
+    });
+    
+    refreshButton.addEventListener('click', function() {
+        iframe.contentWindow.location.reload();
+    });
+    
+    // Add properties and methods to texture
     texture.userData = {
         isElectronApp: true,
+        iframe: iframe,
         canvas: canvas,
         ctx: ctx,
-        updateDashboard: function() {
-            // This function could be used to update the dashboard data
-            // For demonstration we'll just redraw the interface
-            drawElectronInterface();
-            texture.needsUpdate = true;
+        controls: electronControls,
+        updateInterval: updateInterval,
+        
+        // Method to navigate to a specific URL
+        navigate: function(url) {
+            iframe.src = url;
+        },
+        
+        // Cleanup resources
+        dispose: function() {
+            clearInterval(updateInterval);
+            if (iframe && iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+            }
+            if (electronControls && electronControls.parentNode) {
+                electronControls.parentNode.removeChild(electronControls);
+            }
         }
     };
     
