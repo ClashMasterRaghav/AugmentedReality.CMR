@@ -1126,15 +1126,18 @@ export function setupControlPanel() {
     // Only reposition if not being dragged AND not previously manually positioned
     if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
     
-    // Position in front and below the user
+    // Position in front and below the user at a fixed distance
     const cameraDirection = new THREE.Vector3(0, 0, -1);
     cameraDirection.applyQuaternion(camera.quaternion);
     
     const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
+    
+    // Use a fixed distance for positioning to avoid movement towards camera
+    const fixedDistance = 0.8; // Fixed distance from camera
+    position.copy(camera.position).add(cameraDirection.multiplyScalar(-fixedDistance));
     
     // Position BELOW the default screen position
-    position.y -= 0.4; // Position it much lower to appear below the screen
+    position.y -= 0.25; // Position it lower to appear below the screen
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
@@ -1146,7 +1149,12 @@ export function setupControlPanel() {
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
-    console.log("Control panel positioned below screen");
+    // Set a flag to indicate this is the initial position
+    if (!controlPanel.userData.initialPositionSet) {
+        controlPanel.userData.initialPosition = position.clone();
+        controlPanel.userData.initialPositionSet = true;
+        console.log("Control panel initial position set");
+    }
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive

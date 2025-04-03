@@ -1176,24 +1176,57 @@ function onTouchMove(event) {
         
         // Calculate the desired position based on the ray
         const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const distance = 0.6; // Distance in front of camera
+        const fixedDistance = 0.8; // Match the fixed distance in setupControlPanel
         const targetPosition = new THREE.Vector3();
         
-        // Position in front of camera, compensating for panel drag offset
+        // Position in front of camera at fixed distance
         targetPosition.copy(camera.position)
-            .add(cameraDirection.clone().multiplyScalar(-distance));
+            .add(cameraDirection.clone().multiplyScalar(-fixedDistance));
         
-        // Set panel position with some smoothing
-        controlPanel.position.lerp(targetPosition, 0.5);
+        // Allow horizontal and vertical movement but maintain fixed distance from camera
+        // Use the drag offset to allow natural movement but constrain within reasonable bounds
         
-        // Make panel face the camera
-        controlPanel.lookAt(camera.position);
+        // Get the current projected position in camera space
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(currentTouchPosition, camera);
         
-        // Keep panel upright
-        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-        euler.x = 0;
-        euler.z = 0;
-        controlPanel.quaternion.setFromEuler(euler);
+        // Create a plane at fixed distance from camera for intersection
+        const dragPlane = new THREE.Plane();
+        dragPlane.setFromNormalAndCoplanarPoint(
+            cameraDirection.clone().negate(),
+            targetPosition
+        );
+        
+        // Find intersection point with the drag plane
+        const intersection = new THREE.Vector3();
+        raycaster.ray.intersectPlane(dragPlane, intersection);
+        
+        // If we have an intersection, use it for horizontal/vertical positioning
+        if (intersection) {
+            // Calculate offset from the center position (maintains fixed distance)
+            const offset = intersection.clone().sub(targetPosition);
+            
+            // Limit the offset range to prevent panel from going too far
+            const maxOffset = 0.4;
+            offset.x = THREE.MathUtils.clamp(offset.x, -maxOffset, maxOffset);
+            offset.y = THREE.MathUtils.clamp(offset.y, -maxOffset, maxOffset);
+            
+            // Apply the limited offset to the target position
+            targetPosition.add(offset);
+            
+            // Smoothly move toward the target position
+            controlPanel.position.lerp(targetPosition, 0.3);
+            
+            // Keep facing the user - ensure panel is upright
+            controlPanel.lookAt(camera.position);
+            const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
+            euler.x = 0;
+            euler.z = 0;
+            controlPanel.quaternion.setFromEuler(euler);
+            
+            // Mark as manually positioned
+            controlPanel.userData.manuallyPositioned = true;
+        }
         
         return;
     }

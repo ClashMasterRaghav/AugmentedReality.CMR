@@ -264,9 +264,9 @@ export function render() {
     const currentCameraPosition = camera.position.clone();
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
-    // Calculate movement thresholds
-    const positionThreshold = 0.5; // Units of movement
-    const rotationThreshold = 0.3; // Radians (about 17 degrees)
+    // Calculate movement thresholds - increased thresholds to reduce control panel repositioning
+    const positionThreshold = 1.2; // Increased from 0.5 to 1.2 units of movement
+    const rotationThreshold = 0.8; // Increased from 0.3 to 0.8 radians (about 45 degrees)
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
@@ -274,13 +274,19 @@ export function render() {
         Math.abs(currentCameraRotation.x - lastCameraRotation.x) > rotationThreshold ||
         Math.abs(currentCameraRotation.y - lastCameraRotation.y) > rotationThreshold;
     
-    // If camera has moved significantly, update the control panel position
-    if (hasMoved || hasRotated) {
+    // Only update the control panel position if:
+    // 1. Camera has moved significantly AND
+    // 2. We haven't updated in the last 2 seconds (throttle updates)
+    const currentTime = Date.now();
+    if ((hasMoved || hasRotated) && (!window.lastPanelUpdateTime || currentTime - window.lastPanelUpdateTime > 2000)) {
         setupControlPanel();
         
         // Update last known position and rotation
         lastCameraPosition.copy(currentCameraPosition);
         lastCameraRotation.copy(currentCameraRotation);
+        
+        // Track when we last updated
+        window.lastPanelUpdateTime = currentTime;
     }
     
     // Update screen visual effects
