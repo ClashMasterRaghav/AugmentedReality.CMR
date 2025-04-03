@@ -12,6 +12,9 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let isResizeModeActive = false;
 
+// Reference to the icon buttons panel
+export let iconButtonsPanel = null;
+
 // Export notification functions explicitly at the top level
 export function createNotification(message, type = 'info') {
     console.log(`Notification (${type}): ${message}`);
@@ -32,6 +35,8 @@ export const showNotification = createNotification;
 export function initUI() {
     createControlPanel();
     createVirtualKeyboard();
+    iconButtonsPanel = createIconButtons(); // Store reference to the panel
+    setupButtonInteractions(iconButtonsPanel); // Make buttons interactive
 }
 
 // Create a notification in the DOM
@@ -1126,6 +1131,11 @@ export function setupControlPanel() {
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
+    // Also update icon buttons panel if it exists
+    if (iconButtonsPanel && iconButtonsPanel.userData.updatePosition) {
+        iconButtonsPanel.userData.updatePosition();
+    }
+    
     console.log("Control panel positioned below screen");
 }
 
@@ -1149,4 +1159,293 @@ export function floatAnimation() {
         // Use a much more subtle glow
         glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
     }
+}
+
+// Create buttons using AR icons from the assets folder
+export function createIconButtons(parentObj = null) {
+    console.log("Creating icon buttons from AR icons");
+    
+    // Create a container for the buttons
+    const buttonPanel = new THREE.Group();
+    
+    // Create panel background
+    const panelWidth = 0.4;
+    const panelHeight = 0.2;
+    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
+    
+    // Create a canvas texture for the panel with modern glass morphism style
+    const panelCanvas = document.createElement('canvas');
+    panelCanvas.width = 512;
+    panelCanvas.height = 256;
+    const panelCtx = panelCanvas.getContext('2d');
+    
+    // Draw rounded rectangle background
+    const cornerRadius = 40;
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+    panelCtx.lineTo(cornerRadius, panelCanvas.height);
+    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    
+    // Glass morphism style with gradient
+    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+    gradient.addColorStop(0, 'rgba(50, 55, 80, 0.85)'); // Smoky blue at top
+    gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
+    panelCtx.fillStyle = gradient;
+    panelCtx.fill();
+    
+    // Add subtle glass effect with highlights
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
+    panelCtx.lineTo(0, panelCanvas.height/3);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    panelCtx.fill();
+    
+    // Add title
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
+    panelCtx.textAlign = 'center';
+    panelCtx.fillText('AR ICONS', panelCanvas.width/2, 36);
+    
+    // Add subtle line under the title
+    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    panelCtx.lineWidth = 1;
+    panelCtx.beginPath();
+    panelCtx.moveTo(panelCanvas.width/2 - 100, 46);
+    panelCtx.lineTo(panelCanvas.width/2 + 100, 46);
+    panelCtx.stroke();
+    
+    const panelTexture = new THREE.CanvasTexture(panelCanvas);
+    const panelMaterial = new THREE.MeshBasicMaterial({
+        map: panelTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    panelMesh.renderOrder = 100;
+    buttonPanel.add(panelMesh);
+    
+    // Define the icons to use
+    const iconFiles = [
+        { file: 'DuckDuckGo_logo.png', action: 'search', label: 'Search' },
+        { file: 'youtube.png', action: 'youtube', label: 'YouTube' },
+        { file: 'maps.png', action: 'maps', label: 'Maps' },
+        { file: 'electron_app.png', action: 'app', label: 'App' },
+        { file: 'play-buttton.png', action: 'play', label: 'Play' },
+        { file: 'pause-button.png', action: 'pause', label: 'Pause' },
+        { file: 'mute.png', action: 'mute', label: 'Mute' },
+        { file: 'unmute.png', action: 'unmute', label: 'Unmute' },
+        { file: 'add.png', action: 'add', label: 'Add' },
+        { file: 'delete.png', action: 'delete', label: 'Delete' }
+    ];
+    
+    // Create loader for icon textures
+    const textureLoader = new THREE.TextureLoader();
+    
+    // Set the button size and layout 
+    const buttonSize = 0.05;
+    const columns = 5;
+    const padding = 0.01;
+    const startX = -panelWidth/2 + buttonSize + padding;
+    const startY = panelHeight/2 - buttonSize*1.8 - padding; // Leave space for title
+    
+    // Create buttons for each icon
+    iconFiles.forEach((icon, index) => {
+        const row = Math.floor(index / columns);
+        const col = index % columns;
+        
+        const x = startX + col * (buttonSize + padding*2);
+        const y = startY - row * (buttonSize + padding*2.5); // More space between rows for labels
+        
+        // Create button background (circle)
+        const buttonGeometry = new THREE.CircleGeometry(buttonSize/2, 32);
+        const buttonMaterial = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        button.position.set(x, y, 0.001);
+        button.renderOrder = 101;
+        button.userData = {
+            type: 'button',
+            action: icon.action,
+            originalColor: 0x333333,
+            hoverColor: 0x555555,
+            isHovered: false,
+            isPressed: false
+        };
+        
+        // Load and add the icon texture
+        textureLoader.load(`examples/textures/ar_icons/${icon.file}`, (texture) => {
+            const iconGeometry = new THREE.PlaneGeometry(buttonSize, buttonSize);
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.001;
+            iconMesh.renderOrder = 102;
+            button.add(iconMesh);
+        });
+        
+        // Add label text
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 128;
+        labelCanvas.height = 32;
+        const labelCtx = labelCanvas.getContext('2d');
+        
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = '12px Arial';
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        labelCtx.fillText(icon.label, labelCanvas.width/2, labelCanvas.height/2);
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(buttonSize*1.5, buttonSize*0.5);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(0, -buttonSize*0.65, 0.001);
+        labelMesh.renderOrder = 102;
+        button.add(labelMesh);
+        
+        buttonPanel.add(button);
+    });
+    
+    // Position the panel - either add to parent or add to scene
+    if (parentObj && parentObj instanceof THREE.Object3D) {
+        parentObj.add(buttonPanel);
+    } else {
+        // Position to the right side of the control panel
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(camera.quaternion);
+        
+        const position = new THREE.Vector3();
+        position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6));
+        
+        // Position to the right side and slightly above the center
+        position.x += 0.4; // Shift to the right
+        position.y += 0.1; // Shift slightly upward
+        
+        buttonPanel.position.copy(position);
+        buttonPanel.lookAt(camera.position);
+        
+        // Keep panel facing the user but upright
+        const euler = new THREE.Euler().setFromQuaternion(buttonPanel.quaternion);
+        euler.x = 0; // Keep panel upright (no tilt)
+        euler.z = 0; // No roll
+        buttonPanel.quaternion.setFromEuler(euler);
+        
+        scene.add(buttonPanel);
+        
+        // Store reference to update position later
+        buttonPanel.userData.updatePosition = () => {
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(camera.quaternion);
+            
+            const position = new THREE.Vector3();
+            position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6));
+            
+            // Position to the right side and slightly above
+            position.x += 0.4;
+            position.y += 0.1;
+            
+            buttonPanel.position.copy(position);
+            buttonPanel.lookAt(camera.position);
+            
+            // Keep panel facing the user but upright
+            const euler = new THREE.Euler().setFromQuaternion(buttonPanel.quaternion);
+            euler.x = 0;
+            euler.z = 0;
+            buttonPanel.quaternion.setFromEuler(euler);
+        };
+    }
+    
+    return buttonPanel;
+}
+
+// Handle icon button click with visual feedback
+export function handleIconButtonClick(button) {
+    if (!button || !button.userData) return;
+    
+    // Visual feedback - change color
+    const originalColor = button.userData.originalColor;
+    const activeColor = 0x4FC3F7; // Light blue highlight
+    
+    // Change color to show it's pressed
+    button.material.color.set(activeColor);
+    
+    // Return to original color after a short delay
+    setTimeout(() => {
+        button.material.color.set(originalColor);
+    }, 200);
+    
+    return button.userData.action;
+}
+
+// Setup hover and press effects for buttons
+function setupButtonInteractions(panel) {
+    if (!panel) return;
+    
+    // Find all buttons in the panel
+    const buttons = panel.children.filter(child => 
+        child.userData && child.userData.type === 'button');
+    
+    // Add hover and press effects
+    buttons.forEach(button => {
+        // Handle hover effect
+        button.userData.onHover = (isHovered) => {
+            if (isHovered) {
+                if (!button.userData.isPressed) {
+                    button.material.color.set(button.userData.hoverColor);
+                }
+            } else {
+                if (!button.userData.isPressed) {
+                    button.material.color.set(button.userData.originalColor);
+                }
+            }
+        };
+        
+        // Handle press effect
+        button.userData.onPress = (isPressed) => {
+            button.userData.isPressed = isPressed;
+            
+            if (isPressed) {
+                button.material.color.set(0x4FC3F7); // Light blue highlight
+                
+                // Scale down slightly
+                button.scale.set(0.9, 0.9, 0.9);
+            } else {
+                if (button.userData.isHovered) {
+                    button.material.color.set(button.userData.hoverColor);
+                } else {
+                    button.material.color.set(button.userData.originalColor);
+                }
+                
+                // Scale back to normal
+                button.scale.set(1, 1, 1);
+            }
+        };
+    });
 }
