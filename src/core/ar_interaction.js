@@ -203,7 +203,7 @@ function onTouchStart(event) {
                         interactionState.isDragging = true;
                         interactionState.draggedObject = screen;
                         
-                        // Visual feedback
+                        // Show visual feedback
                         createModeChangeIndicator('Moving Screen');
                         
                         // Haptic feedback
@@ -233,7 +233,7 @@ function onTouchStart(event) {
                             interactionState.isDragging = true;
                             interactionState.draggedObject = screen;
                             
-                            // Visual feedback
+                            // Show visual feedback
                             createModeChangeIndicator('Moving Screen');
                             
                             // Haptic feedback
@@ -622,7 +622,7 @@ function onMouseUp(event) {
 }
 
 // Create a mode change indicator
-function createModeChangeIndicator(message) {
+function createSimpleModeChangeIndicator(message) {
     if (!window.camera || !window.scene) return;
     
     // Create canvas for text
