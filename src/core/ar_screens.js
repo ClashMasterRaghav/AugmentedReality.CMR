@@ -1,6 +1,6 @@
 // Screen creation and management functionality
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
-import { CSS3DRenderer, CSS3DObject } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/renderers/CSS3DRenderer.js';
+import * as THREE from 'three';
+import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import { videoTexture, registerVideoScreen, unregisterVideoScreen } from './ar_media.js';
 import { generateUUID, showNotification } from './ar_utils.js';
 

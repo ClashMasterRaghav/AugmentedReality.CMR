@@ -1,5 +1,5 @@
 // AR scene setup and basic environment
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import * as THREE from 'three';
 
 // Initialize AR scene with lighting and basic elements
 export function initARScene(scene, camera) {

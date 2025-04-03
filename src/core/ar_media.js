@@ -1,5 +1,5 @@
 // Media handling for AR experience (video and audio)
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import * as THREE from 'three';
 import { showNotification } from './ar_utils.js';
 
 // Export video texture reference

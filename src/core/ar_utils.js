@@ -1,5 +1,5 @@
 // Utility functions for AR application
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import * as THREE from 'three';
 
 // Create and display notifications
 export function showNotification(message, type = 'info', duration = 3000) {

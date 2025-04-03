@@ -1,5 +1,5 @@
 // UI elements and controls for AR experience
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import * as THREE from 'three';
 import { createRoundedRectTexture, createGlowTexture, showNotification } from './ar_utils.js';
 import { createNewBrowserScreen, createYouTubeScreen, createGoogleMapsScreen } from './ar_screens.js';
 import { deleteLastScreen } from './ar_interaction.js';

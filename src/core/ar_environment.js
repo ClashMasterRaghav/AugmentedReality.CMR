@@ -1,5 +1,5 @@
 // Environment assets and settings for AR
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import * as THREE from 'three';
 import { showNotification } from './ar_utils.js';
 
 // Asset loader
