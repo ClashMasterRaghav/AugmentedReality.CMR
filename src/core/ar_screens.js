@@ -1,6 +1,6 @@
 // Screen creation and management functionality
 import * as THREE from 'three';
-import { CSS3DRenderer, CSS3DObject, CSS3DScene } from 'three/addons/renderers/CSS3DRenderer.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { videoTexture, registerVideoScreen, unregisterVideoScreen } from './ar_media.js';
 import { generateUUID, showNotification } from './ar_utils.js';
 
@@ -27,8 +27,8 @@ export function initCSS3DRenderer() {
         css3dRenderer.domElement.style.zIndex = '1'; // Ensure it's behind UI but visible
         document.body.appendChild(css3dRenderer.domElement);
         
-        // Create CSS3D scene
-        css3dScene = new CSS3DScene();
+        // Create CSS3D scene - use THREE.Scene instead of CSS3DScene
+        css3dScene = new THREE.Scene();
         
         // Add window resize handler
         window.addEventListener('resize', function() {
