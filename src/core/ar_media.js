@@ -1,13 +1,15 @@
 // Media handling for AR experience (video and audio)
 import * as THREE from 'three';
-import { scene, camera } from './ar_core.js';
-import { screens } from './ar_screens.js';
+import { showNotification } from './ar_utils.js';
 
 // Export video texture reference
 export let videoTexture;
 export let videoElement;
 export let currentTime = 0;
 export let duration = 100; // Default duration if not available
+
+// Track screens using video
+const videoScreens = [];
 
 // Load video texture for AR content
 export function loadVideoTexture() {
@@ -54,7 +56,7 @@ export function loadVideoTexture() {
         videoElement.addEventListener('loadeddata', () => {
             console.log('Video loaded successfully');
             duration = videoElement.duration || 100;
-            updateExistingScreensWithVideo();
+            showNotification("Video loaded successfully", "success");
             
             // Update the mute icon to reflect the default muted state
             updateMuteIcons(true);
@@ -62,13 +64,12 @@ export function loadVideoTexture() {
         
         videoElement.addEventListener('timeupdate', () => {
             currentTime = videoElement.currentTime;
-            // No longer need to update progress bars since they've been removed
         });
         
         videoElement.addEventListener('error', (e) => {
             console.error('Video load error:', e);
             videoTexture = createFallbackTexture("Error loading video");
-            updateExistingScreensWithVideo();
+            showNotification("Error loading video", "error");
         });
         
         // Start playing video (will be muted)
@@ -86,12 +87,6 @@ export function loadVideoTexture() {
     }
 }
 
-// Update video progress on all screens - function simplified since progress bars are removed
-function updateVideoProgress() {
-    // This function is now empty as progress bars have been removed
-    // Keeping the function to maintain code structure in case we need to reimplement
-}
-
 // Toggle video playback
 export function toggleVideoPlayback() {
     if (!videoElement) return;
@@ -99,12 +94,15 @@ export function toggleVideoPlayback() {
     if (videoElement.paused) {
         videoElement.play().then(() => {
             updatePlayPauseIcons(false);
+            showNotification("Video playing", "info");
         }).catch(e => {
             console.error("Video play error:", e);
+            showNotification("Error playing video", "error");
         });
     } else {
         videoElement.pause();
         updatePlayPauseIcons(true);
+        showNotification("Video paused", "info");
     }
 }
 
@@ -114,11 +112,28 @@ export function toggleVideoMute() {
     
     videoElement.muted = !videoElement.muted;
     updateMuteIcons(videoElement.muted);
+    
+    showNotification(videoElement.muted ? "Audio muted" : "Audio unmuted", "info");
 }
 
-// Update play/pause icons on all screens
+// Register a screen to receive video updates
+export function registerVideoScreen(screen) {
+    if (!videoScreens.includes(screen)) {
+        videoScreens.push(screen);
+    }
+}
+
+// Unregister a screen from video updates
+export function unregisterVideoScreen(screen) {
+    const index = videoScreens.indexOf(screen);
+    if (index !== -1) {
+        videoScreens.splice(index, 1);
+    }
+}
+
+// Update play/pause icons on all registered screens
 function updatePlayPauseIcons(isPaused) {
-    screens.forEach(screen => {
+    videoScreens.forEach(screen => {
         // Find play/pause button
         const playButton = findButtonInScreen(screen, 'playButton');
         if (playButton) {
@@ -133,9 +148,9 @@ function updatePlayPauseIcons(isPaused) {
     });
 }
 
-// Update mute icons on all screens
+// Update mute icons on all registered screens
 function updateMuteIcons(isMuted) {
-    screens.forEach(screen => {
+    videoScreens.forEach(screen => {
         // Find volume button
         const volumeButton = findButtonInScreen(screen, 'volumeButton');
         if (volumeButton) {
@@ -165,7 +180,13 @@ function updateButtonIcon(button, newType) {
     if (iconMesh && iconMesh.material && iconMesh.material.map) {
         // Create new icon texture
         const newTexture = createControlIcon(newType);
-        iconMesh.material.map.dispose();
+        
+        // Clean up old texture
+        if (iconMesh.material.map) {
+            iconMesh.material.map.dispose();
+        }
+        
+        // Apply new texture
         iconMesh.material.map = newTexture;
         iconMesh.material.needsUpdate = true;
     }
@@ -173,7 +194,7 @@ function updateButtonIcon(button, newType) {
 
 // Create control button icons
 function createControlIcon(type) {
-    // Use the actual PNG icons instead of drawing them
+    // Use texture loader for icons
     const iconLoader = new THREE.TextureLoader();
     let iconPath = '';
     
@@ -203,7 +224,7 @@ function createControlIcon(type) {
             return new THREE.CanvasTexture(canvas);
     }
     
-    // Return the loaded texture directly
+    // Return the loaded texture
     return iconLoader.load(iconPath);
 }
 
@@ -232,28 +253,26 @@ function createFallbackTexture(errorMessage = "Video not available") {
     return texture;
 }
 
-// Update existing screens with video texture
-function updateExistingScreensWithVideo() {
-    if (!videoTexture) return;
+// Update video textures in render loop
+export function updateVideoTextures() {
+    // Update main video texture
+    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
+        videoTexture.needsUpdate = true;
+    }
     
-    screens.forEach(screen => {
-        // Look for the content panel in the screen
-        for (const child of screen.children) {
-            if (child.geometry && 
-                child.geometry.type === 'PlaneGeometry' &&
-                child.material && 
-                child.material.type === 'MeshBasicMaterial') {
-                
-                // Update material with video texture
-                child.material.map = videoTexture;
-                child.material.needsUpdate = true;
-                break;
+    // Update any other video textures in the scene
+    if (window.scene) {
+        window.scene.traverse(object => {
+            if (object.userData && object.userData.texture && object.userData.video) {
+                if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
+                    object.userData.texture.needsUpdate = true;
+                }
             }
-        }
-    });
+        });
+    }
 }
 
-// Create a dynamic video overlay for screen
+// Create a dynamic video overlay for a screen
 export function createVideoOverlay(videoUrl, width = 0.76, height = 0.46) {
     const group = new THREE.Group();
     
@@ -367,38 +386,29 @@ export function createVideoOverlay(videoUrl, width = 0.76, height = 0.46) {
     return group;
 }
 
-// Update video textures in render loop
-export function updateVideoTextures() {
-    // Update main video texture
-    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
-        videoTexture.needsUpdate = true;
-    }
-    
-    // Update any other video textures in the scene
-    scene.traverse(object => {
-        if (object.userData && object.userData.texture && object.userData.video) {
-            if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
-                object.userData.texture.needsUpdate = true;
-            }
-        }
-    });
-}
-
 // Play spatial audio at a location
 export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
+    if (!window.camera || !window.scene) {
+        console.error("Camera or scene not available for spatial audio");
+        return null;
+    }
+    
     // Create audio element
     const audio = document.createElement('audio');
     audio.src = url;
     audio.loop = loop;
     
     // Create audio listener if not already attached to camera
-    if (!THREE.AudioListener) {
+    if (!window.camera.children.find(child => child instanceof THREE.AudioListener)) {
         const listener = new THREE.AudioListener();
-        camera.add(listener);
+        window.camera.add(listener);
     }
     
+    // Get the audio listener
+    const listener = window.camera.children.find(child => child instanceof THREE.AudioListener);
+    
     // Create audio source
-    const sound = new THREE.PositionalAudio(THREE.AudioListener);
+    const sound = new THREE.PositionalAudio(listener);
     sound.setMediaElementSource(audio);
     sound.setRefDistance(1);
     sound.setDistanceModel('exponential');
@@ -423,12 +433,12 @@ export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
     }
     
     // Add to scene
-    scene.add(sphere);
+    window.scene.add(sphere);
     
     // Play audio
     audio.play().catch(e => console.error("Audio play error:", e));
     
-    // Return for later reference/control
+    // Return control object
     return { 
         audio: audio, 
         sound: sound, 
@@ -445,6 +455,12 @@ export function playSpatialAudio(url, position, volume = 1.0, loop = false) {
         },
         setPosition: function(newPosition) {
             sphere.position.copy(newPosition);
+        },
+        dispose: function() {
+            window.scene.remove(sphere);
+            sound.disconnect();
+            audio.pause();
+            audio.remove();
         }
     };
 } 

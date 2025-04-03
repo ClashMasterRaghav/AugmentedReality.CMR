@@ -3,14 +3,12 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, createVirtualKeyboard, setupControlPanel, floatAnimation } from './ar_ui.js';
-import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
-import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
-import { initUI, createNotification } from './ar_ui.js';
-import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { createControlPanel, setupControlPanel, floatAnimation } from './ar_ui.js';
+import { showNotification } from './ar_utils.js';
+import { updateVideoTextures } from './ar_media.js';
+import { createNewBrowserScreen, updateScreenEffects } from './ar_screens.js';
 
-// Global variables exported for use in other modules
+// Global variables for use in other modules
 export let camera, scene, renderer;
 export let controller, controllerGrip;
 export let font;
@@ -23,16 +21,15 @@ export let isMoveModeActive = false;
 export let isRotateModeActive = false;
 export let selectedScreen = null;
 export let selectedKey = null;
-export let container;
 export let isARMode = false;
 export let lastCameraPosition = new THREE.Vector3();
 export let lastCameraRotation = new THREE.Euler();
 
+// Track initialization state
+let isARInitialized = false;
+
 // Frame counter for optimizing updates
 let frameCount = 0;
-
-// Track if the AR application has been initialized
-let isARInitialized = false;
 
 // Function to safely update the selected screen reference globally
 export function setSelectedScreen(screen) {
@@ -40,12 +37,12 @@ export function setSelectedScreen(screen) {
     selectedScreen = screen;
 }
 
-// Main initialization function called from ar_main.js
+// Main initialization function
 export function initAR() {
     // Prevent multiple initializations
     if (isARInitialized) {
         console.log("AR application already initialized, skipping.");
-        return;
+        return true;
     }
     
     try {
@@ -54,8 +51,7 @@ export function initAR() {
         return true;
     } catch (error) {
         console.error("Error initializing AR:", error);
-        // Show error in console only to avoid circular dependencies
-        console.error("Error initializing AR: " + error.message);
+        showNotification("Error initializing AR: " + error.message, "error");
         return false;
     }
 }
@@ -65,8 +61,13 @@ function initAREnvironment() {
     const container = document.createElement('div');
     document.body.appendChild(container);
 
+    // Create scene and camera
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+    // Make global references to scene and camera for other modules
+    window.scene = scene;
+    window.camera = camera;
 
     // Lighting
     const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
@@ -79,6 +80,9 @@ function initAREnvironment() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
+    
+    // Make renderer available globally for other modules
+    window.renderer = renderer;
 
     // AR Button with session end event handling
     const arButton = ARButton.createButton(renderer, {
@@ -93,15 +97,19 @@ function initAREnvironment() {
     
     // Add event listener for session start
     renderer.xr.addEventListener('sessionstart', function() {
-        console.log("AR session started - showing panel instructions");
-        // Show instructions for draggable panel after a short delay
-        showControlPanelInstructions();
+        console.log("AR session started");
+        showNotification("AR session started - Looking for surfaces");
+        
+        // Show instructions after a short delay
+        setTimeout(() => {
+            showNotification("Tap and drag control panel to position it");
+        }, 2000);
     });
     
     // Add event listener for session end
     renderer.xr.addEventListener('sessionend', function() {
         console.log("AR session ended");
-        // Reload the page to return to initial state
+        // Clean reload to reset state
         window.location.reload();
     });
 
@@ -109,9 +117,8 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        // Use setupControlPanel instead of directly calling createControlPanel
+        // Set up control panel once font is loaded
         setupControlPanel();
-        createVirtualKeyboard();
     });
 
     // Controller setup
@@ -134,39 +141,23 @@ function initAREnvironment() {
     controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
     scene.add(controllerGrip);
 
-    // Pointer for interaction - SMALLER SIZE
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+    // Pointer for interaction - smaller size for precision
+    const geometry = new THREE.SphereGeometry(0.005, 16, 16);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff });
     const pointer = new THREE.Mesh(geometry, material);
     pointer.position.z = -0.1;
     controller.add(pointer);
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
-
-    // Initialize UI elements
-    initUI();
-    
-    // Preload video texture right after scene setup
-    console.log("Initializing video functionality");
-    const videoTexture = loadVideoTexture();
-    
-    // Connect video controls to the interaction module
-    setupVideoControls({
-        toggleVideoPlayback,
-        toggleVideoMute
-    });
-    
-    // Setup event listeners
-    setupEventListeners();
     
     // Start animation loop
-    renderer.setAnimationLoop(animate);
+    renderer.setAnimationLoop(render);
     
     // Create initial screen
     createStartScreen();
 
-    // Set initialization flag to prevent duplicate setup
+    // Set initialization flag
     isARInitialized = true;
     
     console.log("AR experience initialized successfully");
@@ -179,19 +170,8 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Animation loop
-export function animate() {
-    renderer.setAnimationLoop(render);
-    
-    // Update video textures in every frame
-    updateVideoTextures();
-    
-    // Check if in AR mode
-    isARMode = renderer.xr.isPresenting;
-}
-
 // Render function
-export function render() {
+function render() {
     // Handle screen placement or movement with controller
     if ((isPlacingScreen && newScreen) || (isMovingScreen && selectedScreen)) {
         const target = isPlacingScreen ? newScreen : selectedScreen;
@@ -243,7 +223,7 @@ export function render() {
             0.1
         );
         
-        // Optional: add subtle rotation based on controller movement for fine-tuning
+        // Add subtle rotation based on controller movement for fine-tuning
         selectedScreen.rotation.y += controllerDirection.x * 0.01;
         selectedScreen.rotation.x += controllerDirection.y * 0.01;
         
@@ -276,9 +256,9 @@ export function render() {
     const currentCameraPosition = camera.position.clone();
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
-    // Calculate movement thresholds - REDUCED for more frequent updates
-    const positionThreshold = 0.2; // Reduced from 0.7 to 0.2
-    const rotationThreshold = 0.15; // Reduced from 0.4 to 0.15
+    // Calculate movement thresholds
+    const positionThreshold = 0.2;
+    const rotationThreshold = 0.15;
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
@@ -295,22 +275,28 @@ export function render() {
         lastCameraRotation.copy(currentCameraRotation);
     }
     
-    // Always update control panel position in EVERY frame when in AR mode
-    if (renderer.xr.isPresenting && controlPanel) {
+    // Update control panel position periodically in AR mode
+    if (renderer.xr.isPresenting) {
         // Update less frequently to avoid performance issues (every 30 frames)
         if (frameCount % 30 === 0) {
             setupControlPanel();
         }
         frameCount++;
+        
+        // Update AR mode state
+        isARMode = true;
+    } else {
+        isARMode = false;
     }
     
     // Add subtle floating animation to control panel
-    if (typeof floatAnimation === 'function') {
-        floatAnimation();
-    }
+    floatAnimation();
     
     // Update screen visual effects
     updateScreenEffects();
+    
+    // Update video textures
+    updateVideoTextures();
     
     // Render the scene
     renderer.render(scene, camera);
@@ -319,7 +305,9 @@ export function render() {
 // Create a welcome screen at the start
 function createStartScreen() {
     const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
-    
-    // Set up control panel initial position
-    setTimeout(setupControlPanel, 500);
 }
+
+// Export function to manually update/re-render
+export function animate() {
+    renderer.setAnimationLoop(render);
+} 
