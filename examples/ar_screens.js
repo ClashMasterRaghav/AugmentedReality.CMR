@@ -897,19 +897,18 @@ function createControlIcon(type) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Logo URLs for different controls - replace with your actual logo URLs
+    // Map icon types to local file paths
     const logoURLs = {
-        'play': 'https://cdn-icons-png.flaticon.com/512/0/375.png',
-        'pause': 'https://cdn-icons-png.flaticon.com/512/2920/2920566.png',
-        'volume': 'https://cdn-icons-png.flaticon.com/512/727/727240.png',
-        'muted': 'https://cdn-icons-png.flaticon.com/512/727/727262.png',
-        'fullscreen': 'https://cdn-icons-png.flaticon.com/512/2089/2089674.png',
-        'resize': 'https://cdn-icons-png.flaticon.com/512/61/61449.png'
+        'play': 'examples/textures/ar_icons/play-buttton.png',
+        'pause': 'examples/textures/ar_icons/pause-button.png',
+        'volume': 'examples/textures/ar_icons/unmute.png',
+        'muted': 'examples/textures/ar_icons/mute.png',
+        'fullscreen': 'examples/textures/ar_icons/fullscreen.png', // Note: This file wasn't in the list, will need fallback
+        'resize': 'examples/textures/ar_icons/resize.png' // Note: This file wasn't in the list, will need fallback
     };
     
     // Create a new image
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
     
     // Create a promise to handle async loading
     return new Promise((resolve) => {

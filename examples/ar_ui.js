@@ -482,19 +482,18 @@ function createButtonIcon(buttonIndex) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Logo URLs for different buttons
+    // Map button indices to local file paths
     const logoURLs = {
-        0: 'https://cdn-icons-png.flaticon.com/512/1828/1828921.png', // New screen button (plus sign)
-        1: 'https://cdn-icons-png.flaticon.com/512/1214/1214428.png', // Delete button (trash)
-        2: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png', // YouTube
-        3: 'https://cdn-icons-png.flaticon.com/512/5968/5968731.png', // DuckDuckGo
-        4: 'https://cdn-icons-png.flaticon.com/512/2642/2642502.png', // Google Maps 
-        5: 'https://cdn-icons-png.flaticon.com/512/5968/5968386.png'  // Electron
+        0: 'examples/textures/ar_icons/add.png',          // New screen button
+        1: 'examples/textures/ar_icons/delete.png',       // Delete button
+        2: 'examples/textures/ar_icons/youtube.png',      // YouTube
+        3: 'examples/textures/ar_icons/DuckDuckGo_logo.png', // DuckDuckGo
+        4: 'examples/textures/ar_icons/maps.png',         // Google Maps 
+        5: 'examples/textures/ar_icons/electron_app.png'  // Electron
     };
     
     // Create a new image
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
     
     // Create a promise to handle async loading
     return new Promise((resolve) => {
