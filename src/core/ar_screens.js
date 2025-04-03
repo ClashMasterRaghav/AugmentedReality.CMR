@@ -939,11 +939,6 @@ export function selectScreen(screen) {
     // Animate scale slightly to provide visual feedback
     animateScreenScale(screen, 1.03, 0.3, true);
     
-    // Show notification
-    const screenType = screen.userData.contentType || 'Screen';
-    const screenNum = screen.userData.screenNumber || '';
-    showNotification(`Selected ${screenType} ${screenNum}`);
-    
     // Make sure CSS3D object is in sync
     if (screen.userData.css3dObject) {
         screen.userData.css3dObject.position.copy(screen.position);

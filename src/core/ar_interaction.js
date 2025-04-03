@@ -244,7 +244,7 @@ function onTouchStart(event) {
                     }
                     
                     // Highlight the screen briefly for visual feedback
-                    flashScreenHighlight(screen);
+                    simpleScreenHighlight(screen);
                 }
             }
         }
@@ -723,7 +723,7 @@ function createSimpleModeChangeIndicator(message) {
 }
 
 // Flash a highlight on a screen for visual feedback
-function flashScreenHighlight(screen) {
+function simpleScreenHighlight(screen) {
     if (!screen || !window.scene) return;
     
     // Create highlight mesh
