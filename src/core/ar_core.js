@@ -388,38 +388,10 @@ function render() {
         }
     }
     
-    // Check if camera has moved significantly and update control panel
-    const currentCameraPosition = camera.position.clone();
-    const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
-    
-    // Calculate movement thresholds
-    const positionThreshold = 0.2;
-    const rotationThreshold = 0.15;
-    
-    // Check for significant camera movement
-    const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
-    const hasRotated = 
-        Math.abs(currentCameraRotation.x - lastCameraRotation.x) > rotationThreshold ||
-        Math.abs(currentCameraRotation.y - lastCameraRotation.y) > rotationThreshold;
-    
-    // If camera has moved significantly, update the control panel position
-    if (hasMoved || hasRotated) {
-        setupControlPanel();
-        
-        // Update last known position and rotation
-        lastCameraPosition.copy(currentCameraPosition);
-        lastCameraRotation.copy(currentCameraRotation);
-    }
-    
-    // Update control panel position periodically in AR mode
+    // REMOVE auto-updating control panel position based on camera movement
+    // Just update AR mode state
     if (renderer.xr.isPresenting) {
-        // Update less frequently to avoid performance issues (every 30 frames)
-        if (frameCount % 30 === 0) {
-            setupControlPanel();
-        }
         frameCount++;
-        
-        // Update AR mode state
         isARMode = true;
     } else {
         isARMode = false;
@@ -442,30 +414,26 @@ function render() {
 function createStartScreen() {
     console.log("Creating start screen...");
     
-    // Get current camera position and direction
-    const cameraPosition = new THREE.Vector3();
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    // Create a screen at a fixed world position rather than relative to camera
+    // This will prevent it from being "stuck" to the camera
     
-    if (window.camera) {
-        window.camera.getWorldPosition(cameraPosition);
-        window.camera.getWorldDirection(cameraDirection);
-    }
+    // Define fixed positions for screens in world space (not relative to camera)
+    const browserScreenPosition = new THREE.Vector3(0, 0, -3);
+    const youtubeScreenPosition = new THREE.Vector3(0, -0.7, -3);
     
-    // Position 1.5 meters in front of camera
-    const screenPosition = cameraPosition.clone().add(
-        cameraDirection.multiplyScalar(1.5)
-    );
+    console.log("Creating browser screen at fixed position:", browserScreenPosition);
     
-    console.log("Camera position:", cameraPosition);
-    console.log("Screen position:", screenPosition);
-    
-    // Create different screen types for testing
     let startScreen;
     
     // Try to create a browser screen first
     try {
-        startScreen = createNewBrowserScreen(screenPosition);
+        startScreen = createNewBrowserScreen(browserScreenPosition);
         console.log("Created browser screen:", startScreen);
+        
+        // Make sure the screen userData has the correct fixed position
+        if (startScreen.userData) {
+            startScreen.userData.fixedPosition = true;
+        }
     } catch (error) {
         console.error("Failed to create browser screen:", error);
         
@@ -476,10 +444,7 @@ function createStartScreen() {
             side: THREE.DoubleSide 
         });
         startScreen = new THREE.Mesh(geometry, material);
-        startScreen.position.copy(screenPosition);
-        
-        // Make it face the camera
-        startScreen.lookAt(cameraPosition);
+        startScreen.position.copy(browserScreenPosition);
         
         // Add to scene
         if (window.scene) {
@@ -490,16 +455,37 @@ function createStartScreen() {
     
     // Create a YouTube screen as well
     try {
-        const youtubePosition = screenPosition.clone();
-        youtubePosition.y -= 1.0; // Position below the browser screen
+        const youtubeScreen = createYouTubeScreen('dQw4w9WgXcQ', youtubeScreenPosition);
+        console.log("Created YouTube screen at fixed position:", youtubeScreenPosition);
         
-        const youtubeScreen = createYouTubeScreen('dQw4w9WgXcQ', youtubePosition);
-        console.log("Created YouTube screen:", youtubeScreen);
+        // Make sure the screen userData has the correct fixed position
+        if (youtubeScreen.userData) {
+            youtubeScreen.userData.fixedPosition = true;
+        }
     } catch (error) {
         console.error("Failed to create YouTube screen:", error);
     }
     
+    // Create visible debug markers to help with orientation
+    createWorldAxisHelper();
+    
     return startScreen;
+}
+
+// Create a simple axis helper to visualize world space
+function createWorldAxisHelper() {
+    const axisHelper = new THREE.AxesHelper(1);
+    axisHelper.position.set(0, -1, -3);
+    scene.add(axisHelper);
+    
+    // Create a red sphere to mark origin
+    const sphereGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.position.set(0, -1, -3);
+    scene.add(sphere);
+    
+    console.log("Added world axis helper at:", sphere.position);
 }
 
 // Create a floor grid for spatial reference

@@ -107,29 +107,44 @@ function init() {
 }
 
 function onSelect() {
-    // Simple test - create a screen when the controller select event happens
+    // Create a screen at a fixed position in the world space, rather than attached to controller
     try {
-        // Create position directly in front of controller
-        const tempMatrix = new THREE.Matrix4();
-        tempMatrix.identity().extractRotation(controller.matrixWorld);
-        const raycaster = new THREE.Raycaster();
-        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        // Get camera position for reference, but don't position screens relative to it
+        const cameraPosition = camera.position.clone();
         
-        const position = new THREE.Vector3();
-        position.copy(raycaster.ray.origin);
-        position.addScaledVector(raycaster.ray.direction, 2.3);
+        // Generate a fixed position in front of where the user is looking
+        // But far enough away to be visible
+        const screenPosition = new THREE.Vector3(
+            // Add some randomness to x-position so screens don't all stack
+            THREE.MathUtils.randFloat(-1, 1),
+            // Position at roughly eye level
+            THREE.MathUtils.randFloat(-0.5, 0.5),
+            // Fixed distance in front
+            -3
+        );
         
-        // Create a basic test plane
-        const testScreen = createYouTubeScreen('dQw4w9WgXcQ', position);
-        console.log("Created test screen on select at:", position);
+        console.log("Creating screen at fixed position:", screenPosition);
         
-        // Make it face the user
-        testScreen.lookAt(camera.position);
+        // Create a YouTube screen at the fixed position
+        const videoId = 'dQw4w9WgXcQ'; // Rick Roll
+        const testScreen = createYouTubeScreen(videoId, screenPosition);
         
-        showNotification("Screen created!", "success");
+        // Make sure it doesn't follow the camera
+        if (testScreen.userData) {
+            testScreen.userData.fixedPosition = true;
+        }
+        
+        // Add a red marker sphere to show where the screen was placed
+        const markerGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+        const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.copy(screenPosition);
+        scene.add(marker);
+        
+        showNotification("Screen created at fixed position", "success");
     } catch (error) {
         console.error("Error creating screen:", error);
+        showNotification("Failed to create screen: " + error.message, "error");
     }
 }
 
