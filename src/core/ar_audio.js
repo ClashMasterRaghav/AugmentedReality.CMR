@@ -209,4 +209,17 @@ export function toggleMute() {
     }
     
     return isMuted;
+}
+
+// Update audio system each frame
+export function updateAudio() {
+    // Resume audio context if suspended
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+    
+    // This function can be expanded later to update spatial audio positions
+    // or handle other dynamic audio processing
+    
+    return true;
 } 
