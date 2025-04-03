@@ -107,7 +107,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
 }
 
 // Create a YouTube screen using CSS3D renderer
-export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+export function createYouTubeScreen(videoId, position = new THREE.Vector3(0, 0, -1.5)) {
     // Check if CSS3D renderer is initialized
     if (!css3dRenderer) {
         initCSS3DRenderer();
@@ -163,12 +163,12 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     }
     
     // Create actual iframe for YouTube with CSS3D
-    const videoId = "Myrr9vA7j5A"; // Demo video ID
+    // Use the provided videoId or a default one
     const iframeElement = document.createElement('iframe');
     iframeElement.style.width = `${screenWidth * 1000}px`;
     iframeElement.style.height = `${screenHeight * 1000}px`;
     iframeElement.style.border = '0px';
-    iframeElement.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1`;
+    iframeElement.src = `https://www.youtube-nocookie.com/embed/${videoId || "Myrr9vA7j5A"}?autoplay=1&mute=1&enablejsapi=1`;
     iframeElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
     
     // Create CSS3D object and position it to match the Three.js object
@@ -215,7 +215,7 @@ export function createYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
 }
 
 // Create a DuckDuckGo search screen
-export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+export function createDuckDuckGoScreen(query = '', position = new THREE.Vector3(0, 0, -1.5)) {
     // Check if CSS3D renderer is initialized
     if (!css3dRenderer) {
         initCSS3DRenderer();
@@ -320,7 +320,7 @@ export function createDuckDuckGoScreen(position = new THREE.Vector3(0, 0, -1.5))
 }
 
 // Create a Google Maps screen
-export function createGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5)) {
+export function createGoogleMapsScreen(location = '', position = new THREE.Vector3(0, 0, -1.5)) {
     // Check if CSS3D renderer is initialized
     if (!css3dRenderer) {
         initCSS3DRenderer();
@@ -819,10 +819,16 @@ export function createScreenFromButton(screenType, position) {
     
     console.log(`Creating ${screenType} screen at position:`, position);
     
+    // Check if type includes a YouTube video ID
+    if (typeof screenType === 'string' && screenType.includes('youtube:')) {
+        const videoId = screenType.split(':')[1];
+        return createYouTubeScreen(videoId, position);
+    }
+    
     // Create appropriate screen based on type
     switch(screenType.toLowerCase()) {
         case 'youtube':
-            return createYouTubeScreen(position);
+            return createYouTubeScreen('dQw4w9WgXcQ', position); // Default video
         case 'maps':
         case 'googlemaps':
         case 'googlemapssatellite':

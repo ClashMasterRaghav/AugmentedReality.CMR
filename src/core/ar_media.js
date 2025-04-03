@@ -2,9 +2,41 @@
 import * as THREE from 'three';
 import { showNotification } from './ar_utils.js';
 
+// Global variables
+let videoElement = null;
+let videoScreens = [];
+export let videoTexture = null;
+
+// Initialize media sources
+export async function initMediaSources() {
+    try {
+        // Create video element for texture
+        videoElement = document.createElement('video');
+        videoElement.autoplay = false;
+        videoElement.muted = true;
+        videoElement.loop = true;
+        videoElement.playsInline = true;
+        videoElement.crossOrigin = 'anonymous';
+        
+        // Add test video source
+        videoElement.src = 'https://threejs.org/examples/textures/sintel.ogv';
+        
+        // Create video texture
+        videoTexture = new THREE.VideoTexture(videoElement);
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+        videoTexture.format = THREE.RGBAFormat;
+        
+        console.log("Media sources initialized");
+        return true;
+    } catch (error) {
+        console.error("Failed to initialize media sources:", error);
+        showNotification("Failed to initialize media: " + error.message, "error");
+        return false;
+    }
+}
+
 // Export video texture reference
-export let videoTexture;
-export let videoElement;
 export let currentTime = 0;
 export let duration = 100; // Default duration if not available
 

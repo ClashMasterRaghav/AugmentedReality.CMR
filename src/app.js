@@ -263,9 +263,12 @@ function createInitialScreen() {
         cameraDirection.applyQuaternion(window.camera.quaternion);
         
         // Position in front of camera
-        welcomeScreen.position.copy(cameraPosition).add(
+        const screenPosition = cameraPosition.clone().add(
             cameraDirection.multiplyScalar(distance)
         );
+        
+        // Update screen position
+        welcomeScreen.position.copy(screenPosition);
         
         // Look at camera
         welcomeScreen.lookAt(cameraPosition);
