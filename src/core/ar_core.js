@@ -38,7 +38,7 @@ export function setSelectedScreen(screen) {
 }
 
 // Main initialization function
-export function initAR() {
+export function initAR(container, camera) {
     // Prevent multiple initializations
     if (isARInitialized) {
         console.log("AR application already initialized, skipping.");
@@ -47,7 +47,12 @@ export function initAR() {
     
     try {
         console.log("Initializing AR application...");
-        initAREnvironment();
+        if (container && camera) {
+            scene = window.scene || new THREE.Scene();
+            initAREnvironment();
+        } else {
+            initAREnvironment();
+        }
         return true;
     } catch (error) {
         console.error("Error initializing AR:", error);
@@ -55,6 +60,9 @@ export function initAR() {
         return false;
     }
 }
+
+// Export alias for initAR to maintain compatibility with app.js
+export const initARCore = initAR;
 
 // Update AR core components
 export function updateARCore() {

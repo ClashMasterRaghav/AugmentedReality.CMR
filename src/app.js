@@ -322,7 +322,7 @@ function animate() {
 }
 
 // Initialize AR functionality - this is the main entry point
-export function initAR() {
+export function initApplication() {
     console.log("Initializing AR...");
     
     // Initialize core AR components
