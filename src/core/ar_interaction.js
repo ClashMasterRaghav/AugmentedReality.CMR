@@ -380,11 +380,11 @@ function moveScreenWithTouch(touchPosition, touchDelta) {
     }
     
     // Create visual movement indicator
-    createMoveIndicator(screen.position.clone(), 0.05);
+    createSimpleMoveIndicator(screen.position.clone(), 0.05);
 }
 
 // Create a move indicator at position
-function createMoveIndicator(position, size) {
+function createSimpleMoveIndicator(position, size) {
     if (!window.scene) return;
     
     // Create a small dot where the ray hit
