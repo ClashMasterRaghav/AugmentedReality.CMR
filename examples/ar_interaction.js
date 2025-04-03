@@ -202,6 +202,7 @@ function onSelect(event) {
     // Use a larger threshold for better button detection
     raycaster.params.Line.threshold = 0.1;
     raycaster.params.Points.threshold = 0.1;
+    raycaster.params.Mesh.threshold = 0.01;
     
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
@@ -927,7 +928,7 @@ function onTouchStart(event) {
         // Check if we're in the top 2/3 of the screen
         // The top of the screen is at y = screenHeight/2
         // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+        if (localPoint.y > screenHeight/2 - (screenHeight * 1/10)) {
             // We hit the draggable area
             intersectedScreen = screen;
             draggableAreaHit = true;
