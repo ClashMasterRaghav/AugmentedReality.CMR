@@ -1,5 +1,5 @@
 // Core AR functionality for initialization, scene setup, and render loop
-import * as THREE from '../three.module.js';
+import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
@@ -8,7 +8,7 @@ import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } fr
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
-import * as BufferGeometryUtils from '../BufferGeometryUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Global variables exported for use in other modules
 export let camera, scene, renderer;

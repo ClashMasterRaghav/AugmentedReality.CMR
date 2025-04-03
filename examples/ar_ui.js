@@ -844,11 +844,11 @@ export function setupControlPanel() {
     
     // Position the control panel appropriately
     if (controlPanel) {
-        // Position in front and below the user
-        const cameraDirection = new THREE.Vector3(0, 0, -1);
-        cameraDirection.applyQuaternion(camera.quaternion);
-        
-        const targetPosition = new THREE.Vector3();
+    // Position in front and below the user
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(camera.quaternion);
+    
+    const targetPosition = new THREE.Vector3();
         const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         
         // Ensure the direction is always away from the camera
@@ -863,12 +863,12 @@ export function setupControlPanel() {
         
         // Update panel rotation to face user
         controlPanel.lookAt(camera.position);
-        
-        // Keep panel facing the user but upright
-        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-        euler.x = 0; // Keep panel upright (no tilt)
-        euler.z = 0; // No roll
-        controlPanel.quaternion.setFromEuler(euler);
+    
+    // Keep panel facing the user but upright
+    const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
+    euler.x = 0; // Keep panel upright (no tilt)
+    euler.z = 0; // No roll
+    controlPanel.quaternion.setFromEuler(euler);
     }
 }
 
