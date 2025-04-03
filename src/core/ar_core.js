@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, setupControlPanel, floatAnimation } from './ar_ui.js';
+import { createControlPanel, setupControlPanel } from './ar_ui.js';
 import { showNotification } from './ar_utils.js';
 import { updateVideoTextures } from './ar_media.js';
 import { createNewBrowserScreen, updateScreenEffects } from './ar_screens.js';
