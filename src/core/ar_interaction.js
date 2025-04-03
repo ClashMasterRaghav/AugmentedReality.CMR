@@ -22,26 +22,35 @@ const interactionState = {
 // Reference to video controls
 let videoControls = null;
 
+// Initialize interaction systems
+export function initInteraction() {
+    // Set up all event listeners for touch, mouse, and XR interactions
+    setupEventListeners();
+    
+    // Initialize raycaster for interaction
+    interactionState.raycaster = new THREE.Raycaster();
+    
+    console.log("Interaction system initialized");
+    return true;
+}
+
 // Set up event listeners for different input types
 export function setupEventListeners() {
-    // Check if we already have a renderer (required for touch interaction)
-    if (!window.renderer) {
-        console.error("Cannot set up event listeners - renderer not initialized");
-        return;
-    }
+    console.log("Setting up event listeners for interactions");
     
-    // Touch events for mobile
-    window.renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-    window.renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-    window.renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+    // Set up touch event listeners
+    document.addEventListener('touchstart', onTouchStart, false);
+    document.addEventListener('touchmove', onTouchMove, false);
+    document.addEventListener('touchend', onTouchEnd, false);
     
-    // Mouse events for desktop testing
-    window.renderer.domElement.addEventListener('mousedown', onMouseDown, false);
-    window.renderer.domElement.addEventListener('mousemove', onMouseMove, false);
-    window.renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+    // Set up mouse event listeners for desktop testing
+    document.addEventListener('mousedown', onMouseDown, false);
+    document.addEventListener('mousemove', onMouseMove, false);
+    document.addEventListener('mouseup', onMouseUp, false);
     
-    // Add XR controller event listeners if they exist
+    // Set up controller event handlers if in XR
     if (window.controller) {
+        console.log("Setting up XR controller event listeners");
         window.controller.addEventListener('selectstart', onSelectStart);
         window.controller.addEventListener('select', onSelect);
         window.controller.addEventListener('selectend', onSelectEnd);

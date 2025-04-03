@@ -36,6 +36,9 @@ export async function initMediaSources() {
     }
 }
 
+// Alias for initMediaSources to maintain compatibility with app.js
+export const initMedia = initMediaSources;
+
 // Export video texture reference
 export let currentTime = 0;
 export let duration = 100; // Default duration if not available
@@ -286,22 +289,17 @@ function createFallbackTexture(errorMessage = "Video not available") {
 
 // Update video textures in render loop
 export function updateVideoTextures() {
-    // Update main video texture
-    if (videoTexture && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
-        videoTexture.needsUpdate = true;
-    }
-    
-    // Update any other video textures in the scene
-    if (window.scene) {
-        window.scene.traverse(object => {
-            if (object.userData && object.userData.texture && object.userData.video) {
-                if (object.userData.video.readyState >= object.userData.video.HAVE_CURRENT_DATA) {
-                    object.userData.texture.needsUpdate = true;
-                }
-            }
-        });
+    // Only run this update if there's a video playing
+    if (videoElement && videoTexture) {
+        if (videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
+            videoTexture.needsUpdate = true;
+            currentTime = videoElement.currentTime;
+        }
     }
 }
+
+// Alias for updateVideoTextures to maintain compatibility with app.js
+export const updateMedia = updateVideoTextures;
 
 // Create a dynamic video overlay for a screen
 export function createVideoOverlay(videoUrl, width = 0.76, height = 0.46) {

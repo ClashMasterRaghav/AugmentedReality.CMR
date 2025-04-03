@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { initARCore, updateARCore, createFloorGrid } from './core/ar_core.js';
 import { initCSS3DRenderer, updateCSS3DRenderer, createNewBrowserScreen, createYouTubeScreen, animateScreenEntrance, updateScreenEffects } from './core/ar_screens.js';
-import { initInteraction } from './core/ar_interaction.js';
+import { initInteraction, setupEventListeners } from './core/ar_interaction.js';
 import { initUI, updateUI, createControlPanel } from './core/ar_ui.js';
 import { initAudio, updateAudio } from './core/ar_audio.js';
 import { initMedia, updateMedia } from './core/ar_media.js';
