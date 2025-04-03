@@ -1,5 +1,5 @@
 // AR interaction handling
-import * as THREE from 'three';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
 import { showNotification, throttle, debounce } from './ar_utils.js';
 import { toggleVideoPlayback, toggleVideoMute } from './ar_media.js';
 import { setButtonHover, setButtonPressed, virtualKeyboard } from './ar_ui.js';

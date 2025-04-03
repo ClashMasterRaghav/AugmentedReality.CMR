@@ -1,573 +1,457 @@
 // UI elements and controls for AR experience
-import * as THREE from 'three';
-import { createRoundedRectTexture, createGlowTexture, loadTexture } from './ar_utils.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import { createRoundedRectTexture, createGlowTexture, showNotification } from './ar_utils.js';
+import { createNewBrowserScreen, createYouTubeScreen, createGoogleMapsScreen } from './ar_screens.js';
+import { deleteLastScreen } from './ar_interaction.js';
 
 // Global UI elements
-export let controlPanel = null;
-export let virtualKeyboard = null;
-
-// UI interaction states
-export let isMoveModeActive = false;
-export let isRotateModeActive = false;
-export let isResizeModeActive = false;
+let controlPanel = null;
+let buttons = [];
+let virtualKeyboard = null;
 
 // Initialize UI elements
-export function initUI() {
-    // Control panel will be created by setupControlPanel
-    createVirtualKeyboard();
-}
-
-// Create a control panel
-export function createControlPanel() {
-    // If a control panel already exists, don't create another one
-    if (controlPanel && window.scene && window.scene.children.includes(controlPanel)) {
-        console.log("Control panel already exists - not creating a new one");
-        return controlPanel;
+export async function initUI() {
+    // Create control panel if it doesn't exist yet
+    if (!controlPanel && window.scene) {
+        createControlPanel();
     }
     
-    console.log("Creating control panel");
-    controlPanel = new THREE.Group();
-    controlPanel.name = "controlPanel";
-    controlPanel.userData = {
-        type: 'controlPanel',
-        isDragging: false,
-        manuallyPositioned: false
-    };
+    console.log("UI initialized");
+}
+
+// Update UI elements each frame
+export function updateUI() {
+    // Animate control panel
+    if (controlPanel) {
+        // Simple hover animation
+        controlPanel.position.y += Math.sin(Date.now() * 0.002) * 0.0005;
+    }
+}
+
+// Create main control panel
+export function createControlPanel() {
+    // Check if scene is available
+    if (!window.scene) {
+        console.error("Cannot create control panel - scene not initialized");
+        return null;
+    }
     
-    // Panel dimensions
+    // Create panel geometry
     const panelWidth = 0.6;
-    const panelHeight = 0.4;
+    const panelHeight = 0.2;
+    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
     
-    // Create a rounded rectangle texture for the panel
+    // Create panel material with rounded rectangle texture
     const panelTexture = createRoundedRectTexture(
-        512, 512, 
-        30,
-        'rgba(10, 20, 40, 0.85)',
-        'rgba(30, 80, 140, 0.9)',
-        3,
-        'rgba(70, 140, 230, 1.0)'
+        512, 
+        256, 
+        40, 
+        '#2A2A2A', 
+        '#4fc3f7',
+        2
     );
     
     const panelMaterial = new THREE.MeshBasicMaterial({
         map: panelTexture,
         transparent: true,
-        opacity: 0.95,
-        depthWrite: false
+        opacity: 0.9,
+        side: THREE.DoubleSide
     });
     
-    // Create a background glow effect
-    const glowSize = 40;
-    const glowTexture = createGlowTexture(
-        512 + glowSize*2, 
-        512 + glowSize*2, 
-        'rgba(60, 140, 230, 0.25)'
-    );
+    // Create panel mesh
+    controlPanel = new THREE.Mesh(panelGeometry, panelMaterial);
+    controlPanel.position.set(0, -0.5, -1);
+    controlPanel.userData.type = 'controlPanel';
+    controlPanel.userData.isDraggable = true;
     
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        map: glowTexture,
-        transparent: true,
-        opacity: 0.8,
-        depthWrite: false
-    });
+    // Add to scene
+    window.scene.add(controlPanel);
     
-    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-    
-    // Add glow behind panel
-    const glowGeometry = new THREE.PlaneGeometry(panelWidth * 1.2, panelHeight * 1.2);
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    glowMesh.position.z = -0.005;
-    
-    controlPanel.add(glowMesh);
-    controlPanel.add(panelMesh);
-    
-    // Set render order for proper visibility
-    panelMesh.renderOrder = 1000;
-    glowMesh.renderOrder = 999;
-    
-    // Add buttons to control panel
-    const buttonSize = panelHeight / 6;
-    const smallButtonSize = buttonSize * 1.3;
-    const spacing = smallButtonSize * 2.1;
-    
-    // Add the screen type buttons at the bottom of the panel
-    const buttonY = -panelHeight/2 + smallButtonSize * 1.2;
-    const buttonStartX = -spacing * 1.5;
-    
-    // Create YouTube button
-    const youtubeIcon = loadTexture('examples/textures/ar_icons/youtube.png');
-    createUIButton(
-        controlPanel,
-        'YouTube',
-        buttonStartX, 
-        buttonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'selectScreenType', screenType: 'youtube' },
-        youtubeIcon
-    );
-    
-    // Create Search button
-    const searchIcon = loadTexture('examples/textures/ar_icons/DuckDuckGo_logo.png');
-    createUIButton(
-        controlPanel,
-        'Search',
-        buttonStartX + spacing, 
-        buttonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'selectScreenType', screenType: 'duckduckgo' },
-        searchIcon
-    );
-    
-    // Create Maps button
-    const mapsIcon = loadTexture('examples/textures/ar_icons/satellite-earth.png');
-    createUIButton(
-        controlPanel,
-        'Maps',
-        buttonStartX + spacing * 2, 
-        buttonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'selectScreenType', screenType: 'googlemapssatellite' },
-        mapsIcon
-    );
-    
-    // Create App button
-    const appIcon = loadTexture('examples/textures/ar_icons/app-window.png');
-    createUIButton(
-        controlPanel,
-        'App',
-        buttonStartX + spacing * 3, 
-        buttonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'selectScreenType', screenType: 'electronapp' },
-        appIcon
-    );
-    
-    // Add the Add and Delete buttons at the top of the panel
-    const topButtonY = panelHeight/2 - smallButtonSize * 1.2;
-    
-    // Create Add button
-    const addIcon = loadTexture('examples/textures/ar_icons/plus.png');
-    createUIButton(
-        controlPanel,
-        'Add',
-        buttonStartX + spacing * 0.5, 
-        topButtonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'addScreen' },
-        addIcon
-    );
-    
-    // Create Delete button
-    const deleteIcon = loadTexture('examples/textures/ar_icons/trash.png');
-    createUIButton(
-        controlPanel,
-        'Delete',
-        buttonStartX + spacing * 2.5, 
-        topButtonY,
-        smallButtonSize,
-        'handleButtonAction',
-        { action: 'deleteScreen' },
-        deleteIcon
-    );
-    
-    // Add control panel to scene
-    if (window.scene) {
-        window.scene.add(controlPanel);
-    }
-    
-    console.log("Control panel created successfully");
+    // Add buttons to panel
+    addButtonToPanel(controlPanel, 'add', 'Add Screen', -0.2, 0, 0.08, handleAddButtonClick);
+    addButtonToPanel(controlPanel, 'delete', 'Delete Screen', 0, 0, 0.08, handleDeleteButtonClick);
+    addButtonToPanel(controlPanel, 'youtube', 'YouTube', 0.2, 0, 0.08, handleYouTubeButtonClick);
     
     return controlPanel;
 }
 
-// Create a button for UI
-export function createUIButton(parent, label, x, y, size, action, actionData, iconTexture = null) {
+// Add a button to the panel
+function addButtonToPanel(panel, id, label, x, y, radius, clickHandler) {
     // Create button geometry
-    const buttonGeometry = new THREE.CircleGeometry(size / 2, 32);
+    const buttonGeometry = new THREE.CircleGeometry(radius, 32);
     
-    // Create button material with light background for better visibility
+    // Create button texture
+    const buttonTexture = createButtonTexture(id, label);
+    
+    // Create button material
     const buttonMaterial = new THREE.MeshBasicMaterial({
-        color: 0x666666,
+        map: buttonTexture,
         transparent: true,
-        opacity: 0.9
+        opacity: 1,
+        side: THREE.DoubleSide
     });
     
     // Create button mesh
     const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-    button.position.set(x, y, 0.005);
-    button.renderOrder = 1001;
+    button.position.set(x, y, 0.001); // Slightly above panel
+    button.userData.type = 'button';
+    button.userData.id = id;
+    button.userData.label = label;
+    button.userData.action = 'handleButtonAction';
+    button.userData.actionData = { action: id };
+    button.userData.parent = panel;
     
-    // Store button action data
-    button.userData = {
-        type: 'button',
-        action: action,
-        actionData: actionData,
-        label: label,
-        originalColor: 0x666666,
-        hoverColor: 0x999999,
-        isToggle: false,
-        isActive: false
-    };
+    // Add to panel
+    panel.add(button);
     
-    // Add icon if provided
-    if (iconTexture) {
-        const iconSize = size * 0.7;
-        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-        const iconMaterial = new THREE.MeshBasicMaterial({
-            map: iconTexture,
-            transparent: true,
-            depthWrite: false
-        });
-        
-        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.renderOrder = 1002;
-        button.add(iconMesh);
-    }
-    
-    // Add label text below button
-    const labelCanvas = document.createElement('canvas');
-    labelCanvas.width = 128;
-    labelCanvas.height = 32;
-    const labelContext = labelCanvas.getContext('2d');
-    
-    // Draw text with shadow for better visibility
-    labelContext.fillStyle = '#ffffff';
-    labelContext.font = 'bold 16px Arial';
-    labelContext.textAlign = 'center';
-    labelContext.textBaseline = 'middle';
-    
-    // Add shadow for better contrast
-    labelContext.shadowColor = 'rgba(0, 0, 0, 0.7)';
-    labelContext.shadowBlur = 4;
-    labelContext.shadowOffsetX = 1;
-    labelContext.shadowOffsetY = 1;
-    
-    labelContext.fillText(label, 64, 16);
-    
-    const labelTexture = new THREE.CanvasTexture(labelCanvas);
-    const labelGeometry = new THREE.PlaneGeometry(size * 1.2, size * 0.4);
-    const labelMaterial = new THREE.MeshBasicMaterial({
-        map: labelTexture,
-        transparent: true,
-        depthWrite: false
-    });
-    
-    const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-    labelMesh.position.set(0, -size * 0.7, 0);
-    labelMesh.renderOrder = 1003;
-    button.add(labelMesh);
-    
-    // Add button to parent
-    parent.add(button);
+    // Add button to global array for tracking
+    buttons.push(button);
     
     return button;
 }
 
-// Create a virtual keyboard
-export function createVirtualKeyboard() {
-    if (virtualKeyboard) {
-        console.log("Virtual keyboard already exists");
-        return virtualKeyboard;
-    }
+// Create a texture for a button
+function createButtonTexture(id, label) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
     
-    console.log("Creating virtual keyboard");
-    virtualKeyboard = new THREE.Group();
-    virtualKeyboard.name = "virtualKeyboard";
+    // Draw circle background
+    ctx.beginPath();
+    ctx.arc(64, 64, 60, 0, Math.PI * 2);
+    ctx.fillStyle = '#4fc3f7';
+    ctx.fill();
     
-    // Keyboard background
-    const keyboardGeometry = new THREE.PlaneGeometry(0.8, 0.3);
-    const keyboardMaterial = new THREE.MeshBasicMaterial({
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-    });
-    const keyboardMesh = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
-    virtualKeyboard.add(keyboardMesh);
+    // Draw border
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
     
-    // Add glow border
-    const borderGeometry = new THREE.PlaneGeometry(0.82, 0.32);
-    const borderMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4FC3F7,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-    });
-    const borderMesh = new THREE.Mesh(borderGeometry, borderMaterial);
-    borderMesh.position.z = -0.001;
-    virtualKeyboard.add(borderMesh);
+    // Add icon based on id
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     
-    // Create keys
-    const keyRows = [
-        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
-        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '.'],
-        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '?', '!']
-    ];
-    
-    const keySize = 0.07;
-    const keyMargin = 0.005;
-    const rowOffsetY = 0.12;
-    
-    keyRows.forEach((row, rowIndex) => {
-        const offsetY = rowOffsetY - (rowIndex * (keySize + keyMargin));
-        
-        row.forEach((key, keyIndex) => {
-            // Calculate key position
-            const offsetX = -0.36 + (keyIndex * (keySize + keyMargin));
-            
-            // Create key background
-            const keyGeometry = new THREE.PlaneGeometry(keySize, keySize);
-            const keyMaterial = new THREE.MeshBasicMaterial({
-                color: 0x555555,
-                transparent: true,
-                opacity: 0.9,
-                side: THREE.DoubleSide
-            });
-            const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-            keyMesh.position.set(offsetX, offsetY, 0.001);
-            keyMesh.userData = {
-                type: 'key',
-                value: key
-            };
-            virtualKeyboard.add(keyMesh);
-            
-            // Create key label
-            const labelCanvas = document.createElement('canvas');
-            labelCanvas.width = 64;
-            labelCanvas.height = 64;
-            const labelCtx = labelCanvas.getContext('2d');
-            labelCtx.fillStyle = '#ffffff';
-            labelCtx.font = 'bold 48px Arial';
-            labelCtx.textAlign = 'center';
-            labelCtx.textBaseline = 'middle';
-            labelCtx.fillText(key, 32, 32);
-            
-            const labelTexture = new THREE.CanvasTexture(labelCanvas);
-            const labelGeometry = new THREE.PlaneGeometry(keySize * 0.8, keySize * 0.8);
-            const labelMaterial = new THREE.MeshBasicMaterial({
-                map: labelTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-            labelMesh.position.z = 0.001;
-            keyMesh.add(labelMesh);
-        });
-    });
-    
-    // Add special keys
-    const specialKeys = [
-        { label: '⌫', value: 'Backspace', width: 0.15, x: 0.3, y: -0.12 },
-        { label: '↵', value: 'Enter', width: 0.15, x: 0.3, y: 0 },
-        { label: '␣', value: 'Space', width: 0.4, x: 0, y: -0.24 }
-    ];
-    
-    specialKeys.forEach(specialKey => {
-        const keyGeometry = new THREE.PlaneGeometry(specialKey.width, keySize);
-        const keyMaterial = new THREE.MeshBasicMaterial({
-            color: 0x2196F3,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
-        });
-        const keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
-        keyMesh.position.set(specialKey.x, specialKey.y, 0.001);
-        keyMesh.userData = {
-            type: 'key',
-            value: specialKey.value
-        };
-        virtualKeyboard.add(keyMesh);
-        
-        // Create key label
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 64;
-        labelCanvas.height = 64;
-        const labelCtx = labelCanvas.getContext('2d');
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = 'bold 48px Arial';
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        labelCtx.fillText(specialKey.label, 32, 32);
-        
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(specialKey.width * 0.8, keySize * 0.8);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.z = 0.001;
-        keyMesh.add(labelMesh);
-    });
-    
-    // Hide keyboard initially
-    virtualKeyboard.visible = false;
-    if (window.scene) {
-        window.scene.add(virtualKeyboard);
-    }
-    
-    return virtualKeyboard;
-}
-
-// Toggle mode buttons (move, rotate, resize)
-export function toggleModeButton(mode) {
-    if (!controlPanel) return;
-    
-    const buttons = controlPanel.children.filter(child => 
-        child.userData && child.userData.type === 'button');
-    
-    let buttonIndex;
-    let isActive = false;
-    
-    switch(mode) {
-        case 'move':
-            buttonIndex = 1;
-            isMoveModeActive = !isMoveModeActive;
-            isActive = isMoveModeActive;
-            isRotateModeActive = false;
-            isResizeModeActive = false;
+    let icon = '+';
+    switch(id) {
+        case 'add':
+            icon = '+';
             break;
-        case 'rotate':
-            buttonIndex = 2;
-            isRotateModeActive = !isRotateModeActive;
-            isActive = isRotateModeActive;
-            isMoveModeActive = false;
-            isResizeModeActive = false;
+        case 'delete':
+            icon = '×';
             break;
-        case 'resize':
-            buttonIndex = 3;
-            isResizeModeActive = !isResizeModeActive;
-            isActive = isResizeModeActive;
-            isMoveModeActive = false;
-            isRotateModeActive = false;
+        case 'youtube':
+            icon = '▶';
             break;
+        case 'maps':
+            icon = '🌍';
+            break;
+        default:
+            icon = id.charAt(0).toUpperCase();
     }
     
-    if (buttonIndex !== undefined && buttons[buttonIndex]) {
-        const button = buttons[buttonIndex];
-        
-        // Update button color based on active state
-        button.material.color.set(isActive ? 0x44cc88 : 0x777777);
-        button.userData.originalColor = isActive ? 0x44cc88 : 0x777777;
-        
-        // Update other buttons to inactive
-        buttons.forEach((otherButton, idx) => {
-            if (idx !== buttonIndex && idx !== 0) { // Skip the New Screen button
-                otherButton.material.color.set(0x777777);
-                otherButton.userData.originalColor = 0x777777;
-            }
-        });
-    }
+    ctx.fillText(icon, 64, 64);
+    
+    // Add label below
+    ctx.font = '16px Arial';
+    ctx.fillText(label, 64, 100);
+    
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    return texture;
 }
 
 // Set button hover state
 export function setButtonHover(button, isHovered) {
-    if (!button || !button.userData) return;
-    
-    button.userData.isHovered = isHovered;
+    if (!button || !button.material) return;
     
     if (isHovered) {
-        button.material.color.set(button.userData.hoverColor);
-    } else if (!button.userData.isPressed) {
-        button.material.color.set(button.userData.originalColor);
+        // Apply hover effect
+        button.material.opacity = 1;
+        button.scale.set(1.1, 1.1, 1.1);
+    } else {
+        // Remove hover effect
+        button.material.opacity = 0.9;
+        button.scale.set(1, 1, 1);
     }
 }
 
 // Set button pressed state
 export function setButtonPressed(button, isPressed) {
-    if (!button || !button.userData) return;
-    
-    button.userData.isPressed = isPressed;
+    if (!button || !button.material) return;
     
     if (isPressed) {
-        // Visual feedback - darken the button
-        const color = new THREE.Color(button.userData.originalColor);
-        color.multiplyScalar(0.7);
-        button.material.color.copy(color);
-    } else if (button.userData.isHovered) {
-        button.material.color.set(button.userData.hoverColor);
+        // Apply pressed effect
+        button.material.opacity = 0.8;
+        button.scale.set(0.9, 0.9, 0.9);
+        
+        // Add small delay then trigger click handler
+        if (button.userData && button.userData.action) {
+            if (button.userData.clickHandled) return;
+            
+            button.userData.clickHandled = true;
+            
+            // Visual feedback for button press
+            const originalPosition = button.position.z;
+            button.position.z -= 0.005;
+            
+            // Reset after small delay
+            setTimeout(() => {
+                if (button) {
+                    button.position.z = originalPosition;
+                }
+            }, 100);
+        }
     } else {
-        button.material.color.set(button.userData.originalColor);
+        // Remove pressed effect
+        button.material.opacity = 1;
+        button.scale.set(1, 1, 1);
+        
+        // Reset click handled flag
+        if (button.userData) {
+            button.userData.clickHandled = false;
+        }
     }
 }
 
-// Setup the control panel position
-export function setupControlPanel() {
-    // Don't try to set up control panel if no camera or scene
-    if (!window.camera || !window.scene) {
-        console.log("Cannot setup control panel - camera or scene not initialized");
-        return;
-    }
-    
-    // Remove existing control panel if it exists
-    const existingPanels = window.scene.children.filter(obj => 
-        obj.userData && obj.userData.type === 'controlPanel');
-    
-    if (existingPanels.length > 0) {
-        console.log(`Found ${existingPanels.length} control panel(s), removing all and creating a fresh one`);
-        existingPanels.forEach(panel => {
-            window.scene.remove(panel);
-        });
-        controlPanel = null;
-    }
-    
-    // Create a new control panel
-    createControlPanel();
-    
-    // Position the control panel in front of the camera
-    if (controlPanel) {
+// Button handlers
+function handleAddButtonClick() {
+    // Create new screen in front of camera
+    if (window.camera) {
         const cameraDirection = new THREE.Vector3(0, 0, -1);
         cameraDirection.applyQuaternion(window.camera.quaternion);
         
-        // Position panel in front of camera
-        const targetPosition = new THREE.Vector3();
-        targetPosition.copy(window.camera.position).addScaledVector(cameraDirection, 0.5);
+        const position = new THREE.Vector3();
+        window.camera.getWorldPosition(position);
         
-        // Position slightly below center view for better ergonomics
-        targetPosition.y = window.camera.position.y - 0.2;
+        // Create screen 1.5 meters in front
+        const screenPosition = position.clone().add(cameraDirection.multiplyScalar(1.5));
         
-        // Apply position
-        controlPanel.position.copy(targetPosition);
-        
-        // Make panel face the camera
-        controlPanel.lookAt(window.camera.position);
-        
-        // Keep panel upright (no tilt or roll)
-        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-        euler.x = 0;
-        euler.z = 0;
-        controlPanel.quaternion.setFromEuler(euler);
-        
-        console.log("Control panel positioned at:", 
-            controlPanel.position.x.toFixed(2), 
-            controlPanel.position.y.toFixed(2), 
-            controlPanel.position.z.toFixed(2)
-        );
+        // Create browser screen
+        const screen = createNewBrowserScreen();
+        if (screen) {
+            screen.position.copy(screenPosition);
+            
+            // Look at camera
+            screen.lookAt(position);
+            
+            // Add slight random rotation
+            screen.rotateY(Math.random() * 0.2 - 0.1);
+            
+            showNotification("New screen created", "success");
+        }
     }
 }
 
-// Add gentle floating animation to the control panel
-export function floatAnimation() {
-    if (!controlPanel) return;
-    
-    const time = Date.now();
-    
-    // Subtle floating effect
-    const amplitude = 0.00003;
-    controlPanel.position.y += Math.sin(time * 0.001) * amplitude;
-    
-    // Update glow effect
-    const glowMesh = controlPanel.children.find(child => 
-        child.material && child.material.blending === THREE.AdditiveBlending);
-    
-    if (glowMesh) {
-        glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
+function handleDeleteButtonClick() {
+    deleteLastScreen();
+}
+
+function handleYouTubeButtonClick() {
+    // Create YouTube screen in front of camera
+    if (window.camera) {
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(window.camera.quaternion);
+        
+        const position = new THREE.Vector3();
+        window.camera.getWorldPosition(position);
+        
+        // Create screen 1.5 meters in front
+        const screenPosition = position.clone().add(cameraDirection.multiplyScalar(1.5));
+        
+        // Grab a random YouTube video ID (Rick roll for now)
+        const videoId = 'dQw4w9WgXcQ';
+        
+        // Create YouTube screen
+        const screen = createYouTubeScreen(videoId);
+        if (screen) {
+            screen.position.copy(screenPosition);
+            
+            // Look at camera
+            screen.lookAt(position);
+            
+            // Add slight random rotation
+            screen.rotateY(Math.random() * 0.2 - 0.1);
+            
+            showNotification("YouTube screen created", "success");
+        }
     }
+}
+
+// Create a virtual keyboard for text input
+export function createVirtualKeyboard() {
+    // Check if scene is available
+    if (!window.scene) {
+        console.error("Cannot create virtual keyboard - scene not initialized");
+        return null;
+    }
+    
+    // Create keyboard container
+    const keyboardWidth = 1;
+    const keyboardHeight = 0.4;
+    const keyboardGeometry = new THREE.PlaneGeometry(keyboardWidth, keyboardHeight);
+    
+    // Create keyboard texture
+    const keyboardTexture = createKeyboardTexture();
+    
+    // Create keyboard material
+    const keyboardMaterial = new THREE.MeshBasicMaterial({
+        map: keyboardTexture,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide
+    });
+    
+    // Create keyboard mesh
+    virtualKeyboard = new THREE.Mesh(keyboardGeometry, keyboardMaterial);
+    virtualKeyboard.position.set(0, -0.8, -1);
+    virtualKeyboard.userData.type = 'virtualKeyboard';
+    virtualKeyboard.visible = false; // Hide initially
+    
+    // Add to scene
+    window.scene.add(virtualKeyboard);
+    
+    return virtualKeyboard;
+}
+
+// Create keyboard texture
+function createKeyboardTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw keyboard background
+    ctx.fillStyle = 'rgba(40, 40, 40, 0.9)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw keyboard keys
+    const keys = [
+        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+        ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+        ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+        ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '.', 'DEL']
+    ];
+    
+    const keyWidth = 80;
+    const keyHeight = 80;
+    const keySpacing = 10;
+    const startX = 50;
+    const startY = 50;
+    
+    // Draw each row of keys
+    for (let row = 0; row < keys.length; row++) {
+        const rowOffset = row === 2 ? 20 : 0; // Offset for ASDF row
+        
+        for (let col = 0; col < keys[row].length; col++) {
+            const x = startX + rowOffset + col * (keyWidth + keySpacing);
+            const y = startY + row * (keyHeight + keySpacing);
+            
+            // Draw key background
+            ctx.fillStyle = 'rgba(80, 80, 80, 0.9)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            
+            // Rounded rectangle for key
+            const radius = 8;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + keyWidth - radius, y);
+            ctx.quadraticCurveTo(x + keyWidth, y, x + keyWidth, y + radius);
+            ctx.lineTo(x + keyWidth, y + keyHeight - radius);
+            ctx.quadraticCurveTo(x + keyWidth, y + keyHeight, x + keyWidth - radius, y + keyHeight);
+            ctx.lineTo(x + radius, y + keyHeight);
+            ctx.quadraticCurveTo(x, y + keyHeight, x, y + keyHeight - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x + radius, y);
+            ctx.closePath();
+            
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw key letter
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.font = '32px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(keys[row][col], x + keyWidth / 2, y + keyHeight / 2);
+        }
+    }
+    
+    // Draw spacebar
+    const spacebarWidth = 400;
+    const spacebarHeight = 60;
+    const spacebarX = canvas.width / 2 - spacebarWidth / 2;
+    const spacebarY = startY + 4 * (keyHeight + keySpacing);
+    
+    // Spacebar background
+    ctx.fillStyle = 'rgba(80, 80, 80, 0.9)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    
+    // Rounded rectangle for spacebar
+    const radius = 8;
+    ctx.beginPath();
+    ctx.moveTo(spacebarX + radius, spacebarY);
+    ctx.lineTo(spacebarX + spacebarWidth - radius, spacebarY);
+    ctx.quadraticCurveTo(spacebarX + spacebarWidth, spacebarY, spacebarX + spacebarWidth, spacebarY + radius);
+    ctx.lineTo(spacebarX + spacebarWidth, spacebarY + spacebarHeight - radius);
+    ctx.quadraticCurveTo(spacebarX + spacebarWidth, spacebarY + spacebarHeight, spacebarX + spacebarWidth - radius, spacebarY + spacebarHeight);
+    ctx.lineTo(spacebarX + radius, spacebarY + spacebarHeight);
+    ctx.quadraticCurveTo(spacebarX, spacebarY + spacebarHeight, spacebarX, spacebarY + spacebarHeight - radius);
+    ctx.lineTo(spacebarX, spacebarY + radius);
+    ctx.quadraticCurveTo(spacebarX, spacebarY, spacebarX + radius, spacebarY);
+    ctx.closePath();
+    
+    ctx.fill();
+    ctx.stroke();
+    
+    // Label for spacebar
+    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SPACE', spacebarX + spacebarWidth / 2, spacebarY + spacebarHeight / 2);
+    
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    return texture;
+}
+
+// Toggle keyboard visibility
+export function toggleVirtualKeyboard() {
+    if (!virtualKeyboard) {
+        virtualKeyboard = createVirtualKeyboard();
+    }
+    
+    if (virtualKeyboard) {
+        virtualKeyboard.visible = !virtualKeyboard.visible;
+        
+        // Position in front of camera when shown
+        if (virtualKeyboard.visible && window.camera) {
+            // Get camera position and direction
+            const cameraPosition = new THREE.Vector3();
+            window.camera.getWorldPosition(cameraPosition);
+            
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(window.camera.quaternion);
+            
+            // Position keyboard in front and below camera
+            const keyboardPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1));
+            keyboardPosition.y -= 0.4; // Position below center
+            
+            virtualKeyboard.position.copy(keyboardPosition);
+            
+            // Orient keyboard to face camera
+            virtualKeyboard.lookAt(cameraPosition);
+        }
+    }
+    
+    return virtualKeyboard?.visible || false;
 } 

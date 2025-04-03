@@ -1,17 +1,33 @@
-// Utility functions for AR experience
-import * as THREE from 'three';
+// Utility functions for AR application
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
 
 // Create and display notifications
-export function showNotification(message, type = 'info') {
-    console.log(`Notification (${type}): ${message}`);
+export function showNotification(message, type = 'info', duration = 3000) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
     
-    // Create DOM notification
-    createDOMNotification(message, type);
-    
-    // Create 3D notification if renderer is available
-    if (window.renderer && window.camera) {
-        create3DNotification(message, type);
+    // Add to container
+    const container = document.getElementById('notification-container');
+    if (!container) {
+        console.error('Notification container not found');
+        return;
     }
+    
+    container.appendChild(notification);
+    
+    // Remove after duration
+    setTimeout(() => {
+        // Fade out animation already handled by CSS
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, duration);
+    
+    console.log(`Notification [${type}]: ${message}`);
+    
+    return notification;
 }
 
 // Alias for backward compatibility
@@ -138,25 +154,22 @@ function create3DNotification(message, type = 'info') {
 
 // Create a texture with rounded rectangle
 export function createRoundedRectTexture(
-    width, 
-    height, 
-    radius, 
-    bgColor = 'rgba(40, 40, 60, 0.8)', 
-    gradientColor = 'rgba(60, 80, 120, 0.8)',
-    borderSize = 2,
-    borderColor = 'rgba(100, 150, 255, 0.9)'
+    width = 256, 
+    height = 256, 
+    radius = 30, 
+    backgroundColor = '#2A2A2A', 
+    borderColor = '#4fc3f7',
+    borderWidth = 2
 ) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, bgColor);
-    gradient.addColorStop(1, gradientColor);
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
     
-    // Draw rounded rectangle with gradient
+    // Draw rounded rectangle background
     ctx.beginPath();
     ctx.moveTo(radius, 0);
     ctx.lineTo(width - radius, 0);
@@ -169,51 +182,55 @@ export function createRoundedRectTexture(
     ctx.quadraticCurveTo(0, 0, radius, 0);
     ctx.closePath();
     
-    // Fill with gradient
-    ctx.fillStyle = gradient;
+    // Fill background
+    ctx.fillStyle = backgroundColor;
     ctx.fill();
     
-    // Add border
-    if (borderSize > 0) {
+    // Draw border if needed
+    if (borderWidth > 0) {
         ctx.strokeStyle = borderColor;
-        ctx.lineWidth = borderSize;
+        ctx.lineWidth = borderWidth;
         ctx.stroke();
     }
     
-    // Create texture
+    // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     
     return texture;
 }
 
-// Create a glow texture
+// Create a glow texture for buttons
 export function createGlowTexture(
-    width, 
-    height, 
-    color = 'rgba(100, 150, 255, 0.2)'
+    size = 64, 
+    color = '#4fc3f7', 
+    intensity = 0.7
 ) {
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d');
     
-    // Create radial gradient for glow
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = Math.min(width, height) / 2;
-    
+    // Create radial gradient
     const gradient = ctx.createRadialGradient(
-        centerX, centerY, radius * 0.2,
-        centerX, centerY, radius * 0.8
+        size / 2, size / 2, 0,
+        size / 2, size / 2, size / 2
     );
     
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    // Parse color to RGB
+    const tempDiv = document.createElement('div');
+    tempDiv.style.color = color;
+    document.body.appendChild(tempDiv);
+    const rgbColor = window.getComputedStyle(tempDiv).color;
+    document.body.removeChild(tempDiv);
+    
+    // Add color stops
+    gradient.addColorStop(0, rgbColor.replace('rgb', 'rgba').replace(')', `, ${intensity})`));
+    gradient.addColorStop(1, rgbColor.replace('rgb', 'rgba').replace(')', ', 0)'));
     
     // Fill with gradient
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, size, size);
     
     // Create texture
     const texture = new THREE.CanvasTexture(canvas);
@@ -224,7 +241,15 @@ export function createGlowTexture(
 
 // Load a texture from URL
 export function loadTexture(url) {
-    return new THREE.TextureLoader().load(url);
+    return new Promise((resolve, reject) => {
+        const loader = new THREE.TextureLoader();
+        loader.load(
+            url,
+            texture => resolve(texture),
+            undefined,
+            error => reject(error)
+        );
+    });
 }
 
 // Generate a random color
@@ -247,8 +272,8 @@ export function distance(point1, point2) {
 }
 
 // Linear interpolation between values
-export function lerp(start, end, alpha) {
-    return start + (end - start) * alpha;
+export function lerp(start, end, t) {
+    return start * (1 - t) + end * t;
 }
 
 // Ease in-out function
@@ -258,7 +283,10 @@ export function easeInOut(t) {
 
 // Generate UUID
 export function generateUUID() {
-    return THREE.MathUtils.generateUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
 
 // Format time in MM:SS format
@@ -288,9 +316,11 @@ export async function checkARSupport() {
 // Throttle function to limit calls
 export function throttle(func, limit) {
     let inThrottle;
-    return function(...args) {
+    return function() {
+        const context = this;
+        const args = arguments;
         if (!inThrottle) {
-            func.apply(this, args);
+            func.apply(context, args);
             inThrottle = true;
             setTimeout(() => inThrottle = false, limit);
         }
@@ -298,15 +328,71 @@ export function throttle(func, limit) {
 }
 
 // Debounce function
-export function debounce(func, wait) {
+export function debounce(func, wait, immediate = false) {
     let timeout;
-    return function(...args) {
+    return function() {
+        const context = this;
+        const args = arguments;
+        const later = function() {
+            timeout = null;
+            if (!immediate) func.apply(context, args);
+        };
+        const callNow = immediate && !timeout;
         clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
     };
 }
 
 // Create a delay with Promise
 export function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Calculate distance between 3D points
+export function distanceBetween(point1, point2) {
+    return point1.distanceTo(point2);
+}
+
+// Create a texture from text
+export function createTextTexture(
+    text, 
+    width = 256, 
+    height = 64,
+    backgroundColor = 'rgba(0,0,0,0.7)',
+    textColor = '#ffffff',
+    fontSize = 24,
+    fontFamily = 'Arial'
+) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // Draw background if needed
+    if (backgroundColor) {
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+    }
+    
+    // Add text
+    ctx.fillStyle = textColor;
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+    
+    // Create texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    
+    return texture;
+}
+
+// Clamp a value between min and max
+export function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
 } 

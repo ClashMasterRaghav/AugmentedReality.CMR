@@ -1,6 +1,6 @@
 // Main AR application entry point
-import * as THREE from 'three';
-import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/webxr/ARButton.js';
 import { initARScene, updateScene } from './core/ar_scene.js';
 import { 
     initCSS3DRenderer, 
