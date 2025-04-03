@@ -1,9 +1,9 @@
 // AR interaction handling
 import * as THREE from 'three';
 import { showNotification, throttle, debounce } from './ar_utils.js';
-import { toggleVideoPlayback, toggleVideoMute } from './ar_media.js';
-import { setButtonHover, setButtonPressed, virtualKeyboard } from './ar_ui.js';
-import { createScreenFromButton, selectScreen, screens } from './ar_screens.js';
+import { toggleVideoPlayback, toggleVideoMute, unregisterVideoScreen } from './ar_media.js';
+import { setButtonHover, setButtonPressed, toggleVirtualKeyboard } from './ar_ui.js';
+import { createScreenFromButton, selectScreen, screens, css3dScene } from './ar_screens.js';
 
 // Objects for tracking interaction state
 const interactionState = {
@@ -18,6 +18,9 @@ const interactionState = {
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2()
 };
+
+// Reference to video controls
+let videoControls = null;
 
 // Set up event listeners for different input types
 export function setupEventListeners() {
@@ -469,8 +472,8 @@ export function deleteLastScreen() {
     // If screen has a CSS3D object, remove it
     if (screenToDelete.userData && screenToDelete.userData.css3dObject) {
         // Remove from CSS3D scene
-        if (window.css3dScene) {
-            window.css3dScene.remove(screenToDelete.userData.css3dObject);
+        if (css3dScene) {
+            css3dScene.remove(screenToDelete.userData.css3dObject);
         }
     }
     

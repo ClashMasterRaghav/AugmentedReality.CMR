@@ -6,7 +6,8 @@ import {
     initCSS3DRenderer, 
     updateCSS3DRenderer, 
     createNewBrowserScreen, 
-    createYouTubeScreen 
+    createYouTubeScreen,
+    animateScreenEntrance 
 } from './core/ar_screens.js';
 import { setupEventListeners } from './core/ar_interaction.js';
 import { initUI, updateUI } from './core/ar_ui.js';
@@ -68,6 +69,9 @@ async function init() {
         // Show welcome notification
         showNotification('AR Environment Ready', 'success');
         playStartupSound();
+        
+        // Dispatch initialization complete event
+        document.dispatchEvent(new Event('ar-initialized'));
         
         console.log('AR application initialized successfully');
     } catch (error) {
@@ -275,56 +279,6 @@ function createInitialScreen() {
         // Animate entrance
         animateScreenEntrance(welcomeScreen);
     }
-}
-
-// Animate screen entrance with a pop effect
-function animateScreenEntrance(screen) {
-    if (!screen) return;
-    
-    // Save original scale
-    const originalScale = new THREE.Vector3(1, 1, 1);
-    
-    // Start with zero scale
-    screen.scale.set(0, 0, 0);
-    
-    // Animation duration
-    const duration = 0.5;
-    const startTime = Date.now();
-    
-    // Easing function (elastic out)
-    function easeElasticOut(x) {
-        const c4 = (2 * Math.PI) / 3;
-        return x === 0
-            ? 0
-            : x === 1
-            ? 1
-            : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
-    }
-    
-    // Animation loop
-    function animate() {
-        const elapsed = (Date.now() - startTime) / 1000;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        const easedProgress = easeElasticOut(progress);
-        
-        // Scale up with elastic effect
-        screen.scale.set(
-            originalScale.x * easedProgress,
-            originalScale.y * easedProgress,
-            originalScale.z * easedProgress
-        );
-        
-        if (progress < 1) {
-            requestAnimationFrame(animate);
-        } else {
-            // Ensure final scale is correct
-            screen.scale.copy(originalScale);
-        }
-    }
-    
-    // Start animation
-    animate();
 }
 
 // Main animation loop
