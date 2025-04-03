@@ -52,7 +52,7 @@ ar-web-screens/
    ```
    git clone https://github.com/yourusername/ar-web-screens.git
    cd ar-web-screens
-   ```
+```
 
 2. Install dependencies:
    ```

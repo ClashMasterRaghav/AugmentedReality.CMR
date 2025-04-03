@@ -152,15 +152,13 @@ function initAREnvironment() {
     // Make renderer available globally for other modules
     window.renderer = renderer;
 
-    // AR Button with session end event handling
+    // AR Button with session end event handling - follow the cones example pattern
     const arButton = ARButton.createButton(renderer, {
-        requiredFeatures: ['hit-test', 'dom-overlay'],
-        domOverlay: { root: document.body },
-        optionalFeatures: ['dom-overlay', 'light-estimation']
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.getElementById('ui-container') || document.body }
     });
     
-    // Add class for styling
-    arButton.classList.add('ar-button');
     document.body.appendChild(arButton);
     
     // Add event listener for session start
@@ -168,10 +166,19 @@ function initAREnvironment() {
         console.log("AR session started");
         showNotification("AR session started - Looking for surfaces");
         
+        // Create control panel immediately on session start
+        if (createControlPanel) {
+            const panel = createControlPanel();
+            console.log("Control panel created in session start:", panel);
+        }
+        
         // Show instructions after a short delay
         setTimeout(() => {
             showNotification("Tap and drag control panel to position it");
-        }, 2000);
+            
+            // Create an initial screen for testing
+            createStartScreen();
+        }, 1000);
     });
     
     // Add event listener for session end
@@ -185,19 +192,26 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        // Set up control panel once font is loaded
-        setupControlPanel();
     });
 
-    // Controller setup
+    // Controller setup - follow the cones example pattern
     controller = renderer.xr.getController(0);
+    controller.addEventListener('connected', function(event) {
+        console.log("XR Controller connected:", event.data.gamepad);
+        this.add(buildController(event.data));
+    });
+    controller.addEventListener('disconnected', function() {
+        console.log("XR Controller disconnected");
+        this.remove(this.children[0]);
+    });
     
-    // Add controller event listeners
     controller.addEventListener('selectstart', function() {
+        console.log("Controller select start");
         controller.userData.isSelecting = true;
     });
     
     controller.addEventListener('selectend', function() {
+        console.log("Controller select end");
         controller.userData.isSelecting = false;
     });
     
@@ -209,26 +223,48 @@ function initAREnvironment() {
     controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
     scene.add(controllerGrip);
 
-    // Pointer for interaction - smaller size for precision
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-    const pointer = new THREE.Mesh(geometry, material);
-    pointer.position.z = -0.1;
-    controller.add(pointer);
-
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
     
     // Start animation loop
     renderer.setAnimationLoop(render);
-    
-    // Create initial screen
-    createStartScreen();
 
     // Set initialization flag
     isARInitialized = true;
     
     console.log("AR experience initialized successfully");
+}
+
+// Build a visual controller based on XRInputSource data
+function buildController(data) {
+    let geometry, material;
+    
+    switch (data.targetRayMode) {
+        case 'tracked-pointer':
+            // Tracked pointer - cylinder with small sphere at end
+            geometry = new THREE.CylinderGeometry(0.01, 0.02, 0.08, 12);
+            material = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            // Rotate so the narrow end points outward
+            geometry.rotateX(-Math.PI / 2); 
+            break;
+            
+        case 'gaze':
+            // Gaze mode - small reticle
+            geometry = new THREE.RingGeometry(0.02, 0.03, 32).translate(0, 0, -1);
+            material = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            break;
+    }
+    
+    const controller = new THREE.Mesh(geometry, material);
+    
+    // Add pointer tip for precise interactions
+    const pointerGeometry = new THREE.SphereGeometry(0.01, 16, 16);
+    const pointerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const pointer = new THREE.Mesh(pointerGeometry, pointerMaterial);
+    pointer.position.z = -0.05; // Position at the end of the controller
+    controller.add(pointer);
+    
+    return controller;
 }
 
 // Handle window resize
@@ -404,7 +440,66 @@ function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    console.log("Creating start screen...");
+    
+    // Get current camera position and direction
+    const cameraPosition = new THREE.Vector3();
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    
+    if (window.camera) {
+        window.camera.getWorldPosition(cameraPosition);
+        window.camera.getWorldDirection(cameraDirection);
+    }
+    
+    // Position 1.5 meters in front of camera
+    const screenPosition = cameraPosition.clone().add(
+        cameraDirection.multiplyScalar(1.5)
+    );
+    
+    console.log("Camera position:", cameraPosition);
+    console.log("Screen position:", screenPosition);
+    
+    // Create different screen types for testing
+    let startScreen;
+    
+    // Try to create a browser screen first
+    try {
+        startScreen = createNewBrowserScreen(screenPosition);
+        console.log("Created browser screen:", startScreen);
+    } catch (error) {
+        console.error("Failed to create browser screen:", error);
+        
+        // Fallback to simpler geometry if screen creation fails
+        const geometry = new THREE.PlaneGeometry(1, 0.6);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0x3399ff,
+            side: THREE.DoubleSide 
+        });
+        startScreen = new THREE.Mesh(geometry, material);
+        startScreen.position.copy(screenPosition);
+        
+        // Make it face the camera
+        startScreen.lookAt(cameraPosition);
+        
+        // Add to scene
+        if (window.scene) {
+            window.scene.add(startScreen);
+            console.log("Added fallback screen to scene");
+        }
+    }
+    
+    // Create a YouTube screen as well
+    try {
+        const youtubePosition = screenPosition.clone();
+        youtubePosition.y -= 1.0; // Position below the browser screen
+        
+        const youtubeScreen = createYouTubeScreen('dQw4w9WgXcQ', youtubePosition);
+        console.log("Created YouTube screen:", youtubeScreen);
+    } catch (error) {
+        console.error("Failed to create YouTube screen:", error);
+    }
+    
+    return startScreen;
 }
 
 // Create a floor grid for spatial reference
