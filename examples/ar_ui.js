@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controller } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
-import { enhancedCreateScreen, addDropShadow, animateScreenEntrance } from './ar_default_screen.js';
 
 // Global UI elements
 export let controlPanel = null;
@@ -160,431 +159,417 @@ export function createControlPanel() {
     // Create panel group
     controlPanel = new THREE.Group();
     
-    // Control panel dimensions - make panel wider to accommodate more buttons
-    const panelWidth = 0.5;
-    const panelHeight = 0.3;
-    const position = new THREE.Vector3(0, 0, 0);
+    // Modern, sleek panel design with solid appearance
+    const panelSize = { width: 0.28, height: 0.13 };
+    const panelGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
     
-    // Use the enhancedCreateScreen function from default screen
-    const screenTitle = "AR Control Panel";
+    // Create rounded panel texture with high-quality design
+    const panelCanvas = document.createElement('canvas');
+    panelCanvas.width = 512;
+    panelCanvas.height = 256;
+    const panelCtx = panelCanvas.getContext('2d');
     
-    // Create a canvas texture for the control panel background
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = 512;
-    bgCanvas.height = 310;
-    const bgCtx = bgCanvas.getContext('2d');
+    // Draw rounded rectangle with flat design
+    const cornerRadius = 50;
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
+    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
+    panelCtx.lineTo(cornerRadius, panelCanvas.height);
+    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
     
-    // Create gradient background
-    const gradient = bgCtx.createLinearGradient(0, 0, 0, bgCanvas.height);
-    gradient.addColorStop(0, '#1a1a2e'); // Dark blue at top
-    gradient.addColorStop(1, '#16213e'); // Darker blue at bottom
-    bgCtx.fillStyle = gradient;
-    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+    // Glass morphism style with gradient
+    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
+    gradient.addColorStop(0, 'rgba(60, 65, 92, 0.85)'); // Smoky blue at top
+    gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
+    panelCtx.fillStyle = gradient;
+    panelCtx.fill();
     
-    // Add subtle pattern
-    bgCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-    for (let i = 0; i < 50; i++) {
-        const x = Math.random() * bgCanvas.width;
-        const y = Math.random() * bgCanvas.height;
-        const size = Math.random() * 3 + 1;
-        bgCtx.beginPath();
-        bgCtx.arc(x, y, size, 0, Math.PI * 2);
-        bgCtx.fill();
-    }
+    // Add subtle glass effect with highlights
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    panelCtx.beginPath();
+    panelCtx.moveTo(cornerRadius, 0);
+    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
+    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
+    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
+    panelCtx.lineTo(0, panelCanvas.height/3);
+    panelCtx.lineTo(0, cornerRadius);
+    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
+    panelCtx.closePath();
+    panelCtx.fill();
     
-    // Create glass effect
-    bgCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    bgCtx.beginPath();
-    if (bgCtx.roundRect) {
-        bgCtx.roundRect(20, 20, bgCanvas.width - 40, bgCanvas.height - 40, 20);
-    } else {
-        // Fallback for browsers without roundRect
-        roundRect(bgCtx, 20, 20, bgCanvas.width - 40, bgCanvas.height - 40, 20);
-    }
-    bgCtx.fill();
+    // Add thin, elegant border with gradient
+    const borderGradient = panelCtx.createLinearGradient(0, 0, panelCanvas.width, panelCanvas.height);
+    borderGradient.addColorStop(0, 'rgba(180, 190, 255, 0.8)'); // Light purple-blue
+    borderGradient.addColorStop(0.5, 'rgba(120, 140, 220, 0.6)'); // Medium purple-blue
+    borderGradient.addColorStop(1, 'rgba(90, 100, 180, 0.8)'); // Darker purple-blue
+    panelCtx.strokeStyle = borderGradient;
+    panelCtx.lineWidth = 2;
+    panelCtx.stroke();
     
-    // Add subtle border
-    bgCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    bgCtx.lineWidth = 2;
-    bgCtx.beginPath();
-    if (bgCtx.roundRect) {
-        bgCtx.roundRect(20, 20, bgCanvas.width - 40, bgCanvas.height - 40, 20);
-    } else {
-        // Fallback for browsers without roundRect
-        roundRect(bgCtx, 20, 20, bgCanvas.width - 40, bgCanvas.height - 40, 20);
-    }
-    bgCtx.stroke();
+    // Add "Control Center" text as panel title with modern font
+    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
+    panelCtx.textAlign = 'center';
+    panelCtx.fillText('CONTROL CENTER', panelCanvas.width/2, 36);
     
-    const bgTexture = new THREE.CanvasTexture(bgCanvas);
+    // Add subtle line under the title
+    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    panelCtx.lineWidth = 1;
+    panelCtx.beginPath();
+    panelCtx.moveTo(panelCanvas.width/2 - 120, 46);
+    panelCtx.lineTo(panelCanvas.width/2 + 120, 46);
+    panelCtx.stroke();
     
-    // Use the enhanced screen creation function
-    const panel = enhancedCreateScreen(
-        position,
-        { x: panelWidth, y: panelHeight },
-        screenTitle,
-        bgTexture
-    );
+    // Create texture from canvas
+    const panelTexture = new THREE.CanvasTexture(panelCanvas);
+    const panelMaterial = new THREE.MeshBasicMaterial({
+        map: panelTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
+    // Set high renderOrder to ensure panel renders on top of other elements
+    panelMesh.renderOrder = 1000;
+    controlPanel.add(panelMesh);
     
-    // Add custom userData
-    panel.userData = { 
-        type: "controlPanel",
-        isControlPanel: true,
-        isInteractive: true,
-        originalScale: new THREE.Vector3(1, 1, 1)
+    // Add background blur effect with subtle glow
+    const glowGeometry = new THREE.PlaneGeometry(panelSize.width + 0.01, panelSize.height + 0.01);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x6495ED, // Cornflower blue glow
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.002;
+    glowMesh.renderOrder = 998;
+    controlPanel.add(glowMesh);
+    
+    // Make the entire panel draggable by attaching a hidden drag area
+    const fullPanelDragGeometry = new THREE.PlaneGeometry(panelSize.width, panelSize.height);
+    const fullPanelDragMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.001, // Nearly invisible
+        side: THREE.DoubleSide
+    });
+    const fullPanelDrag = new THREE.Mesh(fullPanelDragGeometry, fullPanelDragMaterial);
+    fullPanelDrag.position.z = 0.0005; // Between panel and buttons
+    fullPanelDrag.renderOrder = 1001; // Above panel for interaction
+    fullPanelDrag.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        isPartOfDragHandle: true,
+        originalColor: 0xffffff,
+        hoverColor: 0xffffff
     };
+    controlPanel.add(fullPanelDrag);
     
-    // Add drop shadow for depth
-    addDropShadow(panel, panelWidth, panelHeight);
+    // Add a modern, visually distinct drag handle at the top
+    const topDragWidth = panelSize.width * 0.25;
+    const topDragHeight = 0.01;
+    const topDragGeometry = new THREE.PlaneGeometry(topDragWidth, topDragHeight);
     
-    // Add to control panel group
-    controlPanel.add(panel);
+    // Create a fancy gradient drag handle with canvas texture
+    const dragHandleCanvas = document.createElement('canvas');
+    dragHandleCanvas.width = 128;
+    dragHandleCanvas.height = 16;
+    const dragHandleCtx = dragHandleCanvas.getContext('2d');
     
-    // Define button layout for a 2x3 grid
-    const buttonSize = 0.06;
-    const horizontalSpacing = 0.12;
-    const verticalSpacing = 0.10;
+    // Pill shape for drag handle
+    const pillRadius = 8;
+    dragHandleCtx.beginPath();
+    dragHandleCtx.moveTo(pillRadius, 0);
+    dragHandleCtx.lineTo(dragHandleCanvas.width - pillRadius, 0);
+    dragHandleCtx.arcTo(dragHandleCanvas.width, 0, dragHandleCanvas.width, pillRadius, pillRadius);
+    dragHandleCtx.arcTo(dragHandleCanvas.width, dragHandleCanvas.height, dragHandleCanvas.width - pillRadius, dragHandleCanvas.height, pillRadius);
+    dragHandleCtx.lineTo(pillRadius, dragHandleCanvas.height);
+    dragHandleCtx.arcTo(0, dragHandleCanvas.height, 0, dragHandleCanvas.height - pillRadius, pillRadius);
+    dragHandleCtx.arcTo(0, 0, pillRadius, 0, pillRadius);
+    dragHandleCtx.closePath();
     
-    // Create icons with a 2x3 grid layout
-    const icons = [
-        // Top row
-        { action: 'newScreen', position: new THREE.Vector2(-horizontalSpacing, verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/add.png' },
-        { action: 'deleteScreen', position: new THREE.Vector2(0, verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/delete.png' },
-        { action: 'rotateMode', position: new THREE.Vector2(horizontalSpacing, verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/rotate.png' },
-        
-        // Bottom row
-        { action: 'selectScreenType', screenType: 'youtube', position: new THREE.Vector2(-horizontalSpacing, -verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/youtube.png' },
-        { action: 'moveMode', position: new THREE.Vector2(0, -verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/move.png' },
-        { action: 'selectScreenType', screenType: 'duckduckgo', position: new THREE.Vector2(horizontalSpacing, -verticalSpacing/2), iconSrc: 'examples/textures/ar_icons/DuckDuckGo_logo.png' }
+    const handleGradient = dragHandleCtx.createLinearGradient(0, 0, dragHandleCanvas.width, 0);
+    handleGradient.addColorStop(0, 'rgba(145, 190, 255, 0.8)'); // Light blue
+    handleGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.85)'); // White
+    handleGradient.addColorStop(1, 'rgba(145, 190, 255, 0.8)'); // Light blue
+    
+    dragHandleCtx.fillStyle = handleGradient;
+    dragHandleCtx.fill();
+    
+    const dragHandleTexture = new THREE.CanvasTexture(dragHandleCanvas);
+    const topDragMaterial = new THREE.MeshBasicMaterial({
+        map: dragHandleTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    
+    const topDragHandle = new THREE.Mesh(topDragGeometry, topDragMaterial);
+    topDragHandle.position.set(0, panelSize.height/2 - topDragHeight/2 - 0.015, 0.005);
+    topDragHandle.renderOrder = 1002;
+    topDragHandle.userData = {
+        type: 'dragHandle',
+        isDragArea: true,
+        isPartOfDragHandle: true,
+        originalColor: 0x91BEFF,
+        hoverColor: 0xB8D4FF
+    };
+    controlPanel.add(topDragHandle);
+    
+    // Define button parameters - preserve original functionality
+    const buttonSize = 0.06; // Slightly larger buttons
+    const buttonSpacing = 0.14; // Slightly closer together
+    
+    // Create buttons with modern design
+    const buttonPositions = [
+        { x: -buttonSpacing/2, y: 0.01 },  // Left - Add Screen
+        { x: buttonSpacing/2, y: 0.01 }    // Right - Delete Screen
     ];
     
-    // Create colorful button backgrounds for better visual feedback
-    const buttonColors = [
-        0x4CAF50, // Green for new screen
-        0xFF5252, // Red for delete
-        0x2196F3, // Blue for rotate
-        0xFF0000, // Red for YouTube
-        0x3F51B5, // Indigo for move
-        0x00AEEF  // DuckDuckGo blue for DuckDuckGo
-    ];
+    const buttonActions = ['newScreen', 'deleteScreen'];
+    const buttonColors = [0x4ecca3, 0xff6b6b]; // Modern mint green and coral red
     
-    // Add buttons to the panel
-    icons.forEach((icon, index) => {
-        const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
-        
-        // Create button background with gradient
+    buttonPositions.forEach((position, index) => {
+        // Create modern button with gradient effect using canvas
         const buttonCanvas = document.createElement('canvas');
         buttonCanvas.width = 128;
         buttonCanvas.height = 128;
         const buttonCtx = buttonCanvas.getContext('2d');
         
-        // Use color from our array
-        const baseColor = buttonColors[index];
-        const r = (baseColor >> 16) & 255;
-        const g = (baseColor >> 8) & 255;
-        const b = baseColor & 255;
+        // Create gradient fill
+        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 20, 64, 50, 64);
+        const baseColor = new THREE.Color(buttonColors[index]);
+        const r = Math.floor(baseColor.r * 255);
+        const g = Math.floor(baseColor.g * 255);
+        const b = Math.floor(baseColor.b * 255);
         
-        // Fill with gradient
-        const buttonGradient = buttonCtx.createRadialGradient(64, 64, 20, 64, 64, 64);
-        buttonGradient.addColorStop(0, `rgba(${r+40}, ${g+40}, ${b+40}, 0.9)`); // Lighter center
-        buttonGradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.8)`); // Original color at edges
+        buttonGradient.addColorStop(0, `rgb(${r + 40}, ${g + 40}, ${b + 40})`); // Lighter center
+        buttonGradient.addColorStop(1, `rgb(${r}, ${g}, ${b})`); // Original color at edges
+        
         buttonCtx.fillStyle = buttonGradient;
         buttonCtx.beginPath();
         buttonCtx.arc(64, 64, 64, 0, Math.PI * 2);
         buttonCtx.fill();
         
-        // Add subtle border
-        buttonCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        buttonCtx.lineWidth = 2;
+        // Add subtle inner shadow
+        buttonCtx.shadowBlur = 15;
+        buttonCtx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        buttonCtx.shadowOffsetX = 3;
+        buttonCtx.shadowOffsetY = 3;
         buttonCtx.beginPath();
         buttonCtx.arc(64, 64, 62, 0, Math.PI * 2);
         buttonCtx.stroke();
+        buttonCtx.shadowBlur = 0;
         
         const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+        const buttonGeometry = new THREE.CircleGeometry(buttonSize / 2, 32);
         const buttonMaterial = new THREE.MeshBasicMaterial({
             map: buttonTexture,
-            transparent: true,
+            transparent: false,
             side: THREE.DoubleSide
         });
         
         const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.set(icon.position.x, icon.position.y, 0.005);
-        button.renderOrder = 1050;
-        
-        // Create a fallback icon for this button type
-        const iconCanvas = document.createElement('canvas');
-        iconCanvas.width = 128;
-        iconCanvas.height = 128;
-        const iconCtx = iconCanvas.getContext('2d');
-        
-        // Draw different fallback icons based on button action
-        createFallbackButtonIcon(icon.action, iconCtx);
-        const fallbackTexture = new THREE.CanvasTexture(iconCanvas);
-        
-        // Create icon mesh
-        const iconGeometry = new THREE.CircleGeometry(buttonSize / 2 * 0.7, 32);
-        const iconMaterial = new THREE.MeshBasicMaterial({
-            map: fallbackTexture, // Start with fallback
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.position.z = 0.001;
-        iconMesh.renderOrder = 1051;
-        
-        // Set up button information
+        button.position.set(position.x, position.y, 0.003);
+        button.renderOrder = 1002;
         button.userData = {
             type: 'button',
-            action: icon.action,
-            screenType: icon.screenType, // For screen type buttons
-            originalColor: new THREE.Color(baseColor / 0xFFFFFF), // Normalized color
-            hoverColor: new THREE.Color((baseColor + 0x333333) / 0xFFFFFF), // Lighter for hover
-            activeColor: new THREE.Color((baseColor + 0x666666) / 0xFFFFFF), // Even lighter for active
-            inactiveColor: new THREE.Color(baseColor / 0xFFFFFF), // Same as original
-            isActive: false
+            action: buttonActions[index],
+            hoverColor: index === 0 ? 0x7EEEC9 : 0xFF9999, // Lighter versions
+            activeColor: buttonColors[index],
+            inactiveColor: buttonColors[index],
+            originalColor: buttonColors[index],
+            isToggle: false,
+            isActive: true
         };
         
-        // Try to load the actual icon
-        if (icon.iconSrc) {
-            const img = new Image();
-            img.onload = function() {
-                // Clear canvas
-                iconCtx.clearRect(0, 0, 128, 128);
-                // Draw loaded image centered
-                iconCtx.drawImage(img, 0, 0, 128, 128);
-                // Update texture
-                fallbackTexture.needsUpdate = true;
-            };
-            img.onerror = function() {
-                console.log(`Could not load icon: ${icon.iconSrc}, using fallback`);
-                // Fallback already created
-            };
-            img.src = icon.iconSrc;
-        }
+        controlPanel.add(button);
         
-        // Add icon to button
+        // Add icon with same functionality as before
+        // Create placeholder icon mesh that will be updated when texture loads
+        const iconSize = buttonSize * 0.6;
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff, // Default white color until texture loads
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.z = 0.004;
+        iconMesh.renderOrder = 1003;
         button.add(iconMesh);
         
-        // Add button to panel
-        panel.add(button);
-    });
-    
-    // Create labels for buttons
-    const labelTexts = ["Add", "Delete", "Rotate", "YouTube", "Move", "Browser"];
-    
-    labelTexts.forEach((text, index) => {
-        const lblCanvas = document.createElement('canvas');
-        lblCanvas.width = 128;
-        lblCanvas.height = 32;
-        const lblCtx = lblCanvas.getContext('2d');
+        // Load the icon texture asynchronously
+        createButtonIcon(index).then(iconTexture => {
+            iconMaterial.map = iconTexture;
+            iconMaterial.needsUpdate = true;
+        }).catch(error => {
+            console.error("Error loading button icon:", error);
+        });
         
-        lblCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        lblCtx.font = 'bold 20px Arial';
-        lblCtx.textAlign = 'center';
-        lblCtx.textBaseline = 'middle';
-        lblCtx.fillText(text, 64, 16);
+        // Add button shadow for depth
+        const shadowGeometry = new THREE.CircleGeometry(buttonSize / 2 * 1.1, 32);
+        const shadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+        shadowMesh.position.z = -0.001;
+        shadowMesh.renderOrder = 1001;
+        button.add(shadowMesh);
         
-        const lblTexture = new THREE.CanvasTexture(lblCanvas);
-        const lblGeometry = new THREE.PlaneGeometry(0.08, 0.02);
-        const lblMaterial = new THREE.MeshBasicMaterial({
-            map: lblTexture,
+        // Add label below each button - modern font, more visible
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 128;
+        labelCanvas.height = 48; // Taller for better quality
+        const labelCtx = labelCanvas.getContext('2d');
+        
+        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        
+        // Add subtle shadow to text
+        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        labelCtx.shadowBlur = 3;
+        labelCtx.shadowOffsetX = 1;
+        labelCtx.shadowOffsetY = 1;
+        
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = '600 18px Inter, SF Pro Display, Arial'; // Modern font, slightly bolder
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        labelCtx.fillText(index === 0 ? 'New Screen' : 'Delete', labelCanvas.width / 2, labelCanvas.height / 2);
+        labelCtx.shadowBlur = 0; // Reset shadow
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(buttonSize * 1.8, buttonSize * 0.6);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
         
-        const label = new THREE.Mesh(lblGeometry, lblMaterial);
-        
-        // Position label below corresponding button
-        const icon = icons[index];
-        label.position.set(icon.position.x, icon.position.y - 0.05, 0.005);
-        label.renderOrder = 1052;
-        
-        panel.add(label);
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(0, -buttonSize * 0.8, 0.002);
+        labelMesh.renderOrder = 1003;
+        button.add(labelMesh);
     });
     
-    // Run entrance animation
-    animateScreenEntrance(panel);
-    
-    // Add control panel to scene
+    // Add positioning and interaction
+    controlPanel.position.set(0, -0.3, -0.5);
+    controlPanel.rotation.set(-0.2, 0, 0);
     scene.add(controlPanel);
     
-    console.log("Control panel created and added to scene with 6 buttons");
+    // Add screen type selector below the main panel
+    createScreenTypeSelector(controlPanel, 0, -0.08, 0.04);
     
     return controlPanel;
 }
 
-// Helper function for rounded rectangle
-function roundRect(ctx, x, y, width, height, radius) {
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-}
-
-// Create button icons with image loading and fallback
-function createButtonIconWithImg(type, iconPath) {
+// Create modern, clean button icons with logos
+function createButtonIcon(buttonIndex) {
     const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = 256; // Higher resolution for better quality
+    canvas.height = 256;
     const ctx = canvas.getContext('2d');
     
-    // Clear canvas with transparency
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Immediately create a fallback icon since some images might be missing
-    createFallbackButtonIcon(type, ctx);
+    // Map button indices to local file paths
+    const logoURLs = {
+        0: 'examples/textures/ar_icons/add.png',          // New screen button
+        1: 'examples/textures/ar_icons/delete.png',       // Delete button
+        2: 'examples/textures/ar_icons/youtube.png',      // YouTube
+        3: 'examples/textures/ar_icons/DuckDuckGo_logo.png', // DuckDuckGo
+        4: 'examples/textures/ar_icons/maps.png',         // Google Maps 
+        5: 'examples/textures/ar_icons/electron_app.png'  // Electron
+    };
     
     // Create a new image
     const img = new Image();
     
-    // Load the image
-    img.src = iconPath;
-    
-    // Handle image load
-    img.onload = function() {
-        // Clear the fallback icon
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Create a promise to handle async loading
+    return new Promise((resolve) => {
+        img.onload = function() {
+            // Draw image centered on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
         
-        // Draw image centered on canvas
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        img.onerror = function() {
+            console.error('Error loading logo image for button index: ' + buttonIndex);
+            
+            // Fallback to simple shapes with colors based on button type
+            if (buttonIndex === 0) { // New Screen button
+                ctx.fillStyle = '#4CAF50'; // Green
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(64, 118, 128, 20);
+                ctx.fillRect(118, 64, 20, 128);
+            } else if (buttonIndex === 1) { // Delete button
+                ctx.fillStyle = '#F44336'; // Red
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.moveTo(88, 88);
+                ctx.lineTo(168, 168);
+                ctx.lineTo(158, 178);
+                ctx.lineTo(78, 98);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(168, 88);
+                ctx.lineTo(88, 168);
+                ctx.lineTo(78, 158);
+                ctx.lineTo(158, 78);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // For other buttons, create a generic icon
+                ctx.fillStyle = '#2196F3'; // Blue
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add button index
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '80px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(buttonIndex.toString(), 128, 128);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
         
-        console.log("Successfully loaded icon for:", type);
-        
-        if (iconMaterial) {
-            iconMaterial.map.needsUpdate = true;
+        // Set image source
+        if (logoURLs[buttonIndex] !== undefined) {
+            img.src = logoURLs[buttonIndex];
+        } else {
+            // Fallback if no logo URL is available for this button index
+            img.onerror();
         }
-    };
-    
-    // Handle image load error with fallback - already drawn, just log the error
-    img.onerror = function() {
-        console.error(`Failed to load icon: ${iconPath}, using fallback for type: ${type}`);
-    };
-    
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    return texture;
-}
-
-// Create fallback button icons
-function createFallbackButtonIcon(type, ctx) {
-    // Clear canvas
-    ctx.clearRect(0, 0, 128, 128);
-    
-    switch(type) {
-        case 'newScreen':
-            // Plus icon
-            ctx.fillStyle = '#4ecca3';
-            ctx.beginPath();
-            ctx.rect(32, 56, 64, 16);
-            ctx.rect(56, 32, 16, 64);
-        ctx.fill();
-            break;
-            
-        case 'deleteScreen':
-            // Trash/delete icon
-            ctx.fillStyle = '#ff6b6b';
-            ctx.beginPath();
-            // Trash lid
-            ctx.rect(32, 34, 64, 8);
-            ctx.rect(48, 26, 32, 8);
-            // Trash can
-            ctx.rect(40, 42, 48, 60);
-            // Lines in trash can
-            ctx.fillRect(52, 50, 4, 44);
-            ctx.fillRect(72, 50, 4, 44);
-        ctx.fill();
-            break;
-        
-        case 'moveMode':
-            // Move arrows icon
-            ctx.fillStyle = '#3d84a8';
-            // Draw up arrow
-            ctx.beginPath();
-            ctx.moveTo(64, 16);
-            ctx.lineTo(44, 36);
-            ctx.lineTo(84, 36);
-            ctx.closePath();
-        ctx.fill();
-        
-            // Draw right arrow
-        ctx.beginPath();
-            ctx.moveTo(112, 64);
-            ctx.lineTo(92, 44);
-            ctx.lineTo(92, 84);
-        ctx.closePath();
-        ctx.fill();
-        
-            // Draw down arrow
-        ctx.beginPath();
-            ctx.moveTo(64, 112);
-            ctx.lineTo(44, 92);
-            ctx.lineTo(84, 92);
-            ctx.closePath();
-        ctx.fill();
-        
-            // Draw left arrow
-        ctx.beginPath();
-            ctx.moveTo(16, 64);
-            ctx.lineTo(36, 44);
-            ctx.lineTo(36, 84);
-        ctx.closePath();
-        ctx.fill();
-            break;
-            
-        case 'rotateMode':
-            // Rotation icon
-            ctx.fillStyle = '#2196F3';
-            ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 6;
-            
-            // Draw circular arrow
-        ctx.beginPath();
-            ctx.arc(64, 64, 30, 0, 1.5 * Math.PI);
-            ctx.stroke();
-            
-            // Draw arrowhead
-            ctx.beginPath();
-            ctx.moveTo(34, 64);
-            ctx.lineTo(50, 54);
-            ctx.lineTo(50, 74);
-            ctx.closePath();
-            ctx.fill();
-            break;
-            
-        case 'selectScreenType':
-            // Generic type selector icon (target/crosshair)
-            ctx.fillStyle = '#FF5722';
-            ctx.strokeStyle = '#FF5722';
-            ctx.lineWidth = 5;
-            
-            // Draw circle
-            ctx.beginPath();
-            ctx.arc(64, 64, 30, 0, 2 * Math.PI);
-            ctx.stroke();
-        
-            // Draw crosshair
-        ctx.beginPath();
-            ctx.moveTo(64, 34);
-            ctx.lineTo(64, 94);
-            ctx.moveTo(34, 64);
-            ctx.lineTo(94, 64);
-            ctx.stroke();
-            break;
-            
-        default:
-            // Generic icon
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 32px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), 64, 64);
-            break;
-    }
+    });
 }
 
 // Create a screen type selector with buttons for different content types
@@ -1136,28 +1121,20 @@ export function setButtonPressed(button, isPressed) {
 
 // Position control panel in front of user
 export function setupControlPanel() {
-    if (!controlPanel) {
-        console.error("Cannot set up control panel - control panel is null");
-        return;
-    }
-    
-    console.log("Setting up control panel position");
+    if (!controlPanel) return;
     
     // Only reposition if not being dragged AND not previously manually positioned
-    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) {
-        console.log("Control panel is being dragged or was manually positioned - not repositioning");
-        return;
-    }
+    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
     
-    // Position directly in front of the user (not below as before)
+    // Position in front and below the user
     const cameraDirection = new THREE.Vector3(0, 0, -1);
     cameraDirection.applyQuaternion(camera.quaternion);
     
     const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.7)); // Position at 0.7m in front
+    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
     
-    // No vertical offset to keep it centered in view
-    position.y -= 0.1; // Just slightly below eye level for better visibility
+    // Position BELOW the default screen position
+    position.y -= 0.4; // Position it much lower to appear below the screen
     
     // Update panel position and rotation
     controlPanel.position.copy(position);
@@ -1169,10 +1146,7 @@ export function setupControlPanel() {
     euler.z = 0; // No roll
     controlPanel.quaternion.setFromEuler(euler);
     
-    // Ensure the control panel is visible
-    controlPanel.visible = true;
-    
-    console.log("Control panel positioned directly in front of user at:", position);
+    console.log("Control panel positioned below screen");
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive
