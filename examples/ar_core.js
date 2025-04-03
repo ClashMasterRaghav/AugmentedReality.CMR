@@ -6,7 +6,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
 import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
-import { initUI, createNotification, iconButtonsPanel } from './ar_ui.js';
+import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
 
 // Global variables exported for use in other modules
@@ -27,6 +27,9 @@ export let isARMode = false;
 export let lastCameraPosition = new THREE.Vector3();
 export let lastCameraRotation = new THREE.Euler();
 
+// Track if the AR application has been initialized
+let isARInitialized = false;
+
 // Function to safely update the selected screen reference globally
 export function setSelectedScreen(screen) {
     console.log("Setting global selectedScreen to:", screen ? (screen.userData && screen.userData.id ? screen.userData.id : "unknown") : "null");
@@ -35,6 +38,12 @@ export function setSelectedScreen(screen) {
 
 // Main initialization function called from ar_main.js
 export function initAR() {
+    // Prevent multiple initializations
+    if (isARInitialized) {
+        console.log("AR application already initialized, skipping.");
+        return;
+    }
+    
     try {
         console.log("Initializing AR application...");
         initAREnvironment();
@@ -69,11 +78,31 @@ function initAREnvironment() {
 
     // AR Button with session end event handling
     const arButton = ARButton.createButton(renderer, {
-        optionalFeatures: ['dom-overlay'],
-        domOverlay: { root: document.body }
+        requiredFeatures: ['hit-test', 'dom-overlay'],
+        domOverlay: { root: document.body },
+        optionalFeatures: ['dom-overlay', 'light-estimation']
     });
     
+    // Add class for styling
+    arButton.classList.add('ar-button');
     document.body.appendChild(arButton);
+    
+    // Style the button for better visibility
+    arButton.style.cssText = `
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        background: linear-gradient(45deg, #3f51b5, #2196f3);
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
     
     // Add event listener for session start
     renderer.xr.addEventListener('sessionstart', function() {
@@ -149,6 +178,11 @@ function initAREnvironment() {
     
     // Create initial screen
     createStartScreen();
+
+    // Set initialization flag to prevent duplicate setup
+    isARInitialized = true;
+    
+    console.log("AR experience initialized successfully");
 }
 
 // Handle window resize
@@ -256,8 +290,8 @@ export function render() {
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
     // Calculate movement thresholds
-    const positionThreshold = 0.5; // Units of movement
-    const rotationThreshold = 0.3; // Radians (about 17 degrees)
+    const positionThreshold = 0.7; // Increased from 0.5 for less frequent updates
+    const rotationThreshold = 0.4; // Increased from 0.3 for less frequent updates
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;

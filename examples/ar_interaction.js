@@ -7,9 +7,10 @@ import {
 } from './ar_core.js';
 import { 
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
-    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
+    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, 
+    createElectronAppScreen, createScreenFromButton
 } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton, controlPanel, handleIconButtonClick } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
@@ -81,98 +82,28 @@ function onSelectStart(event) {
     }
 }
 
-// Get button from an intersected object
+// Find the actual button from an intersection
 function getButtonFromIntersect(object) {
-    // If object is a button, return it directly
+    // Case 1: Direct hit on button
     if (object.userData && object.userData.type === 'button') {
-        console.log("Direct button hit:", object.userData.action);
         return object;
     }
     
-    // Check if the parent is a button (common for icon meshes)
-    if (object.parent && object.parent.userData && object.parent.userData.type === 'button') {
-        console.log("Parent button hit:", object.parent.userData.action);
-        return object.parent;
+    // Case 2: Hit on a part of the button (icon, shadow, etc)
+    if (object.userData && object.userData.type === 'buttonPart' && object.userData.parentButton) {
+        return object.userData.parentButton;
     }
     
-    // Check if the grandparent is a button (for nested structures)
-    if (object.parent && object.parent.parent && 
-        object.parent.parent.userData && object.parent.parent.userData.type === 'button') {
-        console.log("Grandparent button hit:", object.parent.parent.userData.action);
-        return object.parent.parent;
-    }
-    
-    // Traverse up to find a button (up to 5 levels)
-    let current = object;
-    let level = 0;
-    
-    while (current.parent && level < 5) {
-        current = current.parent;
-        level++;
-        
-        if (current.userData && current.userData.type === 'button') {
-            console.log(`Found button at level ${level}:`, current.userData.action);
-            return current;
+    // Case 3: Hit on child of a button
+    let parent = object.parent;
+    while (parent) {
+        if (parent.userData && parent.userData.type === 'button') {
+            return parent;
         }
+        parent = parent.parent;
     }
     
-    // Special handling for screen video control buttons
-    if (object.parent) {
-        // Check if we're inside a screen
-        let screen = null;
-        let target = object.parent;
-        
-        // Traverse up to find the screen
-        for (let i = 0; i < 5; i++) {
-            if (!target) break;
-            
-            if (target.userData && target.userData.type === 'screen') {
-                screen = target;
-                break;
-            }
-            target = target.parent;
-        }
-        
-        if (screen) {
-            // If we found a screen, check its direct children for buttons
-            for (let i = 0; i < screen.children.length; i++) {
-                const child = screen.children[i];
-                if (child.userData && child.userData.type === 'button') {
-                    // Check if this button contains our hit object
-                    let foundObject = false;
-                    
-                    // Check if the hit object is this button or a descendant
-                    child.traverse((obj) => {
-                        if (obj === object) {
-                            foundObject = true;
-                        }
-                    });
-                    
-                    if (foundObject) {
-                        console.log("Found screen button via traversal:", child.userData.action);
-                        return child;
-                    }
-                    
-                    // Check distance from hit point to button (for near misses)
-                    if (object.worldToLocal && child.getWorldPosition) {
-                        const hitPoint = new THREE.Vector3();
-                        object.getWorldPosition(hitPoint);
-                        
-                        const buttonPoint = new THREE.Vector3();
-                        child.getWorldPosition(buttonPoint);
-                        
-                        const distance = hitPoint.distanceTo(buttonPoint);
-                        if (distance < 0.05) { // If within 5cm
-                            console.log("Found nearby button:", child.userData.action, "distance:", distance);
-                            return child;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    console.log("No button found from intersect");
+    // No button found
     return null;
 }
 
@@ -200,8 +131,9 @@ function onSelect(event) {
     console.log(`Checking for interactions with ${buttons.length} buttons`);
     
     // Use a larger threshold for better button detection
-    raycaster.params.Line.threshold = 0.1;
-    raycaster.params.Points.threshold = 0.1;
+    raycaster.params.Line.threshold = 0.15; // Increased from 0.1 for better detection
+    raycaster.params.Points.threshold = 0.15; // Increased from 0.1 for better detection
+    raycaster.params.Mesh.threshold = 0.02; // Add mesh threshold for better detection
     
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
@@ -311,11 +243,6 @@ function handleButtonAction(button) {
     
     console.log("Handling button action:", button.userData.action);
     
-    // Use the handleIconButtonClick for visual feedback if it's an AR icon button (no screen property)
-    if (button.userData.type === 'button' && !button.userData.screen) {
-        handleIconButtonClick(button);
-    }
-    
     // Extract the button action
     const action = button.userData.action;
     
@@ -358,36 +285,15 @@ function handleButtonAction(button) {
             // Position screen in front of camera
             const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
             
-            // Create the appropriate screen type
-            let newScreen;
+            // Use the new centralized function to create the appropriate screen
             const screenType = button.userData.screenType;
-            
-            switch(screenType) {
-                case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
-                    break;
-                case 'duckduckgo':
-                    newScreen = createDuckDuckGoScreen(screenPosition);
-                    break;
-                case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
-                    break;
-                case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
-                    break;
-                default:
-                    newScreen = createNewBrowserScreen(screenPosition);
-                    break;
-            }
+            const newScreen = createScreenFromButton(screenType, screenPosition);
             
             // Make it face the camera
             newScreen.lookAt(camera.position);
             
             // Add visual feedback
             createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
-            
-            // Select this screen
-            selectScreen(newScreen);
             break;
             
         case 'moveMode':
@@ -447,41 +353,6 @@ function handleButtonAction(button) {
             console.log("Mute/unmute button pressed");
             if (videoControlFunctions.toggleMute) {
                 videoControlFunctions.toggleMute();
-            }
-            break;
-            
-        // New AR icon buttons
-        case 'search':
-            createDuckDuckGoScreen();
-            createNotification("Search screen created");
-            break;
-            
-        case 'youtube':
-            createYouTubeScreen();
-            createNotification("YouTube screen created");
-            break;
-            
-        case 'maps':
-            createGoogleMapsScreen();
-            createNotification("Maps screen created");
-            break;
-            
-        case 'app':
-            createElectronAppScreen();
-            createNotification("App screen created");
-            break;
-            
-        case 'add':
-            createNewBrowserScreen();
-            createNotification("New screen created");
-            break;
-            
-        case 'delete':
-            if (selectedScreen) {
-                deleteSelectedScreen();
-                createNotification("Screen deleted");
-            } else {
-                createNotification("No screen selected to delete", "warning");
             }
             break;
             
@@ -695,6 +566,9 @@ function findAllButtons() {
             if (child.userData && child.userData.type === 'button') {
                 panelButtons.push(child);
                 buttons.push(child);
+                
+                // Increase render order for better interaction
+                child.renderOrder = 1500; // Very high renderOrder ensures it's clickable
             }
         });
         console.log(`Panel ${panelIndex}: Found ${panelButtons.length} buttons`);
@@ -711,7 +585,7 @@ function findAllButtons() {
                 screenButtons.push(child);
                 
                 // Ensure button is always interactive by setting renderOrder
-                child.renderOrder = 10; // Higher renderOrder ensures it renders on top
+                child.renderOrder = 1500; // Higher renderOrder ensures it renders on top
             }
         });
         if (buttonsForThisScreen.length > 0) {
@@ -884,34 +758,42 @@ function onTouchStart(event) {
     // PRIORITY 1: Check for button interactions
     const buttons = findAllButtons();
     console.log("Checking", buttons.length, "buttons for intersection");
+    
+    // Increase raycaster params for better touch detection on buttons
+    raycaster.params.Line.threshold = 0.15;
+    raycaster.params.Points.threshold = 0.15;
+    raycaster.params.Mesh.threshold = 0.03; // Add mesh threshold for better touch detection
+    
     const buttonIntersects = raycaster.intersectObjects(buttons, true);
     
     if (buttonIntersects.length > 0) {
+        console.log("Button intersection found!");
+        
         const buttonObj = getButtonFromIntersect(buttonIntersects[0].object);
         if (buttonObj) {
             console.log("Button touched:", buttonObj.userData.action);
             
-            // Visual feedback
-            const originalColor = buttonObj.material.color.clone();
-            buttonObj.material.color.set(0x4FC3F7);
-            
-            // Scale up and back for button press effect
-            const originalScale = buttonObj.scale.clone();
-            buttonObj.scale.multiplyScalar(1.2);
-            
-            setTimeout(() => {
-                buttonObj.material.color.copy(originalColor);
-                buttonObj.scale.copy(originalScale);
-            }, 200);
-            
-            // Provide haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(40);
+            // Add visual and haptic feedback
+            if (buttonObj.material) {
+                const originalColor = buttonObj.material.color.clone();
+                buttonObj.material.color.set(0x4FC3F7); // Highlight color
+                // Pulse button scale for visual feedback
+                const originalScale = buttonObj.scale.clone();
+                buttonObj.scale.multiplyScalar(1.2); // Scale up when touched
+                
+                setTimeout(() => {
+                    buttonObj.material.color.copy(originalColor);
+                    buttonObj.scale.copy(originalScale);
+                }, 200);
             }
             
-            // Handle the button action
+            // Try to trigger vibration if available
+            if (navigator.vibrate) {
+                navigator.vibrate(50); // Short vibration for feedback
+            }
+            
             handleButtonAction(buttonObj);
-            return;
+            return; // Stop processing touch event
         }
     }
     
@@ -946,7 +828,7 @@ function onTouchStart(event) {
         // Check if we're in the top 2/3 of the screen
         // The top of the screen is at y = screenHeight/2
         // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 2/3)) {
+        if (localPoint.y > screenHeight/2 - (screenHeight * 1/6)) {
             // We hit the draggable area
             intersectedScreen = screen;
             draggableAreaHit = true;
@@ -1124,7 +1006,7 @@ function onTouchMove(event) {
         const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
         
         // Scale factor for more responsive movement - INCREASED
-        const moveScale = 1.5; // Much more responsive movement
+        const moveScale = 0.75; // Same speed as screen dragging
         
         // Create movement vector
         const movement = new THREE.Vector3()
