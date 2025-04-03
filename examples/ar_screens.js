@@ -39,6 +39,9 @@ export function createNewYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5))
     return youtubeScreen;
 }
 
+// Create a DuckDuckGo search screen (alias for browser screen)
+export const createDuckDuckGoScreen = createBrowserScreen;
+
 // Create a new Google Maps screen wrapper function
 export function createNewGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     const mapsScreen = createMapsScreen(position, screens.length + 1);
@@ -52,6 +55,9 @@ export function createNewGoogleMapsScreen(position = new THREE.Vector3(0, 0, -1.
     
     return mapsScreen;
 }
+
+// Create Google Maps screen (alias for createNewGoogleMapsScreen)
+export const createGoogleMapsScreen = createNewGoogleMapsScreen;
 
 // Create a new Electron app screen wrapper function
 export function createNewElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)) {
