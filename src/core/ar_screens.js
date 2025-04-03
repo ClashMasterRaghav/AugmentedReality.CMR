@@ -460,8 +460,10 @@ function addDropShadow(screen, width, height) {
     screen.userData.glowMesh = glowMesh;
 }
 
-// Animate a screen's entrance into the scene
-function animateScreenEntrance(screen) {
+// Animate screen entrance with a pop effect
+export function animateScreenEntrance(screen) {
+    if (!screen) return;
+    
     // Save original position for animation
     const targetPosition = screen.position.clone();
     const targetScale = screen.scale.clone();
