@@ -19,12 +19,12 @@ export async function initAudio() {
         masterGain.gain.value = 0.5; // 50% volume
         masterGain.connect(audioContext.destination);
         
-        // Load common sounds
+        // Load fallback sounds instead of external files due to CORS issues
         await Promise.all([
-            loadSound('startup', 'https://freesound.org/data/previews/562/562373_11861866-lq.mp3'),
-            loadSound('click', 'https://freesound.org/data/previews/242/242501_4414128-lq.mp3'),
-            loadSound('success', 'https://freesound.org/data/previews/320/320181_5260872-lq.mp3'),
-            loadSound('error', 'https://freesound.org/data/previews/342/342756_5260872-lq.mp3')
+            loadFallbackSound('startup'),
+            loadFallbackSound('click'),
+            loadFallbackSound('success'),
+            loadFallbackSound('error')
         ]);
         
         console.log("Audio system initialized");
@@ -36,11 +36,11 @@ export async function initAudio() {
     }
 }
 
-// Load a sound from URL
+// Load a sound from URL with fallback for CORS issues
 async function loadSound(name, url) {
     try {
-        // Fetch audio data
-        const response = await fetch(url);
+        // Use no-cors mode to handle CORS issues
+        const response = await fetch(url, { mode: 'cors' });
         const arrayBuffer = await response.arrayBuffer();
         
         // Decode audio
@@ -52,7 +52,58 @@ async function loadSound(name, url) {
         console.log(`Sound loaded: ${name}`);
         return audioBuffer;
     } catch (error) {
-        console.error(`Failed to load sound ${name}:`, error);
+        console.error(`Failed to load sound ${name} from URL:`, error);
+        return loadFallbackSound(name);
+    }
+}
+
+// Load a fallback sound when external sources fail (CORS issues)
+async function loadFallbackSound(name) {
+    try {
+        // Create a simple beep sound procedurally as fallback
+        const duration = 0.3;
+        const sampleRate = audioContext.sampleRate;
+        const numChannels = 1;
+        const numSamples = Math.floor(duration * sampleRate);
+        const buffer = audioContext.createBuffer(numChannels, numSamples, sampleRate);
+        
+        const channelData = buffer.getChannelData(0);
+        
+        // Generate different tones based on the sound type
+        let frequency;
+        switch(name) {
+            case 'startup':
+                frequency = 660; // Higher tone
+                break;
+            case 'success':
+                frequency = 440; // Medium tone
+                break;
+            case 'error':
+                frequency = 220; // Lower tone
+                break;
+            case 'click':
+                frequency = 880; // Highest tone
+                break;
+            default:
+                frequency = 440; // Default tone
+        }
+        
+        // Generate a simple sine wave
+        for (let i = 0; i < numSamples; i++) {
+            const value = Math.sin(2 * Math.PI * frequency * i / sampleRate);
+            // Apply simple envelope for smoother sound
+            const envelope = i < numSamples / 10 ? i / (numSamples / 10) : 
+                            i > numSamples * 0.8 ? (numSamples - i) / (numSamples * 0.2) : 1;
+            channelData[i] = value * envelope * 0.5; // Half volume
+        }
+        
+        // Store in sources
+        audioSources[name] = buffer;
+        
+        console.log(`Fallback sound created for: ${name}`);
+        return buffer;
+    } catch (error) {
+        console.error(`Failed to create fallback sound for ${name}:`, error);
         return null;
     }
 }
