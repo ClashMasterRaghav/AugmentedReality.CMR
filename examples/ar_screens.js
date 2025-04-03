@@ -185,7 +185,7 @@ function animateScreenScale(screen, targetScale, duration, bounce = false) {
         const progress = Math.min(elapsed / duration, 1);
         
         // Ease in-out for smoother animation
-        const easedProgress = progress < 0.5
+        const easedProgress = progress < 0.5 
             ? 2 * progress * progress 
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
             
@@ -268,28 +268,28 @@ export function updateScreenEffects() {
 
 // Update visual effects for selected screens
 function updateSelectedScreenGlow(screen) {
-    // Find the border mesh
+            // Find the border mesh
     const borderMesh = findBorderMesh(screen);
-    
-    if (borderMesh) {
-        // Subtle pulsing effect for selected screen's border (dark blue colors)
-        const time = Date.now() * 0.001;
-        const pulseIntensity = 0.15 * Math.sin(time * 2) + 0.85;
-        borderMesh.material.color.setRGB(
+                
+            if (borderMesh) {
+                // Subtle pulsing effect for selected screen's border (dark blue colors)
+                const time = Date.now() * 0.001;
+                const pulseIntensity = 0.15 * Math.sin(time * 2) + 0.85;
+                borderMesh.material.color.setRGB(
             0.1 * pulseIntensity, // R (low for blue)
             0.1 * pulseIntensity, // G (low for blue)
             0.5 * pulseIntensity  // B (higher for blue)
-        );
-    }
-    
-    // Update glow effect for selected screen
-    const glowMesh = screen.userData.glowMesh;
-    if (glowMesh) {
-        const time = Date.now() * 0.001;
-        const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.25; // Reduced max intensity
-        glowMesh.material.opacity = glowIntensity;
-    }
-    
-    // Subtle floating effect
-    screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
-}
+                );
+            }
+            
+            // Update glow effect for selected screen
+            const glowMesh = screen.userData.glowMesh;
+            if (glowMesh) {
+                const time = Date.now() * 0.001;
+                const glowIntensity = 0.2 * Math.sin(time * 1.5) + 0.25; // Reduced max intensity
+                glowMesh.material.opacity = glowIntensity;
+            }
+            
+            // Subtle floating effect
+            screen.position.y += Math.sin(Date.now() * 0.002) * 0.0001;
+        }

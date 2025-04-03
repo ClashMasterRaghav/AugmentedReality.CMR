@@ -162,18 +162,18 @@ function createElectronAppTexture() {
         );
     }
     
-    // Create an iframe for YouTube
+    // Create an iframe for embedding a website
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.left = '-9999px';
     iframe.style.top = '-9999px';
     iframe.width = canvas.width;
-    iframe.height = canvas.height - 40; // Allow for title bar
-    iframe.src = 'https://www.youtube.com/';
+    iframe.height = canvas.height - 40; // Account for the title bar
+    iframe.src = 'https://www.github.com/';
     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
     iframe.allowFullscreen = true;
     iframe.frameBorder = "0";
-    iframe.id = `electron-youtube-${Date.now()}`;
+    iframe.id = `electron-app-${Date.now()}`;
     document.body.appendChild(iframe);
     
     // Add viewport meta tag for better interactivity  
@@ -207,12 +207,22 @@ function createElectronAppTexture() {
         ctx.arc(60, 20, 6, 0, Math.PI * 2);
         ctx.fill();
         
-        // App title
+        // App title - use the website domain from the iframe
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '14px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('YouTube - Electron App', canvas.width / 2, 20);
+        
+        // Extract domain from iframe src
+        let domain = "Electron App";
+        try {
+            const url = new URL(iframe.src);
+            domain = url.hostname || "Electron App";
+        } catch (e) {
+            console.warn("Failed to parse URL:", e);
+        }
+        
+        ctx.fillText(domain + ' - Electron', canvas.width / 2, 20);
         
         // Draw small Electron logo in top right corner
         if (logo.complete) {
@@ -230,98 +240,12 @@ function createElectronAppTexture() {
     // Draw the electron frame
     drawElectronFrame();
     
-    // Try to forward user interactions to the iframe
-    function forwardInteraction(event) {
-        try {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'interaction',
-                    event: {
-                        type: event.type,
-                        x: event.clientX,
-                        y: event.clientY
-                    }
-                }, '*');
-            }
-        } catch (e) {
-            console.warn('Unable to forward interaction:', e);
-        }
-    }
-    
-    // Listen for messages from the iframe
-    window.addEventListener('message', function(event) {
-        // Check if message is from our iframe
-        if (event.source === iframe.contentWindow) {
-            console.log('Received message from iframe:', event.data);
-            // Handle specific messages if needed
-        }
-    });
-    
-    // Function to capture iframe content to texture
-    function captureIframeToTexture() {
-        try {
-            // Try to use html2canvas to capture the iframe content
-            if (window.html2canvas && iframe.contentDocument) {
-                html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
-                    // Clear canvas and draw electron frame
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
-                    
-                    // Draw captured content below title bar
-                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
-                    
-                    // Redraw the frame on top
-                    drawElectronFrame();
-                    
-                    texture.needsUpdate = true;
-                });
-            } else {
-                // Fallback - show a placeholder with message
-                ctx.fillStyle = '#2F3241'; // Electron dark background
-                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
-                
-                // Content message
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 20px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('YouTube running in Electron', canvas.width / 2, canvas.height / 2);
-                ctx.font = '16px Arial';
-                ctx.fillText('Tap the screen to interact with YouTube', canvas.width / 2, canvas.height / 2 + 40);
-                
-                // Redraw frame
-                drawElectronFrame();
-                
-                texture.needsUpdate = true;
-            }
-        } catch (e) {
-            console.warn('Error capturing iframe content:', e);
-        }
-    }
-    
-    // Try to load html2canvas if not already available
-    if (!window.html2canvas) {
-        const script = document.createElement('script');
-        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
-        script.onload = function() {
-            console.log('html2canvas loaded for Electron app');
-            captureIframeToTexture();
-        };
-        document.head.appendChild(script);
-    }
-    
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    
-    // Update texture periodically to reflect iframe content
-    const updateInterval = setInterval(captureIframeToTexture, 1000);
-    
     // Create electron app controls
     const electronControls = document.createElement('div');
     electronControls.style.position = 'absolute';
     electronControls.style.left = '-9999px';
     electronControls.style.top = '-9999px';
-    electronControls.style.width = '300px';
+    electronControls.style.width = '400px';
     electronControls.style.background = 'rgba(47, 50, 65, 0.9)';
     electronControls.style.borderRadius = '5px';
     electronControls.style.padding = '10px';
@@ -353,24 +277,210 @@ function createElectronAppTexture() {
     refreshButton.style.padding = '5px 10px';
     refreshButton.style.borderRadius = '3px';
     
+    // URL input box
+    const urlInput = document.createElement('input');
+    urlInput.type = 'text';
+    urlInput.value = 'https://www.github.com/';
+    urlInput.style.flex = '1';
+    urlInput.style.marginLeft = '10px';
+    urlInput.style.marginRight = '10px';
+    urlInput.style.padding = '5px';
+    urlInput.style.border = '1px solid #444';
+    urlInput.style.borderRadius = '3px';
+    urlInput.style.backgroundColor = '#242633';
+    urlInput.style.color = '#FFFFFF';
+    
+    // Navigation controls row
+    const navControls = document.createElement('div');
+    navControls.style.display = 'flex';
+    navControls.style.width = '100%';
+    navControls.style.marginBottom = '10px';
+    navControls.appendChild(backButton);
+    navControls.appendChild(homeButton);
+    navControls.appendChild(refreshButton);
+    
+    // URL row
+    const urlControls = document.createElement('div');
+    urlControls.style.display = 'flex';
+    urlControls.style.width = '100%';
+    urlControls.appendChild(urlInput);
+    
     // Add controls to the div
-    electronControls.appendChild(backButton);
-    electronControls.appendChild(homeButton);
-    electronControls.appendChild(refreshButton);
+    electronControls.appendChild(navControls);
+    electronControls.appendChild(urlControls);
     document.body.appendChild(electronControls);
+    
+    // Try to forward user interactions to the iframe
+    function forwardInteraction(event) {
+        try {
+            if (iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    type: 'interaction',
+                    event: {
+                        type: event.type,
+                        x: event.clientX,
+                        y: event.clientY - 40 // Adjust for title bar
+                    }
+                }, '*');
+            }
+        } catch (e) {
+            console.warn('Unable to forward interaction:', e);
+        }
+    }
     
     // Setup button functionality
     backButton.addEventListener('click', function() {
-        iframe.contentWindow.history.back();
+        try {
+            iframe.contentWindow.history.back();
+        } catch (e) {
+            console.warn('Unable to go back:', e);
+        }
     });
     
     homeButton.addEventListener('click', function() {
-        iframe.src = 'https://www.youtube.com/';
+        iframe.src = 'https://www.github.com/';
+        urlInput.value = iframe.src;
     });
     
     refreshButton.addEventListener('click', function() {
-        iframe.contentWindow.location.reload();
+        try {
+            iframe.contentWindow.location.reload();
+        } catch (e) {
+            console.warn('Unable to refresh:', e);
+            // Alternative method
+            iframe.src = iframe.src;
+        }
     });
+    
+    urlInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            try {
+                // Format URL properly if needed
+                let target = urlInput.value.trim();
+                if (!target.startsWith('http')) {
+                    // Check if it's a URL or a search term
+                    if (target.includes('.') && !target.includes(' ')) {
+                        target = 'https://' + target;
+                    } else {
+                        // Search query using DuckDuckGo
+                        target = 'https://duckduckgo.com/?q=' + encodeURIComponent(target);
+                    }
+                }
+                
+                // Navigate to the URL
+                iframe.src = target;
+                urlInput.value = target;
+                
+                // Update title bar with new domain
+                drawElectronFrame();
+            } catch (e) {
+                console.warn('Unable to navigate:', e);
+            }
+        }
+    });
+    
+    // Listen for messages from the iframe
+    window.addEventListener('message', function(event) {
+        // Check if message is from our iframe
+        if (event.source === iframe.contentWindow) {
+            // Handle location changes
+            if (event.data && event.data.type === 'locationChange' && event.data.url) {
+                urlInput.value = event.data.url;
+                drawElectronFrame();
+            }
+        }
+    });
+    
+    // Function to capture iframe content to texture
+    function captureIframeToTexture() {
+        try {
+            // Try to use html2canvas to capture the iframe content
+            if (window.html2canvas && iframe.contentDocument) {
+                html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
+                    // Clear content area and draw iframe content
+                    ctx.clearRect(0, 40, canvas.width, canvas.height - 40);
+                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
+                    
+                    // Redraw the electron frame
+                    drawElectronFrame();
+                    
+                    texture.needsUpdate = true;
+                });
+            } else {
+                // Draw content placeholder
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                
+                // Add a GitHub-like content simulation if using GitHub
+                if (iframe.src.includes('github.com')) {
+                    // GitHub header
+                    ctx.fillStyle = '#24292e';
+                    ctx.fillRect(0, 40, canvas.width, 60);
+                    
+                    // GitHub logo
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 28px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('GitHub', 20, 70);
+                    
+                    // Content area
+                    ctx.fillStyle = '#f6f8fa';
+                    ctx.fillRect(30, 120, canvas.width - 60, canvas.height - 180);
+                    
+                    // Fake repository name
+                    ctx.fillStyle = '#24292e';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText('electron / electron', 40, 130);
+                    
+                    // Description
+                    ctx.fillStyle = '#586069';
+                    ctx.font = '16px Arial';
+                    ctx.fillText('Build cross-platform desktop apps with JavaScript, HTML, and CSS', 40, 165);
+                    
+                    // Stars, forks, etc.
+                    ctx.fillStyle = '#24292e';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('★ 104k', 40, 200);
+                    ctx.fillText('⑂ 14.2k', 100, 200);
+                    ctx.fillText('👁 2.3k', 160, 200);
+                }
+                
+                // Redraw the frame
+                drawElectronFrame();
+                
+                // Message about interaction
+                ctx.fillStyle = '#333333';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Tap the screen to interact with the app', canvas.width / 2, canvas.height - 40);
+                
+                texture.needsUpdate = true;
+            }
+        } catch (e) {
+            console.warn('Error capturing iframe content:', e);
+        }
+    }
+    
+    // Try to load html2canvas if not already available
+    if (!window.html2canvas) {
+        const script = document.createElement('script');
+        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        script.onload = function() {
+            console.log('html2canvas loaded for Electron app');
+            captureIframeToTexture();
+        };
+        document.head.appendChild(script);
+    }
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    // Update texture periodically to reflect iframe content
+    const updateInterval = setInterval(captureIframeToTexture, 1000);
     
     // Add properties and methods to texture
     texture.userData = {
@@ -381,9 +491,77 @@ function createElectronAppTexture() {
         controls: electronControls,
         updateInterval: updateInterval,
         
+        // Handle click interactions on the Electron app
+        onClick: function(x, y) {
+            // If click is in the title bar
+            if (y < 40) {
+                // Window controls
+                if (y < 30) {
+                    // Close button
+                    if (x < 26) {
+                        return true; // Just acknowledge the click, don't close the app
+                    }
+                    
+                    // Minimize button
+                    if (x > 32 && x < 48) {
+                        return true; // Just acknowledge the click
+                    }
+                    
+                    // Maximize button
+                    if (x > 54 && x < 70) {
+                        return true; // Just acknowledge the click
+                    }
+                }
+                
+                return false;
+            }
+            
+            // Content area - forward the click
+            forwardInteraction({
+                type: 'click',
+                clientX: x,
+                clientY: y
+            });
+            
+            return true;
+        },
+        
+        // Handle dragging on the content
+        onDrag: function(startX, startY, endX, endY) {
+            // If drag starts in the title bar, handle as window drag
+            if (startY < 40) {
+                return false; // Let the parent handle dragging
+            }
+            
+            // Forward drag to iframe content
+            forwardInteraction({
+                type: 'drag',
+                clientX: endX,
+                clientY: endY,
+                startX: startX,
+                startY: startY
+            });
+            
+            return true;
+        },
+        
         // Method to navigate to a specific URL
         navigate: function(url) {
+            if (!url) return;
+            
+            // Format URL properly if needed
+            if (!url.startsWith('http')) {
+                if (url.includes('.') && !url.includes(' ')) {
+                    url = 'https://' + url;
+                } else {
+                    // Search query
+                    url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
+                }
+            }
+            
             iframe.src = url;
+            urlInput.value = url;
+            drawElectronFrame();
         },
         
         // Cleanup resources

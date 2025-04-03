@@ -482,7 +482,7 @@ function createFallbackButtonIcon(type, ctx) {
             ctx.beginPath();
             ctx.rect(32, 56, 64, 16);
             ctx.rect(56, 32, 16, 64);
-            ctx.fill();
+        ctx.fill();
             break;
             
         case 'deleteScreen':
@@ -497,9 +497,9 @@ function createFallbackButtonIcon(type, ctx) {
             // Lines in trash can
             ctx.fillRect(52, 50, 4, 44);
             ctx.fillRect(72, 50, 4, 44);
-            ctx.fill();
+        ctx.fill();
             break;
-            
+        
         case 'moveMode':
             // Move arrows icon
             ctx.fillStyle = '#3d84a8';
@@ -509,31 +509,31 @@ function createFallbackButtonIcon(type, ctx) {
             ctx.lineTo(44, 36);
             ctx.lineTo(84, 36);
             ctx.closePath();
-            ctx.fill();
-            
+        ctx.fill();
+        
             // Draw right arrow
-            ctx.beginPath();
+        ctx.beginPath();
             ctx.moveTo(112, 64);
             ctx.lineTo(92, 44);
             ctx.lineTo(92, 84);
-            ctx.closePath();
-            ctx.fill();
-            
+        ctx.closePath();
+        ctx.fill();
+        
             // Draw down arrow
-            ctx.beginPath();
+        ctx.beginPath();
             ctx.moveTo(64, 112);
             ctx.lineTo(44, 92);
             ctx.lineTo(84, 92);
             ctx.closePath();
-            ctx.fill();
-            
+        ctx.fill();
+        
             // Draw left arrow
-            ctx.beginPath();
+        ctx.beginPath();
             ctx.moveTo(16, 64);
             ctx.lineTo(36, 44);
             ctx.lineTo(36, 84);
-            ctx.closePath();
-            ctx.fill();
+        ctx.closePath();
+        ctx.fill();
             break;
             
         case 'rotateMode':
@@ -543,7 +543,7 @@ function createFallbackButtonIcon(type, ctx) {
             ctx.lineWidth = 6;
             
             // Draw circular arrow
-            ctx.beginPath();
+        ctx.beginPath();
             ctx.arc(64, 64, 30, 0, 1.5 * Math.PI);
             ctx.stroke();
             
@@ -566,9 +566,9 @@ function createFallbackButtonIcon(type, ctx) {
             ctx.beginPath();
             ctx.arc(64, 64, 30, 0, 2 * Math.PI);
             ctx.stroke();
-            
+        
             // Draw crosshair
-            ctx.beginPath();
+        ctx.beginPath();
             ctx.moveTo(64, 34);
             ctx.lineTo(64, 94);
             ctx.moveTo(34, 64);
