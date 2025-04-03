@@ -56,6 +56,66 @@ export function initAR() {
     }
 }
 
+// Update AR core components
+export function updateARCore() {
+    // Update frame counter
+    frameCount++;
+    
+    // Update controller state if in XR mode
+    if (renderer && renderer.xr.isPresenting) {
+        // Update raycaster from controller if available
+        if (controller) {
+            updateControllerRaycaster();
+        }
+        
+        // Check for hit test results if enabled
+        if (renderer.xr.isPresenting && renderer.xr.getSession()) {
+            const session = renderer.xr.getSession();
+            if (session.requestHitTestSource) {
+                updateHitTest(session);
+            }
+        }
+    }
+}
+
+// Update raycaster from controller
+function updateControllerRaycaster() {
+    if (!controller || !raycaster) return;
+    
+    // Set raycaster from controller direction
+    workingMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(workingMatrix);
+}
+
+// Update hit test results
+function updateHitTest(session) {
+    if (!session.hitTestSourceRequested && !session.hitTestSource) {
+        session.hitTestSourceRequested = true;
+        
+        // Request hit test source
+        session.requestReferenceSpace('viewer').then((referenceSpace) => {
+            session.requestHitTestSource({ space: referenceSpace })
+                .then((source) => {
+                    session.hitTestSource = source;
+                })
+                .catch((error) => {
+                    console.error("Error requesting hit test source:", error);
+                    session.hitTestSourceRequested = false;
+                });
+        });
+    } else if (session.hitTestSource) {
+        // Get hit test results
+        const hitTestResults = frame.getHitTestResults(session.hitTestSource);
+        
+        if (hitTestResults.length) {
+            const hit = hitTestResults[0];
+            // Process hit test result if needed
+            // This can be used for placing objects on real-world surfaces
+        }
+    }
+}
+
 // Initialize the AR environment
 function initAREnvironment() {
     const container = document.createElement('div');
@@ -337,6 +397,46 @@ function render() {
 // Create a welcome screen at the start
 function createStartScreen() {
     const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+}
+
+// Create a floor grid for spatial reference
+export function createFloorGrid() {
+    // Check if scene exists
+    if (!scene) {
+        console.error("Cannot create floor grid - scene not initialized");
+        return null;
+    }
+    
+    // Create grid helper
+    const size = 10;
+    const divisions = 20;
+    const gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x888888);
+    
+    // Position at floor level
+    gridHelper.position.y = -1.5;
+    
+    // Add to scene
+    scene.add(gridHelper);
+    
+    // Create floor plane for hit detection
+    const floorGeometry = new THREE.PlaneGeometry(size, size);
+    const floorMaterial = new THREE.MeshBasicMaterial({
+        color: 0x222222,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.DoubleSide
+    });
+    
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+    floor.position.y = -1.5;
+    floor.userData.type = 'floor';
+    
+    // Add to scene
+    scene.add(floor);
+    
+    console.log("Floor grid created");
+    return { grid: gridHelper, floor: floor };
 }
 
 // Export function to manually update/re-render
