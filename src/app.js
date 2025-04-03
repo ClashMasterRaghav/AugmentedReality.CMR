@@ -1,20 +1,17 @@
 // Main AR application entry point
 import * as THREE from 'three';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
-import { initARScene, updateScene } from './core/ar_scene.js';
-import { 
-    initCSS3DRenderer, 
-    updateCSS3DRenderer, 
-    createNewBrowserScreen, 
-    createYouTubeScreen,
-    animateScreenEntrance 
-} from './core/ar_screens.js';
-import { setupEventListeners } from './core/ar_interaction.js';
-import { initUI, updateUI } from './core/ar_ui.js';
-import { initAudio, playStartupSound } from './core/ar_audio.js';
-import { initMediaSources } from './core/ar_media.js';
+import { initARCore, updateARCore, createFloorGrid } from './core/ar_core.js';
+import { initCSS3DRenderer, updateCSS3DRenderer, createNewBrowserScreen, createYouTubeScreen, animateScreenEntrance, updateScreenEffects } from './core/ar_screens.js';
+import { initInteraction } from './core/ar_interaction.js';
+import { initUI, updateUI, createControlPanel } from './core/ar_ui.js';
+import { initAudio, updateAudio } from './core/ar_audio.js';
+import { initMedia, updateMedia } from './core/ar_media.js';
 import { loadEnvironmentAssets } from './core/ar_environment.js';
 import { showNotification } from './core/ar_utils.js';
+
+// Global frame counter for optimizing updates
+let frameCount = 0;
 
 // Global state tracking
 let isARSupported = false;
@@ -58,7 +55,7 @@ async function init() {
         await initAudio();
         
         // Initialize media sources
-        await initMediaSources();
+        await initMedia();
         
         // Mark initialization as complete
         isInitialized = true;
@@ -68,7 +65,6 @@ async function init() {
         
         // Show welcome notification
         showNotification('AR Environment Ready', 'success');
-        playStartupSound();
         
         // Dispatch initialization complete event
         document.dispatchEvent(new Event('ar-initialized'));
@@ -188,7 +184,7 @@ function initRendering() {
     document.body.appendChild(window.renderer.domElement);
     
     // Initialize AR scene with lighting and environment
-    initARScene(window.scene, window.camera);
+    initARCore(window.scene, window.camera);
     
     // Initialize CSS3D renderer for web content
     initCSS3DRenderer();
@@ -218,6 +214,12 @@ function setupARSession() {
         
         // Add controller to event listeners
         setupEventListeners();
+        
+        // Show notification
+        showNotification('AR session started. Tap anywhere to place screens.', 'success');
+        
+        // Create control panel immediately
+        createControlPanel();
         
         // Place initial screen when session starts
         setTimeout(() => {
@@ -286,16 +288,84 @@ function createInitialScreen() {
 
 // Main animation loop
 function animate() {
-    window.renderer.setAnimationLoop(render);
-}
-
-// Render function called each frame
-function render() {
-    // Update all components
-    updateScene();
-    updateCSS3DRenderer();
+    requestAnimationFrame(animate);
+    
+    // Update frame counter
+    frameCount++;
+    
+    // Update AR core functionality
+    updateARCore();
+    
+    // Update media (videos, textures)
+    if (frameCount % 2 === 0) {
+        updateMedia();
+    }
+    
+    // Update audio processing
+    if (frameCount % 3 === 0) {
+        updateAudio();
+    }
+    
+    // Update UI elements and controls
     updateUI();
     
+    // Update screen effects and animations
+    updateScreenEffects();
+    
+    // Update CSS3D renderer (for web content)
+    updateCSS3DRenderer();
+    
     // Render the scene
-    window.renderer.render(window.scene, window.camera);
+    if (window.renderer && window.scene && window.camera) {
+        window.renderer.render(window.scene, window.camera);
+    }
+}
+
+// Initialize AR functionality - this is the main entry point
+export function initAR() {
+    console.log("Initializing AR...");
+    
+    // Initialize core AR components
+    initARCore(document.getElementById('ar-container'));
+    
+    // Initialize required systems in the correct order
+    initCSS3DRenderer();
+    initInteraction();
+    initMedia();
+    initUI();
+    initAudio();
+    
+    // Create the floor grid for spatial reference
+    createFloorGrid();
+    
+    // Create control panel when AR starts
+    const startARButton = document.getElementById('start-ar-button');
+    if (startARButton) {
+        startARButton.addEventListener('click', () => {
+            console.log("AR started by user");
+            
+            // Create control panel after slight delay to ensure everything is ready
+            setTimeout(() => {
+                const controlPanel = createControlPanel();
+                if (controlPanel) {
+                    console.log("Control panel created successfully");
+                } else {
+                    console.error("Failed to create control panel");
+                }
+                
+                // Create an initial browser screen at a comfortable distance
+                const screenPosition = new THREE.Vector3(0, 0, -1.5);
+                const newScreen = createNewBrowserScreen(screenPosition);
+                if (newScreen) {
+                    console.log("Initial screen created:", newScreen.userData.id);
+                    showNotification("Created initial browser screen");
+                }
+            }, 500);
+        });
+    }
+    
+    // Start animation loop
+    animate();
+    
+    console.log("AR initialized successfully");
 } 

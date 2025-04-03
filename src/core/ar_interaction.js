@@ -167,12 +167,20 @@ function onTouchStart(event) {
             if (intersects.length > 0) {
                 const intersectedObject = intersects[0].object;
                 
+                // Provide visual feedback
+                createHitEffect(intersects[0].point);
+                
                 // Handle button interactions
                 const button = getButtonFromIntersect(intersectedObject);
                 if (button) {
                     // Visual feedback
                     setButtonPressed(button, true);
                     interactionState.selectedObject = button;
+                    
+                    // Add haptic feedback
+                    if (navigator.vibrate) {
+                        navigator.vibrate(20);
+                    }
                     
                     // Trigger the button action immediately
                     if (button.userData && button.userData.action) {
@@ -181,27 +189,61 @@ function onTouchStart(event) {
                     return;
                 }
                 
-                // Handle screen interactions
-                const screen = getScreenFromIntersect(intersectedObject);
-                if (screen) {
-                    selectScreen(screen);
-                    interactionState.selectedObject = screen;
+                // Check for drag handle
+                if (intersectedObject.userData && intersectedObject.userData.type === 'dragHandle') {
+                    console.log("Drag handle touched");
                     
-                    // If drag handle was touched, start dragging
-                    if (intersectedObject.userData && intersectedObject.userData.type === 'dragHandle') {
+                    // Get the parent screen
+                    const screen = intersectedObject.userData.screen || intersectedObject.parent;
+                    if (screen) {
+                        // Select the screen
+                        selectScreen(screen);
+                        
+                        // Start dragging operation
                         interactionState.isDragging = true;
                         interactionState.draggedObject = screen;
                         
                         // Visual feedback
                         createModeChangeIndicator('Moving Screen');
                         
-                        // Add haptic feedback if available
+                        // Haptic feedback
                         if (navigator.vibrate) {
                             navigator.vibrate(20);
                         }
+                        
+                        console.log("Started dragging screen:", screen.userData && screen.userData.id);
+                        return;
+                    }
+                }
+                
+                // Handle screen interactions
+                const screen = getScreenFromIntersect(intersectedObject);
+                if (screen) {
+                    selectScreen(screen);
+                    interactionState.selectedObject = screen;
+                    
+                    // If we touched the top portion (drag handle area)
+                    if (screen.userData && screen.userData.dragHandleHeight) {
+                        const localY = intersects[0].point.y - screen.position.y;
+                        const halfHeight = screen.geometry.parameters.height / 2;
+                        
+                        // If touch is in the top drag handle area
+                        if (localY > halfHeight - screen.userData.dragHandleHeight) {
+                            console.log("Touched top area of screen - enabling dragging");
+                            interactionState.isDragging = true;
+                            interactionState.draggedObject = screen;
+                            
+                            // Visual feedback
+                            createModeChangeIndicator('Moving Screen');
+                            
+                            // Haptic feedback
+                            if (navigator.vibrate) {
+                                navigator.vibrate(20);
+                            }
+                        }
                     }
                     
-                    // Highlight the screen briefly
+                    // Highlight the screen briefly for visual feedback
                     flashScreenHighlight(screen);
                 }
             }
@@ -295,6 +337,8 @@ function moveScreenWithTouch(touchPosition, touchDelta) {
     const screen = interactionState.draggedObject;
     if (!screen || !window.camera) return;
     
+    console.log("Moving screen with touch - delta:", touchDelta);
+    
     // Create a plane at screen's distance from camera
     const cameraPosition = new THREE.Vector3();
     window.camera.getWorldPosition(cameraPosition);
@@ -302,7 +346,7 @@ function moveScreenWithTouch(touchPosition, touchDelta) {
     const screenPosition = screen.position.clone();
     const distanceToScreen = cameraPosition.distanceTo(screenPosition);
     
-    // Cast rays for current and previous touch positions
+    // Cast rays for current position
     interactionState.raycaster.setFromCamera(touchPosition, window.camera);
     const rayDirection = interactionState.raycaster.ray.direction.clone();
     
@@ -321,13 +365,21 @@ function moveScreenWithTouch(touchPosition, touchDelta) {
         newPosition.copy(cameraPosition).add(direction.multiplyScalar(maxDistance));
     }
     
-    // Apply smooth movement
-    screen.position.lerp(newPosition, 0.3);
+    // Apply smooth movement - less smoothing for more responsive dragging
+    screen.position.lerp(newPosition, 0.5);
     
     // Make the screen face the camera
     screen.lookAt(cameraPosition);
     
-    // Create visual movement indicator (throttled to avoid too many indicators)
+    // Update CSS3D object position if present
+    if (screen.userData && screen.userData.updateCSS3DPosition) {
+        screen.userData.updateCSS3DPosition();
+    } else if (screen.userData && screen.userData.css3dObject) {
+        screen.userData.css3dObject.position.copy(screen.position);
+        screen.userData.css3dObject.quaternion.copy(screen.quaternion);
+    }
+    
+    // Create visual movement indicator
     createMoveIndicator(screen.position.clone(), 0.05);
 }
 
@@ -786,4 +838,242 @@ export function setupVideoControls(mediaControls) {
     if (mediaControls) {
         videoControls = mediaControls;
     }
+}
+
+// Visual feedback functions for interactions
+
+// Create a brief hit effect at a point
+function createHitEffect(position) {
+    if (!window.scene) return;
+    
+    // Create a sphere geometry for the hit effect
+    const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x3388ff,
+        transparent: true,
+        opacity: 0.7
+    });
+    
+    // Create mesh and position it
+    const hitEffect = new THREE.Mesh(geometry, material);
+    hitEffect.position.copy(position);
+    window.scene.add(hitEffect);
+    
+    // Animate the hit effect
+    const startTime = Date.now();
+    const duration = 300; // ms
+    
+    function animateHitEffect() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Scale up and fade out
+        const scale = 1 + progress * 2;
+        hitEffect.scale.set(scale, scale, scale);
+        
+        material.opacity = 0.7 * (1 - progress);
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateHitEffect);
+        } else {
+            // Remove from scene when animation is complete
+            window.scene.remove(hitEffect);
+            geometry.dispose();
+            material.dispose();
+        }
+    }
+    
+    // Start animation
+    animateHitEffect();
+}
+
+// Create a movement indicator at a point
+function createMoveIndicator(position, size = 0.1) {
+    if (!window.scene) return;
+    
+    // Create a ring geometry for the move indicator
+    const geometry = new THREE.RingGeometry(size * 0.6, size, 16);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x22cc88,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    
+    // Create mesh and position it
+    const moveIndicator = new THREE.Mesh(geometry, material);
+    moveIndicator.position.copy(position);
+    
+    // Orient toward camera
+    if (window.camera) {
+        moveIndicator.lookAt(window.camera.position);
+    }
+    
+    window.scene.add(moveIndicator);
+    
+    // Animate the move indicator
+    const startTime = Date.now();
+    const duration = 200; // ms
+    
+    function animateMoveIndicator() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Scale up and fade out
+        const scale = 1 + progress;
+        moveIndicator.scale.set(scale, scale, scale);
+        
+        material.opacity = 0.5 * (1 - progress);
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateMoveIndicator);
+        } else {
+            // Remove from scene when animation is complete
+            window.scene.remove(moveIndicator);
+            geometry.dispose();
+            material.dispose();
+        }
+    }
+    
+    // Start animation
+    animateMoveIndicator();
+}
+
+// Create a mode change indicator text
+function createModeChangeIndicator(text) {
+    if (!window.scene || !window.camera) return;
+    
+    // Create canvas for text
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw border
+    ctx.strokeStyle = '#3388ff';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
+    
+    // Draw text
+    ctx.font = '36px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    
+    // Create plane with texture
+    const geometry = new THREE.PlaneGeometry(0.8, 0.2);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide
+    });
+    
+    const indicator = new THREE.Mesh(geometry, material);
+    
+    // Position in front of camera
+    const cameraDirection = new THREE.Vector3(0, 0, -1);
+    cameraDirection.applyQuaternion(window.camera.quaternion);
+    
+    const cameraPosition = new THREE.Vector3();
+    window.camera.getWorldPosition(cameraPosition);
+    
+    indicator.position.copy(cameraPosition).add(cameraDirection.multiplyScalar(1));
+    indicator.lookAt(cameraPosition);
+    
+    window.scene.add(indicator);
+    
+    // Animate the indicator
+    const startTime = Date.now();
+    const duration = 1500; // ms
+    
+    function animateIndicator() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        if (progress < 0.1) {
+            // Fade in
+            material.opacity = progress * 10 * 0.9;
+        } else if (progress > 0.8) {
+            // Fade out
+            material.opacity = (1 - (progress - 0.8) * 5) * 0.9;
+        }
+        
+        // Move upward slightly
+        indicator.position.y += 0.0005;
+        
+        // Keep facing camera
+        indicator.lookAt(cameraPosition);
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateIndicator);
+        } else {
+            // Remove from scene when animation is complete
+            window.scene.remove(indicator);
+            geometry.dispose();
+            material.dispose();
+            texture.dispose();
+        }
+    }
+    
+    // Start animation
+    animateIndicator();
+}
+
+// Flash highlight on a screen
+function flashScreenHighlight(screen) {
+    if (!screen || !window.scene) return;
+    
+    // Create geometry for highlight
+    const width = screen.geometry.parameters.width + 0.05;
+    const height = screen.geometry.parameters.height + 0.05;
+    const geometry = new THREE.PlaneGeometry(width, height);
+    
+    // Create material with glow effect
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x3388ff,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    
+    // Create mesh and position it
+    const highlight = new THREE.Mesh(geometry, material);
+    highlight.position.copy(screen.position);
+    highlight.quaternion.copy(screen.quaternion);
+    highlight.position.z += 0.005; // Slightly in front of screen
+    
+    window.scene.add(highlight);
+    
+    // Animate the highlight
+    const startTime = Date.now();
+    const duration = 400; // ms
+    
+    function animateHighlight() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Fade out
+        material.opacity = 0.7 * (1 - progress);
+        
+        if (progress < 1) {
+            requestAnimationFrame(animateHighlight);
+        } else {
+            // Remove from scene when animation is complete
+            window.scene.remove(highlight);
+            geometry.dispose();
+            material.dispose();
+        }
+    }
+    
+    // Start animation
+    animateHighlight();
 } 
