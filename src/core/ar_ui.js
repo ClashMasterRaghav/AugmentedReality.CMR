@@ -60,17 +60,47 @@ export function createControlPanel() {
     
     // Create panel mesh
     controlPanel = new THREE.Mesh(panelGeometry, panelMaterial);
-    controlPanel.position.set(0, -0.5, -1);
+    
+    // Position in front of camera if available
+    if (window.camera) {
+        const cameraPosition = new THREE.Vector3();
+        window.camera.getWorldPosition(cameraPosition);
+        
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(window.camera.quaternion);
+        
+        // Position control panel in front of camera
+        const panelPosition = cameraPosition.clone().add(
+            cameraDirection.multiplyScalar(1)
+        );
+        
+        // Position slightly below eye level
+        panelPosition.y -= 0.3;
+        
+        controlPanel.position.copy(panelPosition);
+        
+        // Make panel face the camera
+        controlPanel.lookAt(cameraPosition);
+    } else {
+        // Fallback position if camera not available
+        controlPanel.position.set(0, -0.5, -1);
+    }
+    
     controlPanel.userData.type = 'controlPanel';
     controlPanel.userData.isDraggable = true;
     
     // Add to scene
     window.scene.add(controlPanel);
     
+    // Ensure panel is visible in console log
+    console.log("Control panel created at position:", controlPanel.position);
+    
     // Add buttons to panel
     addButtonToPanel(controlPanel, 'add', 'Add Screen', -0.2, 0, 0.08, handleAddButtonClick);
     addButtonToPanel(controlPanel, 'delete', 'Delete Screen', 0, 0, 0.08, handleDeleteButtonClick);
     addButtonToPanel(controlPanel, 'youtube', 'YouTube', 0.2, 0, 0.08, handleYouTubeButtonClick);
+    
+    showNotification("Control panel created", "success");
     
     return controlPanel;
 }

@@ -43,7 +43,7 @@
             z-index: 200;
         }
         
-        #notificationContainer {
+        #notification-container {
             position: absolute;
             bottom: 20px;
             left: 50%;
@@ -101,6 +101,43 @@
             text-align: center;
             padding-top: 40%;
         }
+        
+        /* Style for ARButton */
+        .ar-button {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(0, 174, 239, 0.9);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 999;
+            transition: all 0.3s ease;
+        }
+        
+        .ar-button:hover {
+            background: rgba(0, 174, 239, 1);
+            transform: translateX(-50%) scale(1.05);
+        }
+        
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        #ui-container button, #ui-container .ar-button {
+            pointer-events: all;
+        }
     </style>
 </head>
 <body>
@@ -120,8 +157,11 @@
     <!-- Loading message -->
     <div id="loadingMessage">Loading AR Experience...</div>
     
+    <!-- UI container for AR overlay -->
+    <div id="ui-container"></div>
+    
     <!-- Notification container -->
-    <div id="notificationContainer"></div>
+    <div id="notification-container"></div>
     
     <!-- Error message for unsupported browsers -->
     <div id="errorMessage">

@@ -1,6 +1,6 @@
 // Main AR application entry point
 import * as THREE from 'three';
-import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { initARCore, updateARCore, createFloorGrid } from './core/ar_core.js';
 import { initCSS3DRenderer, updateCSS3DRenderer, createNewBrowserScreen, createYouTubeScreen, animateScreenEntrance, updateScreenEffects } from './core/ar_screens.js';
 import { initInteraction, setupEventListeners } from './core/ar_interaction.js';
@@ -29,7 +29,7 @@ window.selectedScreen = null;
 window.addEventListener('DOMContentLoaded', init);
 
 // Main initialization function
-async function init() {
+export async function init() {
     try {
         console.log('Initializing AR application...');
         
@@ -65,6 +65,17 @@ async function init() {
         
         // Show welcome notification
         showNotification('AR Environment Ready', 'success');
+        
+        // Show the start AR button
+        const startButton = document.getElementById('start-ar-button');
+        if (startButton) {
+            // Hide loading message
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) loadingMessage.style.display = 'none';
+            
+            // Show start button
+            startButton.style.display = 'block';
+        }
         
         // Dispatch initialization complete event
         document.dispatchEvent(new Event('ar-initialized'));
@@ -198,15 +209,22 @@ function setupARSession() {
     // Create AR button
     const arButton = ARButton.createButton(window.renderer, {
         requiredFeatures: ['hit-test'],
-        optionalFeatures: ['dom-overlay'],
+        optionalFeatures: ['dom-overlay', 'light-estimation'],
         domOverlay: { root: document.getElementById('ui-container') }
     });
+    
+    // Add class for styling
+    arButton.classList.add('ar-button');
     document.body.appendChild(arButton);
     
     // Set up session start event
     window.renderer.xr.addEventListener('sessionstart', () => {
         console.log('AR session started');
         isARSessionStarted = true;
+        
+        // Hide loading message
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) loadingMessage.style.display = 'none';
         
         // Create XR controller for interaction
         window.controller = window.renderer.xr.getController(0);
@@ -255,7 +273,7 @@ function createInitialScreen() {
     const welcomeScreen = createYouTubeScreen('dQw4w9WgXcQ');
     if (welcomeScreen) {
         // Place in front of user
-        const distance = 1;
+        const distance = 1.5; // Increased from 1 to ensure visibility
         
         // Get camera direction
         const cameraPosition = new THREE.Vector3();
@@ -275,7 +293,7 @@ function createInitialScreen() {
         // Look at camera
         welcomeScreen.lookAt(cameraPosition);
         
-        // Offset slightly down for better viewing
+        // Slightly adjust position for better viewing
         welcomeScreen.position.y -= 0.1;
         
         // Add some random rotation on y-axis
@@ -283,6 +301,17 @@ function createInitialScreen() {
         
         // Animate entrance
         animateScreenEntrance(welcomeScreen);
+        
+        // Ensure screen is visible by confirming material opacity
+        welcomeScreen.traverse(child => {
+            if (child.material) {
+                child.material.opacity = 1.0;
+                child.material.transparent = true;
+                child.material.needsUpdate = true;
+            }
+        });
+        
+        showNotification("Welcome screen created!", "success");
     }
 }
 

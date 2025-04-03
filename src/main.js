@@ -1,5 +1,5 @@
 // Main entry point for AR application
-import { initAR } from './core/ar_core.js';
+import { init } from './app.js';
 import { setupEventListeners } from './core/ar_interaction.js';
 import { loadVideoTexture } from './core/ar_media.js';
 import { initCSS3DRenderer } from './core/ar_screens.js';
@@ -78,22 +78,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // Initialize video texture
             loadVideoTexture();
             
-            // Initialize AR core
-            const initialized = initAR();
+            // Initialize application (uses init from app.js)
+            init();
             
-            if (!initialized) {
-                throw new Error('Failed to initialize AR core');
-            }
-            
-            // Initialize CSS3D renderer for web content
+            // Initialize CSS3D renderer for web content if needed
             initCSS3DRenderer();
             
-            // Set up event listeners for interactions
-            setupEventListeners();
-            
-            // Hide loading message
+            // Hide loading message after initialization
             if (loadingMessage) {
-                loadingMessage.style.display = 'none';
+                setTimeout(() => {
+                    loadingMessage.style.display = 'none';
+                }, 2000);
             }
             
             // Show welcome notification

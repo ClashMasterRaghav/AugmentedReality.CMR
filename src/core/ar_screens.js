@@ -1,6 +1,6 @@
 // Screen creation and management functionality
 import * as THREE from 'three';
-import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
+import { CSS3DRenderer, CSS3DObject, CSS3DScene } from 'three/addons/renderers/CSS3DRenderer.js';
 import { videoTexture, registerVideoScreen, unregisterVideoScreen } from './ar_media.js';
 import { generateUUID, showNotification } from './ar_utils.js';
 
@@ -11,24 +11,49 @@ export let css3dScene;
 
 // Initialize CSS3D renderer for real web content
 export function initCSS3DRenderer() {
-    // Create CSS3D renderer and scene for web content
-    css3dRenderer = new CSS3DRenderer();
-    css3dRenderer.setSize(window.innerWidth, window.innerHeight);
-    css3dRenderer.domElement.style.position = 'absolute';
-    css3dRenderer.domElement.style.top = '0';
-    css3dRenderer.domElement.style.left = '0';
-    css3dRenderer.domElement.style.pointerEvents = 'none'; // Let AR interactions pass through
-    document.body.appendChild(css3dRenderer.domElement);
+    if (css3dRenderer) {
+        console.log('CSS3D renderer already initialized');
+        return css3dRenderer;
+    }
     
-    css3dScene = new THREE.Scene();
-    
-    // Handle resize events
-    window.addEventListener('resize', () => {
+    try {
+        // Create CSS3D renderer
+        css3dRenderer = new CSS3DRenderer();
         css3dRenderer.setSize(window.innerWidth, window.innerHeight);
-    });
-    
-    console.log("CSS3D Renderer initialized for real website integration");
-    return css3dRenderer;
+        css3dRenderer.domElement.style.position = 'absolute';
+        css3dRenderer.domElement.style.top = '0';
+        css3dRenderer.domElement.style.left = '0';
+        css3dRenderer.domElement.style.pointerEvents = 'none';
+        css3dRenderer.domElement.style.zIndex = '1'; // Ensure it's behind UI but visible
+        document.body.appendChild(css3dRenderer.domElement);
+        
+        // Create CSS3D scene
+        css3dScene = new CSS3DScene();
+        
+        // Add window resize handler
+        window.addEventListener('resize', function() {
+            if (css3dRenderer) {
+                css3dRenderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+        
+        console.log('CSS3D renderer initialized');
+        
+        // Wait a moment for DOM to update
+        setTimeout(() => {
+            // Force a render to ensure visibility
+            if (css3dScene && css3dRenderer && window.camera) {
+                css3dRenderer.render(css3dScene, window.camera);
+                console.log('Initial CSS3D render complete');
+            }
+        }, 500);
+        
+        return css3dRenderer;
+    } catch (error) {
+        console.error('Error initializing CSS3D renderer:', error);
+        showNotification('Failed to initialize web content renderer', 'error');
+        return null;
+    }
 }
 
 // Update CSS3D renderer in animation loop
@@ -189,108 +214,91 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
 
 // Create a YouTube screen using CSS3D renderer
 export function createYouTubeScreen(videoId, position = new THREE.Vector3(0, 0, -1.5)) {
-    // Check if CSS3D renderer is initialized
-    if (!css3dRenderer) {
-        initCSS3DRenderer();
+    if (!css3dRenderer || !css3dScene) {
+        console.error("CSS3D renderer not initialized! Call initCSS3DRenderer() first");
+        showNotification("Error: CSS3D renderer not available for YouTube", "error");
+        return null;
     }
     
-    // Screen dimensions
-    const screenWidth = 1.0;
-    const screenHeight = 0.75;
-    const size = { x: screenWidth, y: screenHeight };
-    const title = `YouTube ${screens.length + 1}`;
+    console.log(`Creating YouTube screen for video ID: ${videoId}`);
     
-    console.log("Creating YouTube screen with real iframe");
+    // Create screen dimensions
+    const width = 1.6;
+    const height = 0.9;
+    const screenGeometry = new THREE.PlaneGeometry(width, height);
     
-    // Create a placeholder texture for WebGL renderer
-    const placeholderTexture = createFallbackTexture(screens.length + 1);
-    
-    // Create the screen with placeholder texture
-    const screen = enhancedCreateScreen(position, size, title, placeholderTexture);
-    
-    // Add identification data
-    screen.userData = { 
-        type: 'screen', 
-        id: generateUUID(),
-        screenNumber: screens.length + 1,
-        isSelected: false,
-        isInteractive: true,
-        originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: 'youtube',
-        hasRealContent: true
-    };
-    
-    // Add shadow and styled border
-    addDropShadow(screen, screenWidth, screenHeight);
-    
-    const borderGeometry = new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02);
-    const borderMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xE62117, // YouTube red
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8
+    // Create container for screen using enhancedCreateScreen
+    const screen = enhancedCreateScreen({
+        width,
+        height,
+        depth: 0.05
     });
-    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
-    borderPanel.position.z = -0.001;
-    screen.add(borderPanel);
     
-    // Update drag handle reference
-    const topBar = screen.children.find(child => 
-        child.userData && child.userData.type === 'dragHandle');
-    
-    if (topBar) {
-        topBar.userData.screen = screen;
-        screen.userData.dragHandle = topBar;
+    // Set position if provided
+    if (position) {
+        screen.position.copy(position);
     }
     
-    // Create actual iframe for YouTube with CSS3D
-    // Use the provided videoId or a default one
-    const iframeElement = document.createElement('iframe');
-    iframeElement.style.width = `${screenWidth * 1000}px`;
-    iframeElement.style.height = `${screenHeight * 1000}px`;
-    iframeElement.style.border = '0px';
-    iframeElement.src = `https://www.youtube-nocookie.com/embed/${videoId || "Myrr9vA7j5A"}?autoplay=1&mute=1&enablejsapi=1`;
-    iframeElement.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    // Add user data
+    screen.userData.id = generateUUID();
+    screen.userData.screenNumber = screens.length + 1;
+    screen.userData.contentType = 'youtube';
+    screen.userData.videoId = videoId;
     
-    // Create CSS3D object and position it to match the Three.js object
-    const css3dObject = new CSS3DObject(iframeElement);
-    css3dObject.scale.set(0.001, 0.001, 0.001); // Scale down to match Three.js units
-    css3dObject.position.copy(position);
-    css3dObject.quaternion.copy(screen.quaternion);
+    // Create CSS3D element for YouTube embed
+    const iframe = document.createElement('iframe');
+    iframe.style.width = `${width * 1000}px`; // Convert to pixels at a reasonable scale
+    iframe.style.height = `${height * 1000}px`;
+    iframe.style.border = '0px';
     
-    // Store reference to CSS3D object
+    // Use YouTube embed URL with autoplay and mute
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1`;
+    
+    // Create CSS3D object from iframe
+    const css3dObject = new CSS3DObject(iframe);
+    
+    // Scale down to match Three.js units
+    css3dObject.scale.set(0.001, 0.001, 0.001);
+    
+    // Store reference to iframe and CSS3D object
+    screen.userData.iframe = iframe;
     screen.userData.css3dObject = css3dObject;
+    
+    // Add CSS3D object to scene
     css3dScene.add(css3dObject);
     
-    // Update function to sync CSS3D object with Three.js object
+    // Update CSS3D position to match screen
     const updateCSS3DPosition = () => {
-        if (screen.userData.css3dObject) {
-            screen.userData.css3dObject.position.copy(screen.position);
-            screen.userData.css3dObject.quaternion.copy(screen.quaternion);
-            screen.userData.css3dObject.scale.set(
-                0.001 * screen.scale.x,
-                0.001 * screen.scale.y,
-                0.001 * screen.scale.z
-            );
+        if (css3dObject && screen) {
+            // Copy position and rotation from screen
+            css3dObject.position.copy(screen.position);
+            css3dObject.quaternion.copy(screen.quaternion);
         }
     };
     
-    // Store the update function
-    screen.userData.updateCSS3DPosition = updateCSS3DPosition;
+    // Initial update
+    updateCSS3DPosition();
     
-    // Add to scene and screens array
+    // Add screen to global array
+    screens.push(screen);
+    
+    // Add screen to Three.js scene
     if (window.scene) {
         window.scene.add(screen);
     }
-    screens.push(screen);
     
-    // Add entrance animation
+    // Add update function to be called each frame
+    screen.userData.update = () => {
+        updateCSS3DPosition();
+    };
+    
+    // Add drop shadow for depth
+    addDropShadow(screen);
+    
+    // Animate entrance
     animateScreenEntrance(screen);
     
-    console.log("Created YouTube screen with ID:", screen.userData.id);
-    
-    // Select this as the current screen
-    selectScreen(screen);
+    console.log(`Created YouTube screen with ID: ${screen.userData.id}`);
     
     return screen;
 }
