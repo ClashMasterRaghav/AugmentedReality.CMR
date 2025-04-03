@@ -162,49 +162,77 @@ function findButtonInScreen(screen, action) {
 function updateButtonIcon(button, newType) {
     // Find icon mesh (first child)
     const iconMesh = button.children[0];
-    if (iconMesh && iconMesh.material && iconMesh.material.map) {
+    if (iconMesh && iconMesh.material) {
         // Create new icon texture
-        const newTexture = createControlIcon(newType);
-        iconMesh.material.map.dispose();
-        iconMesh.material.map = newTexture;
-        iconMesh.material.needsUpdate = true;
+        createControlIcon(newType).then(newTexture => {
+            if (iconMesh.material.map) {
+                iconMesh.material.map.dispose();
+            }
+            iconMesh.material.map = newTexture;
+            iconMesh.material.needsUpdate = true;
+        }).catch(error => {
+            console.error("Error updating button icon:", error);
+        });
     }
 }
 
 // Create control button icons
 function createControlIcon(type) {
-    // Use the actual PNG icons instead of drawing them
-    const iconLoader = new THREE.TextureLoader();
-    let iconPath = '';
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; // Increased size for better quality
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
     
-    switch(type) {
-        case 'play':
-            iconPath = 'examples/textures/ar_icons/play-buttton.png';
-            break;
-        case 'pause':
-            iconPath = 'examples/textures/ar_icons/pause-button.png';
-            break;
-        case 'volume':
-            iconPath = 'examples/textures/ar_icons/unmute.png';
-            break;
-        case 'muted':
-            iconPath = 'examples/textures/ar_icons/mute.png';
-            break;
-        default:
-            // Create a fallback if no matching icon
-            const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
-            const ctx = canvas.getContext('2d');
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Logo URLs for different controls - replace with your actual logo URLs
+    const logoURLs = {
+        'play': 'https://cdn-icons-png.flaticon.com/512/0/375.png',
+        'pause': 'https://cdn-icons-png.flaticon.com/512/2920/2920566.png',
+        'volume': 'https://cdn-icons-png.flaticon.com/512/727/727240.png',
+        'muted': 'https://cdn-icons-png.flaticon.com/512/727/727262.png',
+        'fullscreen': 'https://cdn-icons-png.flaticon.com/512/2089/2089674.png'
+    };
+    
+    // Create a new image
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    
+    // Create a promise to handle async loading
+    return new Promise((resolve) => {
+        img.onload = function() {
+            // Draw image centered on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
+        
+        img.onerror = function() {
+            console.error('Error loading logo image for: ' + type);
+            // Fallback to text
             ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(32, 32, 16, 0, Math.PI * 2);
-            ctx.fill();
-            return new THREE.CanvasTexture(canvas);
-    }
-    
-    // Return the loaded texture directly
-    return iconLoader.load(iconPath);
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(type.toUpperCase(), canvas.width/2, canvas.height/2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
+        
+        // Set image source
+        if (logoURLs[type]) {
+            img.src = logoURLs[type];
+        } else {
+            // Fallback if no logo URL is available
+            img.onerror();
+        }
+    });
 }
 
 // Create a fallback texture when video fails

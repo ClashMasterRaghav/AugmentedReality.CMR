@@ -127,12 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Initialize AR
                 initAR();
                 
-                // Initialize CSS3D renderer for real web content
-                import('./ar_screens.js').then(module => {
-                    module.initCSS3DRenderer();
-                    console.log("CSS3D Renderer initialized for real website integration");
-                });
-                
                 // Set up event listeners
                 setupEventListeners();
                 

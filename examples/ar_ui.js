@@ -392,11 +392,11 @@ export function createControlPanel() {
         controlPanel.add(button);
         
         // Add icon with same functionality as before
-        const iconTexture = createButtonIcon(index);
+        // Create placeholder icon mesh that will be updated when texture loads
         const iconSize = buttonSize * 0.6;
         const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
-            map: iconTexture,
+            color: 0xffffff, // Default white color until texture loads
             transparent: true,
             side: THREE.DoubleSide
         });
@@ -404,6 +404,14 @@ export function createControlPanel() {
         iconMesh.position.z = 0.004;
         iconMesh.renderOrder = 1003;
         button.add(iconMesh);
+        
+        // Load the icon texture asynchronously
+        createButtonIcon(index).then(iconTexture => {
+            iconMaterial.map = iconTexture;
+            iconMaterial.needsUpdate = true;
+        }).catch(error => {
+            console.error("Error loading button icon:", error);
+        });
         
         // Add button shadow for depth
         const shadowGeometry = new THREE.CircleGeometry(buttonSize / 2 * 1.1, 32);
@@ -464,7 +472,7 @@ export function createControlPanel() {
     return controlPanel;
 }
 
-// Create modern, clean button icons
+// Create modern, clean button icons with logos
 function createButtonIcon(buttonIndex) {
     const canvas = document.createElement('canvas');
     canvas.width = 256; // Higher resolution for better quality
@@ -474,134 +482,95 @@ function createButtonIcon(buttonIndex) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Set up shared styling - more modern look
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Logo URLs for different buttons
+    const logoURLs = {
+        0: 'https://cdn-icons-png.flaticon.com/512/1828/1828921.png', // New screen button (plus sign)
+        1: 'https://cdn-icons-png.flaticon.com/512/1214/1214428.png', // Delete button (trash)
+        2: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png', // YouTube
+        3: 'https://cdn-icons-png.flaticon.com/512/5968/5968731.png', // DuckDuckGo
+        4: 'https://cdn-icons-png.flaticon.com/512/2642/2642502.png', // Google Maps 
+        5: 'https://cdn-icons-png.flaticon.com/512/5968/5968386.png'  // Electron
+    };
     
-    // Determine which icon to draw
-    if (buttonIndex === 0) { // New Screen button
-        // Draw a modern plus sign
-            ctx.beginPath();
-        ctx.moveTo(64, 128);
-        ctx.lineTo(192, 128);
-            ctx.stroke();
-            
-            ctx.beginPath();
-        ctx.moveTo(128, 64);
-        ctx.lineTo(128, 192);
-            ctx.stroke();
-    } else if (buttonIndex === 1) { // Delete button
-        // Draw a modern 'X'
-            ctx.beginPath();
-        ctx.moveTo(80, 80);
-        ctx.lineTo(176, 176);
-            ctx.stroke();
-            
-            ctx.beginPath();
-        ctx.moveTo(176, 80);
-        ctx.lineTo(80, 176);
-            ctx.stroke();
-    } else if (buttonIndex === 2) { // YouTube icon
-        // Red circle with play button
-        ctx.fillStyle = '#FF0000';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // White play button
-        ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-        ctx.moveTo(100, 90);
-        ctx.lineTo(180, 128);
-        ctx.lineTo(100, 166);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 3) { // DuckDuckGo icon
-        // Orange circle
-        ctx.fillStyle = '#DE5833';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Duck silhouette (simplified)
-        ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-        ctx.arc(148, 108, 30, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#DE5833';
-            ctx.beginPath();
-        ctx.arc(158, 98, 8, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.moveTo(130, 130);
-        ctx.lineTo(180, 170);
-        ctx.lineTo(130, 170);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 4) { // Google Maps icon
-        // Blue-ish background
-        ctx.fillStyle = '#4285F4';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Maps pin
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(128, 108, 40, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#EA4335';
-        ctx.beginPath();
-        ctx.moveTo(128, 108);
-        ctx.lineTo(128, 188);
-        ctx.lineTo(108, 168);
-        ctx.closePath();
-        ctx.fill();
-    } else if (buttonIndex === 5) { // Electron icon
-        // Teal background
-        ctx.fillStyle = '#47848F';
-        ctx.beginPath();
-        ctx.arc(128, 128, 90, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Electron orbits and nucleus
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 8;
-        
-        // Orbit 1
-        ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            
-        // Orbit 2
-            ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, Math.PI/3, 0, Math.PI * 2);
-            ctx.stroke();
-            
-        // Orbit 3
-            ctx.beginPath();
-        ctx.ellipse(128, 128, 70, 30, -Math.PI/3, 0, Math.PI * 2);
-            ctx.stroke();
-        
-        // Nucleus
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(128, 128, 20, 0, Math.PI * 2);
-        ctx.fill();
-    }
+    // Create a new image
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
     
-    // Create a texture from the canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    
-    return texture;
+    // Create a promise to handle async loading
+    return new Promise((resolve) => {
+        img.onload = function() {
+            // Draw image centered on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
+        
+        img.onerror = function() {
+            console.error('Error loading logo image for button index: ' + buttonIndex);
+            
+            // Fallback to simple shapes with colors based on button type
+            if (buttonIndex === 0) { // New Screen button
+                ctx.fillStyle = '#4CAF50'; // Green
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(64, 118, 128, 20);
+                ctx.fillRect(118, 64, 20, 128);
+            } else if (buttonIndex === 1) { // Delete button
+                ctx.fillStyle = '#F44336'; // Red
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.moveTo(88, 88);
+                ctx.lineTo(168, 168);
+                ctx.lineTo(158, 178);
+                ctx.lineTo(78, 98);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(168, 88);
+                ctx.lineTo(88, 168);
+                ctx.lineTo(78, 158);
+                ctx.lineTo(158, 78);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // For other buttons, create a generic icon
+                ctx.fillStyle = '#2196F3'; // Blue
+                ctx.beginPath();
+                ctx.arc(128, 128, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add button index
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '80px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(buttonIndex.toString(), 128, 128);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
+        
+        // Set image source
+        if (logoURLs[buttonIndex] !== undefined) {
+            img.src = logoURLs[buttonIndex];
+        } else {
+            // Fallback if no logo URL is available for this button index
+            img.onerror();
+        }
+    });
 }
 
 // Create a screen type selector with buttons for different content types
@@ -793,11 +762,10 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         button.add(shadowMesh);
         
         // Add icon to button - LARGER
-        const iconTexture = createButtonIcon(buttonIcons[index]);
         const iconSize = smallButtonSize * 0.8; // Keep at 0.8
         const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
         const iconMaterial = new THREE.MeshBasicMaterial({
-            map: iconTexture,
+            color: 0xffffff, // Default white color until texture loads
             transparent: true,
             side: THREE.DoubleSide
         });
@@ -806,6 +774,14 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         iconMesh.position.z = 0.004;
         iconMesh.renderOrder = 1006;
         button.add(iconMesh);
+        
+        // Load the icon texture asynchronously
+        createButtonIcon(buttonIcons[index]).then(iconTexture => {
+            iconMaterial.map = iconTexture;
+            iconMaterial.needsUpdate = true;
+        }).catch(error => {
+            console.error("Error loading button icon:", error);
+        });
         
         // Add label for each button with text shadow for better readability
         const labelCanvas = document.createElement('canvas');
@@ -1149,188 +1125,4 @@ export function floatAnimation() {
         // Use a much more subtle glow
         glowMesh.material.opacity = 0.03 + Math.sin(time * 0.0005) * 0.01;
     }
-}
-
-// Create buttons using AR icons from the assets folder
-export function createIconButtons(parentObj = null) {
-    console.log("Creating icon buttons from AR icons");
-    
-    // Create a container for the buttons
-    const buttonPanel = new THREE.Group();
-    
-    // Create panel background
-    const panelWidth = 0.4;
-    const panelHeight = 0.2;
-    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    
-    // Create a canvas texture for the panel with modern glass morphism style
-    const panelCanvas = document.createElement('canvas');
-    panelCanvas.width = 512;
-    panelCanvas.height = 256;
-    const panelCtx = panelCanvas.getContext('2d');
-    
-    // Draw rounded rectangle background
-    const cornerRadius = 40;
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height - cornerRadius);
-    panelCtx.quadraticCurveTo(panelCanvas.width, panelCanvas.height, panelCanvas.width - cornerRadius, panelCanvas.height);
-    panelCtx.lineTo(cornerRadius, panelCanvas.height);
-    panelCtx.quadraticCurveTo(0, panelCanvas.height, 0, panelCanvas.height - cornerRadius);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    
-    // Glass morphism style with gradient
-    const gradient = panelCtx.createLinearGradient(0, 0, 0, panelCanvas.height);
-    gradient.addColorStop(0, 'rgba(50, 55, 80, 0.85)'); // Smoky blue at top
-    gradient.addColorStop(1, 'rgba(30, 35, 60, 0.85)'); // Darker smoky blue at bottom
-    panelCtx.fillStyle = gradient;
-    panelCtx.fill();
-    
-    // Add subtle glass effect with highlights
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    panelCtx.beginPath();
-    panelCtx.moveTo(cornerRadius, 0);
-    panelCtx.lineTo(panelCanvas.width - cornerRadius, 0);
-    panelCtx.quadraticCurveTo(panelCanvas.width, 0, panelCanvas.width, cornerRadius);
-    panelCtx.lineTo(panelCanvas.width, panelCanvas.height/3);
-    panelCtx.lineTo(0, panelCanvas.height/3);
-    panelCtx.lineTo(0, cornerRadius);
-    panelCtx.quadraticCurveTo(0, 0, cornerRadius, 0);
-    panelCtx.closePath();
-    panelCtx.fill();
-    
-    // Add title
-    panelCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    panelCtx.font = '600 22px Inter, SF Pro Display, Segoe UI, Arial';
-    panelCtx.textAlign = 'center';
-    panelCtx.fillText('AR ICONS', panelCanvas.width/2, 36);
-    
-    // Add subtle line under the title
-    panelCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    panelCtx.lineWidth = 1;
-    panelCtx.beginPath();
-    panelCtx.moveTo(panelCanvas.width/2 - 100, 46);
-    panelCtx.lineTo(panelCanvas.width/2 + 100, 46);
-    panelCtx.stroke();
-    
-    const panelTexture = new THREE.CanvasTexture(panelCanvas);
-    const panelMaterial = new THREE.MeshBasicMaterial({
-        map: panelTexture,
-        transparent: true,
-        side: THREE.DoubleSide
-    });
-    
-    const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
-    panelMesh.renderOrder = 100;
-    buttonPanel.add(panelMesh);
-    
-    // Define the icons to use
-    const iconFiles = [
-        { file: 'DuckDuckGo_logo.png', action: 'search', label: 'Search' },
-        { file: 'youtube.png', action: 'youtube', label: 'YouTube' },
-        { file: 'maps.png', action: 'maps', label: 'Maps' },
-        { file: 'electron_app.png', action: 'app', label: 'App' },
-        { file: 'play-buttton.png', action: 'play', label: 'Play' },
-        { file: 'pause-button.png', action: 'pause', label: 'Pause' },
-        { file: 'mute.png', action: 'mute', label: 'Mute' },
-        { file: 'unmute.png', action: 'unmute', label: 'Unmute' },
-        { file: 'add.png', action: 'add', label: 'Add' },
-        { file: 'delete.png', action: 'delete', label: 'Delete' }
-    ];
-    
-    // Create loader for icon textures
-    const textureLoader = new THREE.TextureLoader();
-    
-    // Set the button size and layout 
-    const buttonSize = 0.05;
-    const columns = 5;
-    const padding = 0.01;
-    const startX = -panelWidth/2 + buttonSize + padding;
-    const startY = panelHeight/2 - buttonSize*1.8 - padding; // Leave space for title
-    
-    // Create buttons for each icon
-    iconFiles.forEach((icon, index) => {
-        const row = Math.floor(index / columns);
-        const col = index % columns;
-        
-        const x = startX + col * (buttonSize + padding*2);
-        const y = startY - row * (buttonSize + padding*2.5); // More space between rows for labels
-        
-        // Create button background (circle)
-        const buttonGeometry = new THREE.CircleGeometry(buttonSize/2, 32);
-        const buttonMaterial = new THREE.MeshBasicMaterial({
-            color: 0x333333,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        button.position.set(x, y, 0.001);
-        button.renderOrder = 101;
-        button.userData = {
-            type: 'button',
-            action: icon.action,
-            originalColor: 0x333333,
-            hoverColor: 0x555555,
-            isHovered: false,
-            isPressed: false
-        };
-        
-        // Load and add the icon texture
-        textureLoader.load(`examples/textures/ar_icons/${icon.file}`, (texture) => {
-            const iconGeometry = new THREE.PlaneGeometry(buttonSize, buttonSize);
-            const iconMaterial = new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.001;
-            iconMesh.renderOrder = 102;
-            button.add(iconMesh);
-        });
-        
-        // Add label text
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 128;
-        labelCanvas.height = 32;
-        const labelCtx = labelCanvas.getContext('2d');
-        
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = '12px Arial';
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        labelCtx.fillText(icon.label, labelCanvas.width/2, labelCanvas.height/2);
-        
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(buttonSize*1.5, buttonSize*0.5);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.set(0, -buttonSize*0.65, 0.001);
-        labelMesh.renderOrder = 102;
-        button.add(labelMesh);
-        
-        buttonPanel.add(button);
-    });
-    
-    // Position the panel - either add to parent or add to scene
-    if (parentObj && parentObj instanceof THREE.Object3D) {
-        parentObj.add(buttonPanel);
-    } else {
-        // Position in front of the camera
-        buttonPanel.position.set(0, 0, -0.8);
-        scene.add(buttonPanel);
-    }
-    
-    return buttonPanel;
 }

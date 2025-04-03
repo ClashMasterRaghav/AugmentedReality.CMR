@@ -9,7 +9,7 @@ import {
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
     createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
 } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton, controlPanel, handleIconButtonClick } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
@@ -311,11 +311,6 @@ function handleButtonAction(button) {
     
     console.log("Handling button action:", button.userData.action);
     
-    // Use the handleIconButtonClick for visual feedback if it's an AR icon button (no screen property)
-    if (button.userData.type === 'button' && !button.userData.screen) {
-        handleIconButtonClick(button);
-    }
-    
     // Extract the button action
     const action = button.userData.action;
     
@@ -447,41 +442,6 @@ function handleButtonAction(button) {
             console.log("Mute/unmute button pressed");
             if (videoControlFunctions.toggleMute) {
                 videoControlFunctions.toggleMute();
-            }
-            break;
-            
-        // New AR icon buttons
-        case 'search':
-            createDuckDuckGoScreen();
-            createNotification("Search screen created");
-            break;
-            
-        case 'youtube':
-            createYouTubeScreen();
-            createNotification("YouTube screen created");
-            break;
-            
-        case 'maps':
-            createGoogleMapsScreen();
-            createNotification("Maps screen created");
-            break;
-            
-        case 'app':
-            createElectronAppScreen();
-            createNotification("App screen created");
-            break;
-            
-        case 'add':
-            createNewBrowserScreen();
-            createNotification("New screen created");
-            break;
-            
-        case 'delete':
-            if (selectedScreen) {
-                deleteSelectedScreen();
-                createNotification("Screen deleted");
-            } else {
-                createNotification("No screen selected to delete", "warning");
             }
             break;
             
