@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-import { createControlPanel, setupControlPanel } from './ar_ui.js';
+import { createControlPanel } from './ar_ui.js';
 import { showNotification } from './ar_utils.js';
 import { updateVideoTextures } from './ar_media.js';
 import { createNewBrowserScreen, updateScreenEffects } from './ar_screens.js';
@@ -168,6 +168,38 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Setup and position the control panel
+function setupControlPanel() {
+    // If control panel exists (as a global variable), update its position
+    if (window.controlPanel) {
+        // Position control panel in front of camera
+        const controlPanel = window.controlPanel;
+        
+        // Create position in front of and slightly below camera
+        const position = new THREE.Vector3(0, -0.2, -0.8);
+        position.applyQuaternion(camera.quaternion);
+        position.add(camera.position);
+        
+        // Update position with smoothing
+        controlPanel.position.lerp(position, 0.3);
+        
+        // Make panel face the camera
+        controlPanel.lookAt(camera.position);
+    } else if (createControlPanel) {
+        // If panel doesn't exist yet, create it
+        window.controlPanel = createControlPanel();
+    }
+}
+
+// Animate floating motion for UI elements
+function floatAnimation() {
+    // Add subtle floating animation to control panel if it exists
+    if (window.controlPanel) {
+        // Gentle floating movement
+        window.controlPanel.position.y += Math.sin(Date.now() * 0.002) * 0.0005;
+    }
 }
 
 // Render function
