@@ -1,7 +1,8 @@
 // Electron app screen component for AR
 import * as THREE from "three";
 import { scene } from "./ar_core.js";
-import { selectScreen, screens } from "./ar_screens.js";
+// Remove circular dependency
+// import { selectScreen, screens } from "./ar_screens.js";
 import { enhancedCreateScreen, addDropShadow, animateScreenEntrance } from "./ar_default_screen.js";
 
 // Create an Electron app screen
