@@ -41,7 +41,6 @@ export let currentTime = 0;
 export let duration = 100; // Default duration if not available
 
 // Track screens using video
-const videoScreens = [];
 
 // Load video texture for AR content
 export function loadVideoTexture() {
