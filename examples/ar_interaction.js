@@ -938,16 +938,38 @@ function onTouchStart(event) {
             localPoint = screen.worldToLocal(localPoint.clone());
         }
         
-        // Screen dimensions
-        const screenHeight = 0.75; // Standard screen height
+        // Get screen dimensions from the actual geometry if possible
+        let screenHeight = 0.75; // Default
+        const screenMesh = screen.children.find(child => 
+            child.geometry && child.geometry.type === 'PlaneGeometry');
         
-        // Check if we're in the top 2/3 of the screen
-        // The top of the screen is at y = screenHeight/2
-        // The bottom of the draggable area is at y = screenHeight/2 - (screenHeight * 2/3)
-        if (localPoint.y > screenHeight/2 - (screenHeight * 1/10)) {
-            // We hit the draggable area
+        if (screenMesh && screenMesh.geometry) {
+            const size = new THREE.Vector3();
+            screenMesh.geometry.computeBoundingBox();
+            screenMesh.geometry.boundingBox.getSize(size);
+            screenHeight = size.y;
+        }
+        
+        // Check if we hit the drag handle specifically if it exists
+        const dragHandle = screen.userData.dragHandle || 
+                           screen.children.find(child => child.userData && child.userData.type === 'dragHandle');
+        
+        let hitDragHandle = false;
+        if (dragHandle) {
+            const handleIntersects = raycaster.intersectObject(dragHandle, true);
+            hitDragHandle = handleIntersects.length > 0;
+        }
+        
+        // Make the draggable area detection more generous - top 20% of screen
+        // This makes it easier to grab screens without being too precise
+        const dragAreaSize = screenHeight * 0.2;
+        const isInTopArea = localPoint.y > (screenHeight/2 - dragAreaSize);
+        
+        if (hitDragHandle || isInTopArea) {
+            // We hit the draggable area or a specific drag handle
             intersectedScreen = screen;
             draggableAreaHit = true;
+            console.log("Drag area detected:", hitDragHandle ? "direct handle hit" : "top area hit", localPoint);
             break;
         }
     }
@@ -960,6 +982,9 @@ function onTouchStart(event) {
         isDraggingHandle = true;
         draggedScreen = intersectedScreen;
         
+        // Store original position for reference
+        draggedScreen.userData.dragStartPosition = draggedScreen.position.clone();
+        
         // Preserve original scale
         if (!intersectedScreen.userData.originalScale) {
             intersectedScreen.userData.originalScale = intersectedScreen.scale.clone();
@@ -968,15 +993,32 @@ function onTouchStart(event) {
             intersectedScreen.scale.copy(intersectedScreen.userData.originalScale);
         }
         
-        // Select this screen
+        // Make sure this screen is selected and the selection is visible
         selectScreen(intersectedScreen);
         
-        // Calculate offset - use a fixed offset for better positioning
-        dragOffset.set(0, 0, 0);
+        // Calculate offset from hit point to screen center for more natural dragging
+        if (intersectedScreen.getWorldPosition) {
+            const screenWorldPos = new THREE.Vector3();
+            intersectedScreen.getWorldPosition(screenWorldPos);
+            dragOffset.copy(screenWorldPos).sub(raycaster.ray.origin);
+        } else {
+            // Fallback to a simple offset
+            dragOffset.set(0, 0, -0.5);
+        }
         
         // Visual feedback - highlight the top bar if available
         if (intersectedScreen.userData.dragHandle) {
+            // Store original color if not already stored
+            if (!intersectedScreen.userData.dragHandle.userData.originalColor) {
+                intersectedScreen.userData.dragHandle.userData.originalColor = 
+                    intersectedScreen.userData.dragHandle.material.color.clone();
+            }
+            
+            // Change to a brighter color for feedback
             intersectedScreen.userData.dragHandle.material.color.set(0x4CAF50); // Green for highlight
+            
+            // Scale up slightly for visual feedback
+            intersectedScreen.userData.dragHandle.scale.set(1.05, 1.05, 1.05);
         }
         
         // Strong haptic feedback to confirm grab
@@ -1113,167 +1155,69 @@ function flashScreenHighlight(screen) {
     requestAnimationFrame(fadeIn);
 }
 
-// Touch move handler - make the movement more responsive and direct
+// Touch move handler
 function onTouchMove(event) {
-    // Always prevent default to avoid browser gestures
+    if (!touchEnabled) return;
+    
     event.preventDefault();
     
-    // Make sure we have a valid touch point
+    // Update touch position
     const touch = event.touches[0];
-    if (!touch) {
-        return;
-    }
+    if (!touch) return;
     
     // Convert touch to normalized device coordinates
-    const previousTouchPosition = currentTouchPosition.clone();
     currentTouchPosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
     currentTouchPosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
     
-    // Handle control panel dragging
+    // Handle control panel dragging if active
     if (isPanelBeingDragged && controlPanel) {
-        // Update raycaster with current touch position
+        // Use the raycaster to project the touch into 3D space
         raycaster.setFromCamera(currentTouchPosition, camera);
         
-        // Get camera direction and up vectors
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        forward.y = 0; // Keep panel at a constant height relative to camera view
-        forward.normalize();
+        // Calculate the desired position based on the ray
+        const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const distance = 0.6; // Distance in front of camera
+        const targetPosition = new THREE.Vector3();
         
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        const up = new THREE.Vector3(0, 1, 0);
+        // Position in front of camera, compensating for panel drag offset
+        targetPosition.copy(camera.position)
+            .add(cameraDirection.clone().multiplyScalar(-distance));
         
-        // IMPROVED: Use same approach as screen dragging for more intuitive movement
-        // Calculate movement delta from touch (like screen dragging)
-        const deltaX = currentTouchPosition.x - previousTouchPosition.x;
-        const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+        // Set panel position with some smoothing
+        controlPanel.position.lerp(targetPosition, 0.5);
         
-        // Get camera's right and up vectors for moving in screen space
-        const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-        
-        // Scale factor for more responsive movement - INCREASED
-        const moveScale = 1.5; // Much more responsive movement
-        
-        // Create movement vector
-        const movement = new THREE.Vector3()
-            .addScaledVector(cameraRight, deltaX * moveScale)
-            .addScaledVector(cameraUp, deltaY * moveScale);
-        
-        // Apply movement directly for more responsive feel
-        controlPanel.position.add(movement);
-        
-        // Keep y position within reasonable bounds
-        controlPanel.position.y = THREE.MathUtils.clamp(controlPanel.position.y, -0.3, 0.4);
-        
-        // Always face the camera for better visibility
+        // Make panel face the camera
         controlPanel.lookAt(camera.position);
         
-        // Mark that the user has manually positioned the panel
-        controlPanel.userData.manuallyPositioned = true;
-        
-        // Visual feedback - show tiny movement indicator
-        const moveIndicatorSize = 0.01;
-        createMoveIndicator(controlPanel.position.clone(), moveIndicatorSize);
+        // Keep panel upright
+        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
+        euler.x = 0;
+        euler.z = 0;
+        controlPanel.quaternion.setFromEuler(euler);
         
         return;
     }
     
-    // Handle dragging via the drag handle - even more direct approach
+    // Handle screen dragging using the drag handle
     if (isDraggingHandle && draggedScreen) {
-        console.log("Moving screen via drag handle:", draggedScreen.userData.id);
-        
-        try {
-            // Preserve original scale
-            if (draggedScreen.userData && draggedScreen.userData.originalScale) {
-                // Ensure scale doesn't change during movement
-                draggedScreen.scale.copy(draggedScreen.userData.originalScale);
-            }
-            
-            // DIRECT MOVEMENT APPROACH - increased sensitivity for AR
-            // Calculate movement delta from touch
-            const deltaX = currentTouchPosition.x - previousTouchPosition.x;
-            const deltaY = currentTouchPosition.y - previousTouchPosition.y;
-            
-            // Get camera's right and up vectors for moving in screen space
-            const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-            const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-            
-            // Scale for more noticeable movement in AR - INCREASED for faster movement
-            const moveScale = 0.75; // Significantly increased for better AR response
-            
-            // Create movement vector
-            const movement = new THREE.Vector3()
-                .addScaledVector(cameraRight, deltaX * moveScale)
-                .addScaledVector(cameraUp, deltaY * moveScale);
-            
-            // Apply movement directly
-            draggedScreen.position.add(movement);
-            
-            // Make screen face the camera
-            draggedScreen.lookAt(camera.position);
-            
-            // Optional visual feedback
-            createMoveIndicator(draggedScreen.position.clone(), 0.03);
-            
-        } catch (error) {
-            console.error("Error in drag movement:", error);
+        // Use the specialized function for drag handle movement
+        handleDraggedScreenMovement();
+        return;
+    }
+    
+    // Other touch interactions
+    if (selectedScreen) {
+        // Handle screen rotation if in rotation mode
+        if (isRotatingScreen) {
+            rotateScreenWithTouch();
+            return;
         }
         
-        return;
-    }
-    
-    // We're not handling other forms of movement to simplify the interaction model
-    // This keeps the drag handle as the primary way to move screens, which improves reliability
-}
-
-// Move screen based on touch movement
-function moveScreenWithTouch() {
-    if (!selectedScreen) return;
-    
-    // Create more direct movement with less complexity
-    // Use a simplified approach that always works
-    
-    // Get the camera's forward and right vectors
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    
-    // Calculate the touch delta
-    const touchDelta = new THREE.Vector2(
-        currentTouchPosition.x - initialTouchPosition.x,
-        currentTouchPosition.y - initialTouchPosition.y
-    );
-    
-    // Scale the movement (adjust multiplier as needed)
-    const movementSpeed = 4.0;
-    
-    // Create movement vector in world space
-    const movement = new THREE.Vector3()
-        .addScaledVector(right, touchDelta.x * movementSpeed)
-        .addScaledVector(new THREE.Vector3(0, 1, 0), touchDelta.y * movementSpeed);
-    
-    // Apply movement directly
-    selectedScreen.position.add(movement);
-    
-    // Ensure screen always faces the camera
-    selectedScreen.lookAt(camera.position);
-    
-    // Keep the screen at a reasonable distance
-    const distanceToCamera = selectedScreen.position.distanceTo(camera.position);
-    if (distanceToCamera < 0.5 || distanceToCamera > 5) {
-        // Get direction from camera to screen
-        const direction = selectedScreen.position.clone().sub(camera.position).normalize();
-        
-        // Set new position at ideal distance
-        const idealDistance = THREE.MathUtils.clamp(distanceToCamera, 0.5, 5);
-        selectedScreen.position.copy(camera.position.clone().add(direction.multiplyScalar(idealDistance)));
-    }
-    
-    // Optional: Add visual feedback
-    createMoveIndicator(selectedScreen.position.clone(), 0.03);
-    
-    // Update control panel if needed
-    if (controlPanel && controlPanel.userData && controlPanel.userData.update) {
-        controlPanel.userData.update();
+        // Handle direct screen movement if moving screen
+        if (isTouchMovingScreen) {
+            moveScreenWithTouch();
+            return;
+        }
     }
 }
 
@@ -1390,8 +1334,18 @@ function onTouchEnd(event) {
         
         // Reset the drag handle appearance if it exists
         if (draggedScreen.userData.dragHandle) {
-            // Just reset the color without changing scale for top bar
-            draggedScreen.userData.dragHandle.material.color.set(0x333333); // Reset to original dark color
+            // Restore original color if stored
+            if (draggedScreen.userData.dragHandle.userData.originalColor) {
+                draggedScreen.userData.dragHandle.material.color.copy(
+                    draggedScreen.userData.dragHandle.userData.originalColor
+                );
+            } else {
+                // Default to a standard color
+                draggedScreen.userData.dragHandle.material.color.set(0x333333); 
+            }
+            
+            // Reset scale to original
+            draggedScreen.userData.dragHandle.scale.set(1.0, 1.0, 1.0);
         }
         
         // Save the current position in userData
