@@ -1,0 +1,438 @@
+// Default screen functionality for AR
+import * as THREE from "three";
+import { scene, camera } from "./ar_core.js";
+import { videoTexture } from "./ar_media.js";
+import { selectScreen } from "./ar_screens.js";
+
+// Create a default screen with standardized functionality
+export function createDefaultScreen(position = new THREE.Vector3(0, 0, -1.5), screenId) {
+    // Screen dimensions
+    const screenWidth = 1.0;
+    const screenHeight = 0.75;
+    const size = { x: screenWidth, y: screenHeight };
+    const title = `Screen ${screenId || "Default"}`;
+    
+    console.log("Creating default screen with video");
+    
+    // Create the screen container 
+    const defaultScreen = enhancedCreateScreen(
+        position,
+        size,
+        title,
+        videoTexture
+    );
+    
+    // Add basic identification data
+    defaultScreen.userData = { 
+        type: "screen",
+        id: screenId,
+        isSelected: false,
+        isInteractive: true,
+        originalScale: new THREE.Vector3(1, 1, 1),
+        contentType: "default"
+    };
+    
+    // Add drop shadow for depth
+    addDropShadow(defaultScreen, screenWidth, screenHeight);
+    
+    // Add border with styling
+    const borderGeometry = new THREE.PlaneGeometry(
+        screenWidth + 0.02,
+        screenHeight + 0.02
+    );
+    const borderMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x444444, // Dark gray border
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
+    borderPanel.position.z = -0.001;
+    defaultScreen.add(borderPanel);
+    
+    // Set up drag handle
+    const topBar = defaultScreen.children.find(
+        (child) => child.userData && child.userData.type === "dragHandle"
+    );
+    
+    if (topBar) {
+        topBar.userData.screen = defaultScreen;
+        defaultScreen.userData.dragHandle = topBar;
+    }
+    
+    // Add entrance animation
+    animateScreenEntrance(defaultScreen);
+    
+    console.log("Created default screen with ID:", defaultScreen.userData.id);
+    
+    return defaultScreen;
+}
+
+// Enhanced screen creation function with modern UI
+export function enhancedCreateScreen(position, size, title = "Screen", content = null) {
+    // Create the screen container
+    const screen = new THREE.Group();
+    
+    // Define screen dimensions
+    const screenWidth = size.x;
+    const screenHeight = size.y;
+    const topBarHeight = 0.06; // Thinner top bar
+    
+    // Content background - create this first so it's behind the top bar
+    const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    let backgroundMaterial;
+    
+    if (content && content.isTexture) {
+        // Use provided texture
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: content,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+    } else {
+        // Default subtle dark background with gradient
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 384;
+        const ctx = canvas.getContext("2d");
+        
+        // Create gradient background
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, "#1a1a2e");
+        gradient.addColorStop(1, "#16213e");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add subtle pattern
+        ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            const size = Math.random() * 3 + 1;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+    }
+    
+    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+    background.position.z = 0.003;
+    background.renderOrder = 1010;
+    screen.add(background);
+    
+    // Create a solid black top bar that spans the entire width
+    const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
+    const topBarMaterial = new THREE.MeshBasicMaterial({
+        color: 0x111111,
+        transparent: false,
+        side: THREE.DoubleSide,
+        depthTest: true
+    });
+    const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
+    topBar.position.set(0, screenHeight / 2 - topBarHeight / 2, 0.004);
+    topBar.renderOrder = 10;
+    topBar.userData = {
+        type: "dragHandle",
+        isTopBar: true,
+        screen: screen,
+        originalColor: topBarMaterial.color.getHex()
+    };
+    screen.add(topBar);
+    
+    // Create a modern grip pattern to indicate draggability
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    
+    // Create a gradient background for the top bar
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#1a1a2e");
+    gradient.addColorStop(1, "#0f3460");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add a subtle border at the bottom
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
+    
+    // Draw screen title with improved typography
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 26px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    // Add text shadow for better readability
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2);
+    ctx.shadowColor = "transparent";
+    
+    // Add modern grip indicator
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    const dotRadius = 1.5;
+    const dotSpacing = 12;
+    const dotsStartX = canvas.width - 100;
+    const dotsY = canvas.height / 2;
+    
+    // Draw the dots with a more modern arrangement
+    for (let i = 0; i < 3; i++) {
+        const x = dotsStartX + i * dotSpacing;
+        ctx.beginPath();
+        ctx.arc(x, dotsY, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Apply the canvas as a texture to the top bar
+    const topBarTexture = new THREE.CanvasTexture(canvas);
+    topBarTexture.anisotropy = 4;
+    topBarMaterial.map = topBarTexture;
+    topBarMaterial.needsUpdate = true;
+    
+    // Add video control buttons if content is a video texture
+    if (content && content.isVideoTexture) {
+        // Add play/pause button to bottom left
+        const playButton = addControlButton(
+            screen,
+            "pause",
+            -screenWidth / 2 + 0.05,
+            -screenHeight / 2 + 0.05,
+            0.03
+        );
+        playButton.userData.videoControl = true;
+        playButton.userData.videoAction = "togglePlayback";
+        playButton.userData.action = "playButton";
+        
+        // Add volume button to bottom right
+        const volumeButton = addControlButton(
+            screen,
+            "muted",
+            screenWidth / 2 - 0.05,
+            -screenHeight / 2 + 0.05,
+            0.03
+        );
+        volumeButton.userData.videoControl = true;
+        volumeButton.userData.videoAction = "toggleMute";
+        volumeButton.userData.action = "volumeButton";
+        
+        // Store controls in userData
+        screen.userData.controls = {
+            isPlaying: true,
+            isMuted: true,
+            playButton: playButton,
+            volumeButton: volumeButton
+        };
+    }
+    
+    // Position the entire screen
+    screen.position.copy(position);
+    
+    return screen;
+}
+
+// Add a control button to the screen
+function addControlButton(screen, type, x, y, size) {
+    // Create button with circular background
+    const buttonGeometry = new THREE.CircleGeometry(size, 32);
+    const buttonMaterial = new THREE.MeshBasicMaterial({
+        color: 0x333333,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    
+    const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    button.position.set(x, y, 0.005);
+    button.renderOrder = 1020;
+    button.userData = {
+        type: "button",
+        action: type
+    };
+    
+    // Create icon
+    createControlIcon(type).then(iconTexture => {
+        const iconSize = size * 0.8;
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            map: iconTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.z = 0.001;
+        button.add(iconMesh);
+    });
+    
+    screen.add(button);
+    return button;
+}
+
+// Create a control icon using a canvas
+function createControlIcon(type) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        
+        // Draw icon based on type
+        switch (type) {
+            case 'play':
+                ctx.beginPath();
+                ctx.moveTo(40, 30);
+                ctx.lineTo(100, 64);
+                ctx.lineTo(40, 98);
+                ctx.closePath();
+                ctx.fill();
+                break;
+                
+            case 'pause':
+                ctx.fillRect(35, 30, 20, 68);
+                ctx.fillRect(75, 30, 20, 68);
+                break;
+                
+            case 'volume':
+                // Speaker cone
+                ctx.beginPath();
+                ctx.moveTo(40, 45);
+                ctx.lineTo(55, 45);
+                ctx.lineTo(80, 30);
+                ctx.lineTo(80, 98);
+                ctx.lineTo(55, 83);
+                ctx.lineTo(40, 83);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Sound waves
+                ctx.beginPath();
+                ctx.arc(85, 64, 15, -Math.PI/3, Math.PI/3);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(85, 64, 25, -Math.PI/3, Math.PI/3);
+                ctx.stroke();
+                break;
+                
+            case 'muted':
+                // Speaker cone
+                ctx.beginPath();
+                ctx.moveTo(40, 45);
+                ctx.lineTo(55, 45);
+                ctx.lineTo(80, 30);
+                ctx.lineTo(80, 98);
+                ctx.lineTo(55, 83);
+                ctx.lineTo(40, 83);
+                ctx.closePath();
+                ctx.fill();
+                
+                // X mark
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(85, 45);
+                ctx.lineTo(105, 83);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(105, 45);
+                ctx.lineTo(85, 83);
+                ctx.stroke();
+                break;
+                
+            default:
+                // Default icon is a play button
+                ctx.beginPath();
+                ctx.moveTo(40, 30);
+                ctx.lineTo(100, 64);
+                ctx.lineTo(40, 98);
+                ctx.closePath();
+                ctx.fill();
+        }
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        resolve(texture);
+    });
+}
+
+// Add a drop shadow to the screen for depth perception
+function addDropShadow(screen, width, height) {
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = 512;
+    shadowCanvas.height = 512;
+    const ctx = shadowCanvas.getContext('2d');
+    
+    // Draw a gradient shadow
+    const gradient = ctx.createRadialGradient(256, 256, 50, 256, 256, 256);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+    
+    // Create shadow texture and mesh
+    const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
+    const shadowGeometry = new THREE.PlaneGeometry(width * 1.5, height * 1.5);
+    const shadowMaterial = new THREE.MeshBasicMaterial({
+        map: shadowTexture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    });
+    
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadow.position.z = -0.05;
+    shadow.renderOrder = 990;
+    screen.add(shadow);
+    
+    return shadow;
+}
+
+// Animate screen entrance with a scale-in effect
+function animateScreenEntrance(screen) {
+    // Start with a small scale
+    screen.scale.set(0.01, 0.01, 0.01);
+    
+    // Store original scale
+    const targetScale = new THREE.Vector3(1, 1, 1);
+    if (screen.userData && screen.userData.originalScale) {
+        targetScale.copy(screen.userData.originalScale);
+    }
+    
+    // Animate to full scale
+    const duration = 300; // milliseconds
+    const startTime = performance.now();
+    
+    function animate() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-out function
+        const scale = 1 - Math.pow(1 - progress, 3);
+        
+        // Apply scale
+        screen.scale.set(
+            scale * targetScale.x,
+            scale * targetScale.y,
+            scale * targetScale.z
+        );
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    
+    animate();
+} 
