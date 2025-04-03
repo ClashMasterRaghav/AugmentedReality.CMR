@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>AR Multi-Screen Experience</title>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0"
+		/>
+		<link type="text/css" rel="stylesheet" href="main.css" />
+		<style>
+			#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				color: #fff;
+				background-color: rgba(0, 0, 0, 0.5);
+				padding: 10px;
+				border-radius: 5px;
+				font-family: Arial, sans-serif;
+				pointer-events: none;
+				z-index: 100;
+			}
+			#info a {
+				color: #4af;
+				pointer-events: auto;
+			}
+			#startButton {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				padding: 12px 24px;
+				background-color: #4488ff;
+				color: white;
+				border: none;
+				border-radius: 5px;
+				font-size: 16px;
+				cursor: pointer;
+				z-index: 100;
+			}
+			/* Hidden video element for texture */
+			#videoElement {
+				display: none;
+			}
+			/* Loading message */
+			#loadingMessage {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #fff;
+				background-color: rgba(0, 0, 0, 0.7);
+				padding: 15px 30px;
+				border-radius: 10px;
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				z-index: 200;
+			}
+			/* Notification container */
+			#notificationContainer {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 80%;
+				max-width: 300px;
+				z-index: 300;
+				pointer-events: none;
+			}
+			.notification {
+				background-color: rgba(0, 0, 0, 0.7);
+				color: white;
+				margin-bottom: 10px;
+				padding: 10px 15px;
+				border-radius: 8px;
+				font-family: Arial, sans-serif;
+				text-align: center;
+				animation: fadeInOut 2s ease-in-out forwards;
+			}
+			@keyframes fadeInOut {
+				0% { opacity: 0; transform: translateY(20px); }
+				10% { opacity: 1; transform: translateY(0); }
+				90% { opacity: 1; transform: translateY(0); }
+				100% { opacity: 0; transform: translateY(-20px); }
+			}
+			/* Error message for unsupported browsers */
+			#errorMessage {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #fff;
+				background-color: rgba(255, 0, 0, 0.7);
+				padding: 20px 30px;
+				border-radius: 10px;
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				z-index: 300;
+				text-align: center;
+				display: none;
+			}
+			#errorMessage h2 {
+				margin-top: 0;
+			}
+			#errorMessage p {
+				margin-bottom: 20px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
+			AR Multi-Screen Experience<br />
+			Touch screens to select and move them
+		</div>
+
+		<!-- Hidden video element that will be used as texture -->
+		<video id="videoElement" loop crossorigin="anonymous" playsInline>
+			<source src="textures/ar_videos/ar_Tek_It.mp4" type="video/mp4">
+			<!-- Fallback to other videos if ar_videoplayback.mp4 is not found -->
+			<source src="textures/sintel.mp4" type="video/mp4">
+			<source src="textures/pano.mp4" type="video/mp4">
+		</video>
+		
+		<!-- Loading message -->
+		<div id="loadingMessage">Loading AR Experience...</div>
+		
+		<!-- Notification container -->
+		<div id="notificationContainer"></div>
+
+		<!-- Error message for unsupported browsers -->
+		<div id="errorMessage">
+			<h2>WebXR AR Not Supported</h2>
+			<p>Your browser or device does not support WebXR Augmented Reality.</p>
+			<p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+		</div>
+
+		<!-- Initial interaction trigger for video playback on mobile devices -->
+		<div id="interactionHelper" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+			background-color: rgba(0,0,0,0.8); z-index: 1000; color: white; text-align: center; padding-top: 40%;">
+			<h2>Tap to Enable Video</h2>
+			<p>Tap anywhere to start your AR experience with video and audio.</p>
+		</div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+
+		<!-- Use the main entry point file instead of ar_web.js -->
+		<script type="module" src="ar_main.js"></script>
+	</body>
+</html>
