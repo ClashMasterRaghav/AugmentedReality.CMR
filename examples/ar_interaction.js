@@ -231,6 +231,27 @@ function onSelect(event) {
         const screenObj = getScreenFromIntersect(screenIntersects[0].object);
         if (screenObj) {
             console.log(`Selected screen: ID=${screenObj.userData.id}`);
+            
+            // Check if this is a YouTube screen and has onClick functionality
+            if (screenObj.userData.contentType === 'youtube') {
+                console.log("YouTube screen clicked");
+                
+                // Find the background mesh with the video texture
+                const backgroundMesh = screenObj.children.find(child => 
+                    child.geometry && 
+                    child.geometry.type === 'PlaneGeometry' &&
+                    child.material && 
+                    child.material.map &&
+                    child.material.map.userData &&
+                    child.material.map.userData.isYouTube);
+                
+                if (backgroundMesh && backgroundMesh.material.map.userData.onClick) {
+                    console.log("Opening YouTube video URL");
+                    backgroundMesh.material.map.userData.onClick();
+                    return;
+                }
+            }
+            
             // Select screen and update global selectedScreen
             selectScreen(screenObj);
             
@@ -956,6 +977,36 @@ function onTouchStart(event) {
         const screen = closestHit.screen;
         
         console.log("Selected closest screen:", screen.userData.id, "at distance", closestHit.distance.toFixed(2));
+        
+        // Check if this is a YouTube screen that has click functionality
+        if (screen.userData.contentType === 'youtube') {
+            console.log("YouTube screen touched");
+            
+            // Find the background mesh with the video texture
+            const backgroundMesh = screen.children.find(child => 
+                child.geometry && 
+                child.geometry.type === 'PlaneGeometry' &&
+                child.material && 
+                child.material.map &&
+                child.material.map.userData &&
+                child.material.map.userData.isYouTube);
+            
+            if (backgroundMesh && backgroundMesh.material.map.userData.onClick) {
+                // Double tap to open video
+                if (doubleTapDetected) {
+                    console.log("Double tap on YouTube screen - opening video");
+                    backgroundMesh.material.map.userData.onClick();
+                    
+                    // Provide haptic feedback
+                    if (navigator.vibrate) {
+                        navigator.vibrate([30, 20, 30]);
+                    }
+                    
+                    createModeChangeIndicator('Opening YouTube Video...');
+                    return;
+                }
+            }
+        }
         
         // Select the screen
         selectScreen(screen);
