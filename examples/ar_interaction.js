@@ -10,7 +10,7 @@ import {
     createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, 
     createElectronAppScreen, createScreenFromButton, css3dScene
 } from './ar_screens.js';
-import { virtualKeyboard, showNotification, toggleModeButton, controlPanel, setButtonHover, setButtonPressed } from './ar_ui.js';
+import { virtualKeyboard, showNotification, toggleModeButton, controlPanel, setButtonHover, setButtonPressed, setupControlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
 
 // Touch interaction variables
@@ -1466,43 +1466,54 @@ export function deleteLastScreen() {
     if (screenToDelete.userData && screenToDelete.userData.hasRealContent && screenToDelete.userData.css3dObject) {
         console.log("Removing CSS3D object for screen:", screenToDelete.userData.id);
         
-        // Remove the CSS3D object from the css3dScene
-        // We import css3dScene directly from ar_screens.js
-        if (css3dScene) {
-            css3dScene.remove(screenToDelete.userData.css3dObject);
-        }
-        
-        // If the screen contains an iframe element, remove it from the DOM to prevent memory leaks
-        if (screenToDelete.userData.css3dObject.element) {
-            // Check if it's an iframe
-            if (screenToDelete.userData.css3dObject.element.tagName === 'IFRAME') {
-                console.log("Cleaning up iframe for screen:", screenToDelete.userData.id);
-                // Stop any media playback
-                screenToDelete.userData.css3dObject.element.src = 'about:blank';
-                
-                // Remove from DOM when safe to do so
-                setTimeout(() => {
+        try {
+            // Import css3dScene from ar_screens.js
+            if (css3dScene && screenToDelete.userData.css3dObject) {
+                css3dScene.remove(screenToDelete.userData.css3dObject);
+                console.log("Removed CSS3D object from scene");
+            } else {
+                console.warn("css3dScene unavailable or css3dObject not found");
+            }
+            
+            // If the screen contains an iframe element, remove it from the DOM to prevent memory leaks
+            if (screenToDelete.userData.css3dObject && screenToDelete.userData.css3dObject.element) {
+                // Check if it's an iframe
+                if (screenToDelete.userData.css3dObject.element.tagName === 'IFRAME') {
+                    console.log("Cleaning up iframe for screen:", screenToDelete.userData.id);
+                    // Stop any media playback
+                    screenToDelete.userData.css3dObject.element.src = 'about:blank';
+                    
+                    // Remove from DOM immediately
                     if (screenToDelete.userData.css3dObject.element.parentNode) {
                         screenToDelete.userData.css3dObject.element.parentNode.removeChild(
                             screenToDelete.userData.css3dObject.element
                         );
                     }
-                }, 100);
+                }
+                
+                // Explicitly release the reference
+                screenToDelete.userData.css3dObject.element = null;
             }
+        } catch (error) {
+            console.error("Error cleaning up CSS3D object:", error);
         }
         
         // Dispose of any textures on the screen
-        screenToDelete.traverse(child => {
-            if (child.material && child.material.map) {
-                child.material.map.dispose();
-            }
-            if (child.geometry) {
-                child.geometry.dispose();
-            }
-            if (child.material) {
-                child.material.dispose();
-            }
-        });
+        try {
+            screenToDelete.traverse(child => {
+                if (child.material && child.material.map) {
+                    child.material.map.dispose();
+                }
+                if (child.geometry) {
+                    child.geometry.dispose();
+                }
+                if (child.material) {
+                    child.material.dispose();
+                }
+            });
+        } catch (error) {
+            console.error("Error disposing screen resources:", error);
+        }
         
         // Clear references
         screenToDelete.userData.css3dObject = null;
@@ -1538,6 +1549,13 @@ export function deleteLastScreen() {
     if (navigator.vibrate) {
         navigator.vibrate([30, 20, 40]); // Pattern for "delete" feel
     }
+    
+    // Update the control panel to ensure it's visible after deletion
+    setTimeout(() => {
+        if (typeof setupControlPanel === 'function') {
+            setupControlPanel();
+        }
+    }, 100);
     
     const screenId = screenToDelete.userData && screenToDelete.userData.id !== undefined ? 
         screenToDelete.userData.id : 'unknown';

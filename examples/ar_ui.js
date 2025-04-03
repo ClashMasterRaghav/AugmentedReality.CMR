@@ -172,40 +172,40 @@ export function createControlPanel() {
         manuallyPositioned: false
     };
     
-    // Create panel body
-    const panelWidth = 0.5;
-    const panelHeight = 0.3;
+    // Create panel body - LARGER SIZE
+    const panelWidth = 0.6;  // Increased from 0.5
+    const panelHeight = 0.4; // Increased from 0.3
     const panelDepth = 0.01;
     
     // Create a rounded rectangle texture for the panel
     const panelTexture = createRoundedRectTexture(
         512, 512, 
         30, // Corner radius 
-        'rgba(10, 20, 40, 0.6)', // Main panel color - transparent dark blue
-        'rgba(30, 80, 140, 0.7)', // Gradient color - lighter blue
-        2, // Border size
-        'rgba(70, 140, 230, 0.8)' // Border color - highlight blue
+        'rgba(10, 20, 40, 0.85)', // Main panel color - MORE OPAQUE
+        'rgba(30, 80, 140, 0.9)', // Gradient color - MORE OPAQUE
+        3, // Border size - INCREASED
+        'rgba(70, 140, 230, 1.0)' // Border color - FULL OPACITY
     );
     
     const panelMaterial = new THREE.MeshBasicMaterial({
         map: panelTexture,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.95, // Higher opacity
         depthWrite: false  // This helps with transparency rendering
     });
     
-    // Create a subtle background glow effect
-    const glowSize = 30; // Size of the glow effect
+    // Create a stronger background glow effect
+    const glowSize = 40; // Increased size
     const glowTexture = createGlowTexture(
         512 + glowSize*2, 
         512 + glowSize*2, 
-        'rgba(40, 120, 200, 0.15)' // Light blue glow
+        'rgba(60, 140, 230, 0.25)' // Brighter, more visible glow
     );
     
     const glowMaterial = new THREE.MeshBasicMaterial({
         map: glowTexture,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.8, // Increased opacity
         depthWrite: false
     });
     
@@ -213,12 +213,16 @@ export function createControlPanel() {
     const panelMesh = new THREE.Mesh(panelGeometry, panelMaterial);
     
     // Add slight larger glow behind panel
-    const glowGeometry = new THREE.PlaneGeometry(panelWidth * 1.15, panelHeight * 1.15);
+    const glowGeometry = new THREE.PlaneGeometry(panelWidth * 1.2, panelHeight * 1.2); // Larger glow
     const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
     glowMesh.position.z = -0.005; // Position slightly behind the panel
     
     controlPanel.add(glowMesh);
     controlPanel.add(panelMesh);
+    
+    // Add buttons to control panel - INCREASE RENDER ORDER for better visibility
+    panelMesh.renderOrder = 1000;
+    glowMesh.renderOrder = 999;
     
     // Add buttons to control panel
     const buttonSize = panelHeight / 6;
@@ -312,6 +316,10 @@ export function createControlPanel() {
     
     // Add control panel to scene and return it
     scene.add(controlPanel);
+    
+    // Log success message
+    console.log("Control panel created successfully");
+    
     return controlPanel;
 }
 
@@ -815,13 +823,12 @@ export function setButtonPressed(button, isPressed) {
     }
 }
 
-// Position control panel in front of user
+// Setup the control panel - can be called multiple times to reposition
 export function setupControlPanel() {
-    // First, check if there's already a control panel in the scene
-    // If we have a reference but it's not actually in the scene, clear it
-    if (controlPanel && !scene.children.includes(controlPanel)) {
-        console.log("Control panel reference exists but not in scene - recreating");
-        controlPanel = null;
+    // Don't try to set up control panel if no camera or scene
+    if (!camera || !scene) {
+        console.log("Cannot setup control panel - camera or scene not initialized");
+        return;
     }
     
     // Remove ALL existing control panels from the scene to prevent duplicates
@@ -844,31 +851,35 @@ export function setupControlPanel() {
     
     // Position the control panel appropriately
     if (controlPanel) {
-    // Position in front and below the user
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
-    cameraDirection.applyQuaternion(camera.quaternion);
-    
-    const targetPosition = new THREE.Vector3();
-        const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        // Position more directly in front of the camera for better visibility
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(camera.quaternion);
         
-        // Ensure the direction is always away from the camera
-        const distance = -0.6; // Negative distance to move away from camera
-        targetPosition.copy(camera.position).add(cameraForward.multiplyScalar(distance));
+        // Calculate position in front of camera (closer than before)
+        const targetPosition = new THREE.Vector3();
+        targetPosition.copy(camera.position).addScaledVector(cameraDirection, 0.5); // Moved closer (0.5m instead of 0.6m)
         
-        // Always keep panel below the user's view
-        targetPosition.y = camera.position.y - 0.4;
+        // Don't position it as low - keep it more in center view
+        targetPosition.y = camera.position.y - 0.2; // Reduced vertical offset from 0.4 to 0.2
         
-        // Set position directly - no lerping needed for initial positioning
+        // Set position directly
         controlPanel.position.copy(targetPosition);
         
-        // Update panel rotation to face user
+        // Make panel face the camera
         controlPanel.lookAt(camera.position);
-    
-    // Keep panel facing the user but upright
-    const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-    euler.x = 0; // Keep panel upright (no tilt)
-    euler.z = 0; // No roll
-    controlPanel.quaternion.setFromEuler(euler);
+        
+        // Keep panel facing the user but upright
+        const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
+        euler.x = 0; // Keep panel upright (no tilt)
+        euler.z = 0; // No roll
+        controlPanel.quaternion.setFromEuler(euler);
+        
+        // Log position for debugging
+        console.log("Control panel positioned at:", 
+            controlPanel.position.x.toFixed(2), 
+            controlPanel.position.y.toFixed(2), 
+            controlPanel.position.z.toFixed(2)
+        );
     }
 }
 

@@ -28,6 +28,9 @@ export let isARMode = false;
 export let lastCameraPosition = new THREE.Vector3();
 export let lastCameraRotation = new THREE.Euler();
 
+// Frame counter for optimizing updates
+let frameCount = 0;
+
 // Track if the AR application has been initialized
 let isARInitialized = false;
 
@@ -273,9 +276,9 @@ export function render() {
     const currentCameraPosition = camera.position.clone();
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
-    // Calculate movement thresholds
-    const positionThreshold = 0.7; // Increased from 0.5 for less frequent updates
-    const rotationThreshold = 0.4; // Increased from 0.3 for less frequent updates
+    // Calculate movement thresholds - REDUCED for more frequent updates
+    const positionThreshold = 0.2; // Reduced from 0.7 to 0.2
+    const rotationThreshold = 0.15; // Reduced from 0.4 to 0.15
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
@@ -290,6 +293,15 @@ export function render() {
         // Update last known position and rotation
         lastCameraPosition.copy(currentCameraPosition);
         lastCameraRotation.copy(currentCameraRotation);
+    }
+    
+    // Always update control panel position in EVERY frame when in AR mode
+    if (renderer.xr.isPresenting && controlPanel) {
+        // Update less frequently to avoid performance issues (every 30 frames)
+        if (frameCount % 30 === 0) {
+            setupControlPanel();
+        }
+        frameCount++;
     }
     
     // Add subtle floating animation to control panel
