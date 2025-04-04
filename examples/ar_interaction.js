@@ -46,27 +46,29 @@ let videoControlFunctions = {
 
 // Setup event listeners
 export function setupEventListeners() {
-    console.log("Setting up event listeners...");
+    console.log("Setting up AR event listeners...");
     
     try {
-        // Controller events - only add if controller exists
-        if (controller) {
+        // Check if controller is defined before adding event listeners
+        if (typeof controller !== 'undefined' && controller) {
+            console.log("Adding event listeners to controller");
+            // Controller events
             controller.addEventListener('select', onSelect);
             controller.addEventListener('selectstart', onSelectStart);
             controller.addEventListener('selectend', onSelectEnd);
-            console.log("Controller event listeners added");
         } else {
-            console.warn("Controller is not available - controller events not set up");
+            console.error("Controller is undefined, cannot add event listeners");
         }
         
-        // Touch events - only add if renderer dom element exists
-        if (renderer && renderer.domElement) {
+        // Check if renderer and its domElement are defined before adding event listeners
+        if (typeof renderer !== 'undefined' && renderer && renderer.domElement) {
+            console.log("Adding touch event listeners to renderer.domElement");
+            // Touch events
             renderer.domElement.addEventListener('touchstart', onTouchStart, false);
             renderer.domElement.addEventListener('touchmove', onTouchMove, false);
             renderer.domElement.addEventListener('touchend', onTouchEnd, false);
-            console.log("Touch event listeners added");
         } else {
-            console.warn("Renderer DOM element is not available - touch events not set up");
+            console.error("Renderer or renderer.domElement is undefined, cannot add touch event listeners");
         }
         
         console.log("Event listeners set up successfully");
@@ -333,7 +335,7 @@ function onSelect(event) {
                 // Try to relay the interaction to iframe content if applicable
                 if (relayInteractionToIframe(screen, intersect, 'click')) {
                     // Interaction was handled by iframe
-                    return;
+            return;
                 }
                 
                 // Handle screen control buttons and interaction zones if not handled by iframe
@@ -361,15 +363,15 @@ function onSelect(event) {
                         // Handle video play/pause button
                         if (videoControlFunctions.togglePlayback) {
                             videoControlFunctions.togglePlayback();
-                        } else {
+        } else {
                             console.warn("Video playback function not available");
-                        }
+        }
                     }
                     else if (intersect.object.userData.action === 'volumeButton') {
                         // Handle volume mute/unmute button
                         if (videoControlFunctions.toggleMute) {
                             videoControlFunctions.toggleMute();
-                        } else {
+    } else {
                             console.warn("Video mute function not available");
                         }
                     }

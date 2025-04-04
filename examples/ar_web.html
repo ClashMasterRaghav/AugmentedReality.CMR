@@ -5,63 +5,9 @@
 		<meta charset="utf-8" />
 		<meta
 			name="viewport"
-			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+			content="width=device-width, initial-scale=1.0"
 		/>
 		<link type="text/css" rel="stylesheet" href="main.css" />
-		<!-- Polyfills for older browsers -->
-		<script>
-			// Check if the browser supports various features
-			window.addEventListener('DOMContentLoaded', function() {
-				// Check if WebXR is likely to be supported
-				var webXRSupported = 'xr' in navigator;
-				if (!webXRSupported) {
-					console.warn('WebXR API not detected - app may not function properly');
-				}
-				
-				// Check for required features and add fallbacks/polyfills if needed
-				if (!window.Promise) {
-					console.warn('Promise not supported - adding polyfill');
-					document.write('<script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"><\/script>');
-				}
-				
-				// Add error handler for unexpected errors
-				window.addEventListener('error', function(event) {
-					console.error('Global error:', event.error || event.message);
-					showErrorMessage('Application Error', event.error?.message || event.message || 'Unknown error occurred');
-				});
-			});
-			
-			// Helper function to show errors
-			function showErrorMessage(title, message) {
-				var errorDiv = document.getElementById('errorMessage');
-				if (!errorDiv) {
-					errorDiv = document.createElement('div');
-					errorDiv.id = 'errorMessage';
-					errorDiv.style.position = 'absolute';
-					errorDiv.style.top = '50%';
-					errorDiv.style.left = '50%';
-					errorDiv.style.transform = 'translate(-50%, -50%)';
-					errorDiv.style.color = '#fff';
-					errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
-					errorDiv.style.padding = '20px';
-					errorDiv.style.borderRadius = '10px';
-					errorDiv.style.fontFamily = 'Arial, sans-serif';
-					errorDiv.style.fontSize = '18px';
-					errorDiv.style.textAlign = 'center';
-					errorDiv.style.zIndex = '1000';
-					document.body.appendChild(errorDiv);
-				}
-				
-				errorDiv.innerHTML = '<h2>' + title + '</h2><p>' + message + '</p>';
-				errorDiv.style.display = 'block';
-				
-				// Hide loading message if it exists
-				var loadingMessage = document.getElementById('loadingMessage');
-				if (loadingMessage) {
-					loadingMessage.style.display = 'none';
-				}
-			}
-		</script>
 		<style>
 			#info {
 				position: absolute;
@@ -157,7 +103,7 @@
 		</div>
 
 		<!-- Hidden video element that will be used as texture -->
-		<video id="videoElement" loop crossorigin="anonymous" playsInline muted>
+		<video id="videoElement" loop crossorigin="anonymous" playsInline>
 			<source src="textures/ar_videos/ar_Tek_It.mp4" type="video/mp4">
 			<!-- Fallback to other videos if ar_videoplayback.mp4 is not found -->
 			<source src="textures/sintel.mp4" type="video/mp4">

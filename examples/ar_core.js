@@ -83,26 +83,36 @@ function initAREnvironment() {
     container.appendChild(renderer.domElement);
 
     // AR Button with session end event handling
-    const arButton = ARButton.createButton(renderer, {
-        optionalFeatures: ['dom-overlay'],
-        domOverlay: { root: document.body }
-    });
-    
-    document.body.appendChild(arButton);
-    
-    // Add event listener for session start
-    renderer.xr.addEventListener('sessionstart', function() {
-        console.log("AR session started - showing panel instructions");
-        // Show instructions for draggable panel after a short delay
-        showControlPanelInstructions();
-    });
-    
-    // Add event listener for session end
-    renderer.xr.addEventListener('sessionend', function() {
-        console.log("AR session ended");
-        // Reload the page to return to initial state
-        window.location.reload();
-    });
+    try {
+        const arButton = ARButton.createButton(renderer, {
+            optionalFeatures: ['dom-overlay'],
+            domOverlay: { root: document.body }
+        });
+        
+        document.body.appendChild(arButton);
+        
+        // Add event listener for session start
+        if (renderer && renderer.xr) {
+            renderer.xr.addEventListener('sessionstart', function() {
+                console.log("AR session started - showing panel instructions");
+                // Show instructions for draggable panel after a short delay
+                if (typeof showControlPanelInstructions === 'function') {
+                    showControlPanelInstructions();
+                }
+            });
+            
+            // Add event listener for session end
+            renderer.xr.addEventListener('sessionend', function() {
+                console.log("AR session ended");
+                // Reload the page to return to initial state
+                window.location.reload();
+            });
+        } else {
+            console.error("renderer.xr is not available");
+        }
+    } catch (error) {
+        console.error("Error setting up AR button or XR session:", error);
+    }
 
     // Load font for text
     const fontLoader = new FontLoader();
@@ -111,8 +121,12 @@ function initAREnvironment() {
         console.log("Font loaded successfully");
         // Create UI controls once font is loaded
         try {
-            createControlPanel();
-            createVirtualKeyboard();
+            if (typeof createControlPanel === 'function') {
+                createControlPanel();
+            }
+            if (typeof createVirtualKeyboard === 'function') {
+                createVirtualKeyboard();
+            }
             console.log("UI controls created successfully");
         } catch (error) {
             console.error("Error creating UI controls:", error);
@@ -121,76 +135,103 @@ function initAREnvironment() {
 
     // Controller setup
     try {
-        controller = renderer.xr.getController(0);
-        
-        if (controller) {
+        if (renderer && renderer.xr) {
+            controller = renderer.xr.getController(0);
+            
             // Add controller event listeners
-            controller.addEventListener('selectstart', function() {
-                controller.userData.isSelecting = true;
-            });
-            
-            controller.addEventListener('selectend', function() {
-                controller.userData.isSelecting = false;
-            });
-            
-            scene.add(controller);
-            
-            // Pointer for interaction - SMALLER SIZE
-            const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-            const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-            const pointer = new THREE.Mesh(geometry, material);
-            pointer.position.z = -0.1;
-            controller.add(pointer);
+            if (controller) {
+                controller.addEventListener('selectstart', function() {
+                    if (controller.userData) {
+                        controller.userData.isSelecting = true;
+                    }
+                });
+                
+                controller.addEventListener('selectend', function() {
+                    if (controller.userData) {
+                        controller.userData.isSelecting = false;
+                    }
+                });
+                
+                scene.add(controller);
+                
+                // Controller model
+                const controllerModelFactory = new XRControllerModelFactory();
+                controllerGrip = renderer.xr.getControllerGrip(0);
+                if (controllerGrip) {
+                    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+                    scene.add(controllerGrip);
+                }
+
+                // Pointer for interaction - SMALLER SIZE
+                const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+                const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+                const pointer = new THREE.Mesh(geometry, material);
+                pointer.position.z = -0.1;
+                controller.add(pointer);
+            } else {
+                console.error("Controller is not available");
+            }
         } else {
-            console.warn("XR controller not available - touch input will be used instead");
-        }
-        
-        // Controller model
-        controllerGrip = renderer.xr.getControllerGrip(0);
-        if (controllerGrip) {
-            const controllerModelFactory = new XRControllerModelFactory();
-            controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-            scene.add(controllerGrip);
+            console.error("renderer.xr is not available for controller setup");
         }
     } catch (error) {
-        console.error("Error setting up XR controller:", error);
-        // Create a fallback controller for debugging
-        controller = new THREE.Group();
-        controller.userData = { isSelecting: false };
-        scene.add(controller);
+        console.error("Error setting up controller:", error);
     }
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
     // Initialize UI elements
-    initUI();
+    if (typeof initUI === 'function') {
+        initUI();
+    } else {
+        console.warn("initUI function not available");
+    }
     
     // Preload video texture right after scene setup
     console.log("Initializing video functionality");
-    const videoTexture = loadVideoTexture();
+    let videoTexture;
+    try {
+        if (typeof loadVideoTexture === 'function') {
+            videoTexture = loadVideoTexture();
+        } else {
+            console.warn("loadVideoTexture function not available");
+        }
+    } catch (error) {
+        console.error("Error loading video texture:", error);
+    }
     
     // Connect video controls to the interaction module
     try {
-        setupVideoControls({
-            toggleVideoPlayback,
-            toggleVideoMute
-        });
-        console.log("Video controls connected successfully");
+        if (typeof setupVideoControls === 'function') {
+            setupVideoControls({
+                toggleVideoPlayback: typeof toggleVideoPlayback === 'function' ? toggleVideoPlayback : null,
+                toggleVideoMute: typeof toggleVideoMute === 'function' ? toggleVideoMute : null
+            });
+            console.log("Video controls connected successfully");
+        } else {
+            console.warn("setupVideoControls function not available");
+        }
     } catch (error) {
         console.error("Error connecting video controls:", error);
     }
     
     // Setup event listeners
     try {
-        setupEventListeners();
-        console.log("Event listeners set up successfully");
+        if (typeof setupEventListeners === 'function') {
+            setupEventListeners();
+            console.log("Event listeners set up successfully");
+        } else {
+            console.warn("setupEventListeners function not available");
+        }
     } catch (error) {
         console.error("Error setting up event listeners:", error);
     }
     
     // Start animation loop
-    renderer.setAnimationLoop(animate);
+    if (renderer) {
+        renderer.setAnimationLoop(animate);
+    }
     
     // Create initial screen
     try {
@@ -199,8 +240,22 @@ function initAREnvironment() {
         console.error("Error creating start screen:", error);
         // Try fallback to browser screen if default screen fails
         try {
-            createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
-            console.log("Created fallback browser screen");
+            if (typeof createNewBrowserScreen === 'function') {
+                createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+                console.log("Created fallback browser screen");
+            } else {
+                console.warn("createNewBrowserScreen function not available");
+                // Create a simple fallback screen if nothing else works
+                const geometry = new THREE.PlaneGeometry(1, 0.75);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: 0x0000ff,
+                    side: THREE.DoubleSide
+                });
+                const fallbackScreen = new THREE.Mesh(geometry, material);
+                fallbackScreen.position.set(0, 0, -1.5);
+                scene.add(fallbackScreen);
+                console.log("Created emergency fallback screen");
+            }
         } catch (fallbackError) {
             console.error("Error creating fallback screen:", fallbackError);
         }
