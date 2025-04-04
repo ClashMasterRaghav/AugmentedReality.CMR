@@ -283,7 +283,7 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+    const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
     
     // Set up control panel initial position
     setTimeout(setupControlPanel, 500);

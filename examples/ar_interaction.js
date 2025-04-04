@@ -102,17 +102,77 @@ function getButtonFromIntersect(object) {
         return object.parent.parent;
     }
     
-    // Traverse up to find a button (up to 5 levels)
+    // Traverse up to find a button (up to 7 levels deep now)
     let current = object;
     let level = 0;
     
-    while (current.parent && level < 5) {
+    while (current.parent && level < 7) {
         current = current.parent;
         level++;
         
         if (current.userData && current.userData.type === 'button') {
             console.log(`Found button at level ${level}:`, current.userData.action);
             return current;
+        }
+    }
+    
+    // Special handling for control panel buttons - check sibling elements
+    // This helps when hitting transparent parts or edges of buttons
+    if (object.parent) {
+        const siblings = object.parent.children || [];
+        for (let i = 0; i < siblings.length; i++) {
+            const sibling = siblings[i];
+            if (sibling.userData && sibling.userData.type === 'button') {
+                // Check proximity - the button should be very close to the hit object
+                const hitPosition = new THREE.Vector3();
+                const buttonPosition = new THREE.Vector3();
+                
+                object.getWorldPosition(hitPosition);
+                sibling.getWorldPosition(buttonPosition);
+                
+                const distance = hitPosition.distanceTo(buttonPosition);
+                if (distance < 0.2) { // Within 20cm, generous for control panel
+                    console.log("Found nearby button sibling:", sibling.userData.action);
+                    return sibling;
+                }
+            }
+        }
+        
+        // Check if parent is the control panel
+        if (object.parent.userData && object.parent.userData.type === 'controlPanel') {
+            // Search all descendant buttons of the control panel
+            let closestButton = null;
+            let closestDistance = 0.2; // Initial max distance (20cm)
+            const hitPosition = new THREE.Vector3();
+            object.getWorldPosition(hitPosition);
+            
+            // Function to recursively search for the closest button
+            function findClosestButton(parent) {
+                if (!parent.children) return;
+                
+                parent.children.forEach(child => {
+                    if (child.userData && child.userData.type === 'button') {
+                        const buttonPosition = new THREE.Vector3();
+                        child.getWorldPosition(buttonPosition);
+                        const distance = hitPosition.distanceTo(buttonPosition);
+                        
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestButton = child;
+                        }
+                    }
+                    
+                    // Recursively check children
+                    findClosestButton(child);
+                });
+            }
+            
+            findClosestButton(object.parent);
+            
+            if (closestButton) {
+                console.log("Found closest control panel button:", closestButton.userData.action, "distance:", closestDistance);
+                return closestButton;
+            }
         }
     }
     
@@ -162,11 +222,44 @@ function getButtonFromIntersect(object) {
                         child.getWorldPosition(buttonPoint);
                         
                         const distance = hitPoint.distanceTo(buttonPoint);
-                        if (distance < 0.05) { // If within 5cm
+                        if (distance < 0.08) { // If within 8cm (increased from 5cm)
                             console.log("Found nearby button:", child.userData.action, "distance:", distance);
                             return child;
                         }
                     }
+                }
+            }
+            
+            // Check for recursive buttons inside screen components
+            const buttonsList = [];
+            screen.traverse((obj) => {
+                if (obj.userData && obj.userData.type === 'button') {
+                    buttonsList.push(obj);
+                }
+            });
+            
+            if (buttonsList.length > 0) {
+                // Find the closest button
+                const hitPoint = new THREE.Vector3();
+                object.getWorldPosition(hitPoint);
+                
+                let closestButton = null;
+                let closestDistance = 0.1; // 10cm threshold
+                
+                buttonsList.forEach(button => {
+                    const buttonPoint = new THREE.Vector3();
+                    button.getWorldPosition(buttonPoint);
+                    
+                    const distance = hitPoint.distanceTo(buttonPoint);
+                    if (distance < closestDistance) {
+                        closestButton = button;
+                        closestDistance = distance;
+                    }
+                });
+                
+                if (closestButton) {
+                    console.log("Found closest screen button:", closestButton.userData.action, "distance:", closestDistance);
+                    return closestButton;
                 }
             }
         }
@@ -199,66 +292,138 @@ function onSelect(event) {
     // Find intersections with all objects in the scene
     const intersects = raycaster.intersectObjects(scene.children, true);
     
+    // Process the first valid intersection
     if (intersects.length > 0) {
-        // Get first intersection
         const intersect = intersects[0];
+        const object = intersect.object;
         
-        // If this is a button
-        const button = getButtonFromIntersect(intersect.object);
-        if (button) {
-            handleButtonAction(button);
-            return;
+        // If we click on a screen, select it
+        let screenFound = false;
+        let screen = null;
+        let target = object;
+        
+        // Traverse up to find the screen object
+        for (let i = 0; i < 5; i++) {
+            if (!target) break;
+            
+            if (target.userData && target.userData.type === 'screen') {
+                screen = target;
+                screenFound = true;
+                break;
+            }
+            target = target.parent;
         }
         
-        // If this is a screen - get the parent screen object
-        const screen = getScreenFromIntersect(intersect.object);
-        if (screen) {
-            // If the screen is already selected, check for control buttons or video player interaction
-            if (screen.userData.isSelected) {
+        if (screenFound) {
+            // Select this screen
+            console.log("Selected screen:", screen.userData.id);
+            selectScreen(screen);
+            
+            // Prevent double handling of screen buttons
+            if (object.userData && object.userData.type === 'button') {
+                console.log("Button in screen clicked");
                 
-                // Try to relay the interaction to iframe content if applicable
-                if (relayInteractionToIframe(screen, intersect, 'click')) {
-                    // Interaction was handled by iframe
-                    return;
-                }
-                
-                // Handle screen control buttons and interaction zones if not handled by iframe
-                
-                // Find if the intersection is with a control button
-                if (intersect.object.userData && 
-                    intersect.object.userData.type === 'button') {
+                // Check if it's a video control button
+                if (object.userData.videoControl) {
+                    const action = object.userData.videoAction;
+                    const videoTexture = screen.children[0].material.map;
                     
-                    // Handle specific button actions
-                    if (intersect.object.userData.action === 'close') {
-                        // Handle close button
-                        scene.remove(screen);
-                        screens.splice(screens.indexOf(screen), 1);
-                        setSelectedScreen(null);
-                    } 
-                    else if (intersect.object.userData.action === 'minimize') {
-                        // Handle minimize button
-                        toggleMinimize(screen);
-                    } 
-                    else if (intersect.object.userData.action === 'maximize') {
-                        // Handle maximize/fullscreen button
-                        toggleFullscreen(screen);
+                    if (videoTexture && videoTexture.userData && videoTexture.userData[action]) {
+                        console.log(`Executing video action: ${action}`);
+                        videoTexture.userData[action]();
                     }
-                    else if (intersect.object.userData.action === 'playButton') {
-                        // Handle video play/pause button
-                        mediaModule.toggleVideoPlayback();
-                    }
-                    else if (intersect.object.userData.action === 'volumeButton') {
-                        // Handle volume mute/unmute button
-                        mediaModule.toggleVideoMute();
-                    }
-                    return;
                 }
                 
-                // If no specific interaction was identified, just select the screen
-                selectScreen(screen);
-            } else {
-                // Select this screen if it wasn't already selected
-                selectScreen(screen);
+                return; // Early return to prevent further processing
+            }
+        }
+        
+        // Check for button intersections (including control panel buttons)
+        const button = getButtonFromIntersect(object);
+        if (button) {
+            console.log("Button clicked:", button.userData);
+            
+            // Provide visual feedback
+            if (button.material) {
+                const originalColor = button.material.color.clone();
+                button.material.color.set(0x4FC3F7); // Highlight color
+                
+                setTimeout(() => {
+                    if (button.material) {
+                        button.material.color.copy(originalColor);
+                    }
+                }, 200);
+            }
+            
+            // Handle screen type selection buttons
+            if (button.userData && button.userData.buttonType === 'screenTypeSelector') {
+                const buttonIndex = button.userData.index;
+                console.log("Screen type button clicked:", buttonIndex);
+                
+                // Create new screen based on button index
+                const cameraWorldPos = new THREE.Vector3();
+                camera.getWorldPosition(cameraWorldPos);
+                
+                // Calculate position in front of the camera
+                const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const screenPosition = cameraWorldPos.clone().add(
+                    cameraDirection.multiplyScalar(1.5)
+                );
+                
+                // Determine screen type from button
+                let screenType = button.userData.action || 'default';
+                
+                // Create appropriate screen type
+                let newScreen = null;
+                switch(screenType) {
+                    case 'youtube':
+                        newScreen = createNewYouTubeScreen(screenPosition);
+                        break;
+                    case 'duckduckgo':
+                        newScreen = createDuckDuckGoScreen(screenPosition);
+                        break;
+                    case 'maps':
+                        newScreen = createNewGoogleMapsScreen(screenPosition);
+                        break;
+                    case 'electron':
+                        newScreen = createNewElectronAppScreen(screenPosition);
+                        break;
+                    default:
+                        newScreen = createNewBrowserScreen(screenPosition);
+                }
+                
+                if (newScreen) {
+                    showNotification(`Created new ${screenType} screen`, 'success');
+                    scene.add(newScreen);
+                    
+                    // Auto-select the new screen
+                    selectScreen(newScreen);
+                }
+                
+                return; // Early return after creating screen
+            }
+            
+            // Handle other button types...
+        }
+        
+        // Handle control panel detection and movement
+        if (object.userData && object.userData.type === 'controlPanel' ||
+            (object.parent && object.parent.userData && object.parent.userData.type === 'controlPanel') ||
+            object.userData && object.userData.parentPanel) {
+            
+            // Get the actual panel
+            let controlPanel;
+            if (object.userData.type === 'controlPanel') {
+                controlPanel = object;
+            } else if (object.userData.parentPanel) {
+                controlPanel = object.userData.parentPanel;
+            } else if (object.parent && object.parent.userData && object.parent.userData.type === 'controlPanel') {
+                controlPanel = object.parent;
+            }
+            
+            if (controlPanel) {
+                console.log("Control panel clicked");
+                // Handle any control panel specific logic here
             }
         }
     }
@@ -628,8 +793,6 @@ function toggleFullscreen(screen) {
         // Return to original scale
         if (screen.userData.originalScale) {
             screen.scale.copy(screen.userData.originalScale);
-        } else {
-            screen.scale.set(1, 1, 1);
         }
         
         // Return to original position

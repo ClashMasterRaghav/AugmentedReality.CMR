@@ -195,7 +195,7 @@ export function createScreenTypeSelector(controlPanel, buttonSize = 0.1) {
     controlPanel.add(buttonContainer);
     
     // Increase button size for easier touch interaction
-    const smallButtonSize = buttonSize * 1.5; // Larger button size for better touch
+    const smallButtonSize = buttonSize * 2.0; // Significantly larger button size for better touch
     
     // Button configuration with direct paths to icons
     const iconPaths = [
@@ -242,7 +242,8 @@ function createIconButton(size, iconPath, label, index) {
         buttonType: 'screenTypeSelector',
         index: index,
         isInteractive: true,
-        isSelected: false
+        isSelected: false,
+        action: getButtonAction(index) // Add action property for easier identification
     };
     
     // Create button background (circle)
@@ -256,6 +257,27 @@ function createIconButton(size, iconPath, label, index) {
     const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
     bgMesh.renderOrder = 1001;
     button.add(bgMesh);
+    
+    // Create invisible larger hitbox for better interaction
+    const hitboxGeometry = new THREE.CircleGeometry(size / 1.5, 32); // 50% larger hitbox
+    const hitboxMaterial = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.DoubleSide
+    });
+    
+    const hitboxMesh = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
+    hitboxMesh.renderOrder = 1000;
+    // Copy userData from button to hitbox for interaction
+    hitboxMesh.userData = {
+        type: 'button',
+        buttonType: 'screenTypeSelector',
+        index: index,
+        isInteractive: true,
+        isSelected: false,
+        action: getButtonAction(index)
+    };
+    button.add(hitboxMesh);
     
     // Create button icon using texture loader
     const texture = createButtonTexture(size, iconPath, index);
@@ -277,6 +299,17 @@ function createIconButton(size, iconPath, label, index) {
     addButtonLabel(button, label, size);
     
     return button;
+}
+
+// Helper function to determine button action based on index
+function getButtonAction(index) {
+    switch(index) {
+        case 0: return 'youtube';
+        case 1: return 'duckduckgo';
+        case 2: return 'maps';
+        case 3: return 'electron';
+        default: return 'unknown';
+    }
 }
 
 // Create a texture for the button icon
