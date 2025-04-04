@@ -37,6 +37,21 @@ export function setSelectedScreen(screen) {
 export function initAR() {
     try {
         console.log("Initializing AR application...");
+        
+        // Check if required imports are available
+        if (!createControlPanel || !createVirtualKeyboard || !setupControlPanel) {
+            console.error("Missing UI imports. Check ar_ui.js imports");
+        }
+        
+        if (!createNewBrowserScreen || !createNewDefaultScreen) {
+            console.error("Missing screen creation imports. Check ar_screens.js imports");
+        }
+        
+        if (!setupEventListeners) {
+            console.error("Missing interaction imports. Check ar_interaction.js imports");
+        }
+        
+        // Initialize the AR environment
         initAREnvironment();
         return true;
     } catch (error) {
@@ -93,9 +108,15 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
+        console.log("Font loaded successfully");
         // Create UI controls once font is loaded
-        createControlPanel();
-        createVirtualKeyboard();
+        try {
+            createControlPanel();
+            createVirtualKeyboard();
+            console.log("UI controls created successfully");
+        } catch (error) {
+            console.error("Error creating UI controls:", error);
+        }
     });
 
     // Controller setup
@@ -136,19 +157,40 @@ function initAREnvironment() {
     const videoTexture = loadVideoTexture();
     
     // Connect video controls to the interaction module
-    setupVideoControls({
-        toggleVideoPlayback,
-        toggleVideoMute
-    });
+    try {
+        setupVideoControls({
+            toggleVideoPlayback,
+            toggleVideoMute
+        });
+        console.log("Video controls connected successfully");
+    } catch (error) {
+        console.error("Error connecting video controls:", error);
+    }
     
     // Setup event listeners
-    setupEventListeners();
+    try {
+        setupEventListeners();
+        console.log("Event listeners set up successfully");
+    } catch (error) {
+        console.error("Error setting up event listeners:", error);
+    }
     
     // Start animation loop
     renderer.setAnimationLoop(animate);
     
     // Create initial screen
-    createStartScreen();
+    try {
+        createStartScreen();
+    } catch (error) {
+        console.error("Error creating start screen:", error);
+        // Try fallback to browser screen if default screen fails
+        try {
+            createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
+            console.log("Created fallback browser screen");
+        } catch (fallbackError) {
+            console.error("Error creating fallback screen:", fallbackError);
+        }
+    }
 }
 
 // Handle window resize
@@ -283,8 +325,28 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
-    
-    // Set up control panel initial position
-    setTimeout(setupControlPanel, 500);
+    console.log("Creating start screen using createNewDefaultScreen...");
+    try {
+        const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
+        console.log("Start screen created successfully:", startScreen);
+        
+        // Set up control panel initial position
+        setTimeout(setupControlPanel, 500);
+        
+        return startScreen;
+    } catch (error) {
+        console.error("Error creating start screen:", error);
+        // Fallback to a simple default screen if there's an error
+        const geometry = new THREE.PlaneGeometry(1, 0.75);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0x0000ff,
+            side: THREE.DoubleSide
+        });
+        const fallbackScreen = new THREE.Mesh(geometry, material);
+        fallbackScreen.position.set(0, 0, -1.5);
+        scene.add(fallbackScreen);
+        
+        console.log("Created fallback screen due to error");
+        return fallbackScreen;
+    }
 }

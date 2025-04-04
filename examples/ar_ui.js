@@ -574,6 +574,8 @@ function createButtonIcon(buttonIndex) {
 
 // Create a screen type selector with buttons for different content types
 function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
+    console.log("Creating screen type selector with button size:", buttonSize);
+    
     // Create a panel for content type selection
     const selectorGroup = new THREE.Group();
     
@@ -683,11 +685,13 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
-    // BIGGER button size for better touch targets
-    const smallButtonSize = buttonSize * 1.1; // Increase from 1.0 to 1.1 (larger)
-    const spacing = smallButtonSize * 2.2; // Space between buttons
+    // MUCH BIGGER button size for better touch targets
+    const smallButtonSize = buttonSize * 1.7; // Significantly increase button size for easier touching
+    const spacing = smallButtonSize * 1.8; // Space between buttons (reduce to fit all buttons)
     const startX = -spacing * 1.5; // Starting position for first button
     const buttonY = -0.01; // Move buttons down slightly within the panel
+    
+    console.log("Creating screen type buttons with size:", smallButtonSize);
     
     buttonTypes.forEach((type, index) => {
         // Create button canvas for gradient effect
@@ -735,148 +739,100 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         // Position with adjusted Y coordinate
         button.position.set(startX + spacing * index, buttonY, 0.003);
         button.renderOrder = 1005;
+        
+        // Add much more complete userData for button identification and behavior
         button.userData = {
             type: 'button',
-            action: 'selectScreenType',
+            buttonType: 'screenTypeSelector', // Help identify this is a screen type button
+            action: type, // Set action to match type (youtube, maps, etc.)
+            index: index, // Store the index
             screenType: buttonTypes[index],
             hoverColor: new THREE.Color(buttonColors[index]).lerp(new THREE.Color(0xFFFFFF), 0.3), // Lighter version for hover
             activeColor: buttonColors[index],
             inactiveColor: buttonColors[index],
             originalColor: buttonColors[index],
             isToggle: false,
-            isActive: true
+            isActive: true,
+            isInteractive: true
         };
         
-        // Add button shadow for depth
-        const shadowGeometry = new THREE.CircleGeometry(smallButtonSize / 2 * 1.05, 32);
-        const shadowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+        // Create invisible larger hitbox for better interaction
+        const hitboxSize = smallButtonSize * 1.5; // 50% larger hitbox
+        const hitboxGeometry = new THREE.CircleGeometry(hitboxSize / 2, 32);
+        const hitboxMaterial = new THREE.MeshBasicMaterial({
             transparent: true,
-            opacity: 0.3,
-            side: THREE.DoubleSide
-        });
-        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
-        shadowMesh.position.z = -0.001;
-        shadowMesh.renderOrder = 1004;
-        button.add(shadowMesh);
-        
-        // Add icon to button - LARGER
-        const iconSize = smallButtonSize * 0.8; // Keep at 0.8
-        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-        const iconMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff, // Default white color until texture loads
-            transparent: true,
+            opacity: 0.0, // Completely invisible
             side: THREE.DoubleSide
         });
         
-        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-        iconMesh.position.z = 0.004;
-        iconMesh.renderOrder = 1006;
-        button.add(iconMesh);
+        const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
+        hitbox.position.z = 0.001; // Slightly in front of the button
         
-        // Direct loading of icons using image files rather than indices
-        const iconPaths = {
-            0: 'examples/textures/ar_icons/youtube.png',
-            1: 'examples/textures/ar_icons/DuckDuckGo_logo.png',
-            2: 'examples/textures/ar_icons/maps.png',
-            3: 'examples/textures/ar_icons/electron_app.png'
+        // Copy userData to hitbox
+        hitbox.userData = {
+            type: 'button',
+            buttonType: 'screenTypeSelector',
+            action: type,
+            index: index,
+            screenType: buttonTypes[index],
+            isInteractive: true,
+            parentButton: button
         };
         
-        // Load the icon texture directly using the file path
-        const img = new Image();
-        img.onload = function() {
-            // Create a canvas to draw the icon
-            const canvas = document.createElement('canvas');
-            canvas.width = 256;
-            canvas.height = 256;
-            const ctx = canvas.getContext('2d');
+        button.add(hitbox);
+        
+        console.log(`Created ${type} button with index ${index}`);
+        
+        // Load icon on button - with simple retry logic
+        createButtonIcon(buttonIcons[index]).then(iconTexture => {
+            const iconSize = smallButtonSize * 0.6; // Icon slightly smaller than button
+            const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: iconTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
             
-            // Draw image centered on canvas
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.001;
+            button.add(iconMesh);
+            console.log(`Added icon to ${type} button`);
+        }).catch(err => {
+            console.error(`Failed to load icon for ${type} button:`, err);
+            // Create simple text instead
+            const textCanvas = document.createElement('canvas');
+            textCanvas.width = 64;
+            textCanvas.height = 64;
+            const textCtx = textCanvas.getContext('2d');
             
-            // Create texture from canvas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
+            textCtx.fillStyle = '#ffffff';
+            textCtx.font = 'bold 20px Arial';
+            textCtx.textAlign = 'center';
+            textCtx.textBaseline = 'middle';
+            textCtx.fillText(type.substring(0, 1).toUpperCase(), 32, 32);
             
-            // Apply to icon material
-            iconMaterial.map = texture;
-            iconMaterial.needsUpdate = true;
-        };
-        
-        img.onerror = function() {
-            console.error("Error loading icon image for button: " + index);
-            // Fallback to text icon
-            const canvas = document.createElement('canvas');
-            canvas.width = 256;
-            canvas.height = 256;
-            const ctx = canvas.getContext('2d');
+            const textTexture = new THREE.CanvasTexture(textCanvas);
+            const iconSize = smallButtonSize * 0.6;
+            const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: textTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
             
-            // Draw text
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '80px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(buttonTypes[index].substring(0, 1).toUpperCase(), 128, 128);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
-            iconMaterial.map = texture;
-            iconMaterial.needsUpdate = true;
-        };
-        
-        // Set image source to the appropriate path for this button
-        img.src = iconPaths[index];
-        
-        // Add label for each button with text shadow for better readability
-        const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 128;
-        labelCanvas.height = 48; // Taller for better quality
-        const labelCtx = labelCanvas.getContext('2d');
-        
-        // Clear canvas and add text with shadow
-        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
-        
-        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        labelCtx.shadowBlur = 3;
-        labelCtx.shadowOffsetX = 1;
-        labelCtx.shadowOffsetY = 1;
-        
-        labelCtx.fillStyle = '#ffffff';
-        labelCtx.font = '600 14px Inter, SF Pro Display, Arial'; // Use consistent font with control panel
-        labelCtx.textAlign = 'center';
-        labelCtx.textBaseline = 'middle';
-        
-        // Choose appropriate text for each button
-        let labelText;
-        switch(index) {
-            case 0: labelText = 'YouTube'; break;
-            case 1: labelText = 'Search'; break;
-            case 2: labelText = 'Maps'; break;
-            case 3: labelText = 'App'; break;
-        }
-        
-        labelCtx.fillText(labelText, labelCanvas.width / 2, labelCanvas.height / 2);
-        labelCtx.shadowBlur = 0;
-        
-        const labelTexture = new THREE.CanvasTexture(labelCanvas);
-        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.8, smallButtonSize * 0.6);
-        const labelMaterial = new THREE.MeshBasicMaterial({
-            map: labelTexture,
-            transparent: true,
-            side: THREE.DoubleSide
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.001;
+            button.add(iconMesh);
+            console.log(`Added text fallback to ${type} button`);
         });
-        
-        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
-        labelMesh.position.set(0, -smallButtonSize * 0.8, 0.002);
-        labelMesh.renderOrder = 1006;
-        button.add(labelMesh);
         
         selectorGroup.add(button);
     });
     
-    // Position the selector panel relative to the parent
-    selectorGroup.position.set(offsetX, offsetY - 0.13, 0.01); // Lower position
+    // Position the entire selector group
+    selectorGroup.position.set(offsetX, offsetY, 0.002);
     parent.add(selectorGroup);
+    console.log("Screen type selector created and added to parent");
     
     return selectorGroup;
 }
