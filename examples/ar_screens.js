@@ -73,6 +73,10 @@ export function createNewElectronAppScreen(position = new THREE.Vector3(0, 0, -1
     return electronScreen;
 }
 
+// Export the imported functions directly
+export { createElectronAppScreen };
+export { createYouTubeScreen };
+
 // Create a new default screen wrapper function
 export function createNewDefaultScreen(position = new THREE.Vector3(0, 0, -1.5)) {
     const defaultScreen = createDefaultScreen(position, screens.length + 1);

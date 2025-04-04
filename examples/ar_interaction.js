@@ -7,7 +7,7 @@ import {
 } from './ar_core.js';
 import { 
     screens, selectScreen, updateKeyboardPosition, createNewBrowserScreen,
-    createYouTubeScreen, createDuckDuckGoScreen, createGoogleMapsScreen, createElectronAppScreen
+    createNewYouTubeScreen, createNewElectronAppScreen, createNewGoogleMapsScreen, createDuckDuckGoScreen
 } from './ar_screens.js';
 import { virtualKeyboard, showNotification, toggleModeButton, controlPanel } from './ar_ui.js';
 import { videoElement, duration } from './ar_media.js';
@@ -375,16 +375,16 @@ function handleButtonAction(button) {
             
             switch(screenType) {
                 case 'youtube':
-                    newScreen = createYouTubeScreen(screenPosition);
+                    newScreen = createNewYouTubeScreen(screenPosition);
                     break;
                 case 'duckduckgo':
                     newScreen = createDuckDuckGoScreen(screenPosition);
                     break;
                 case 'maps':
-                    newScreen = createGoogleMapsScreen(screenPosition);
+                    newScreen = createNewGoogleMapsScreen(screenPosition);
                     break;
                 case 'electron':
-                    newScreen = createElectronAppScreen(screenPosition);
+                    newScreen = createNewElectronAppScreen(screenPosition);
                     break;
                 default:
                     newScreen = createNewBrowserScreen(screenPosition);
