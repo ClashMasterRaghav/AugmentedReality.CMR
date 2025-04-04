@@ -6,56 +6,21 @@ import { selectScreen } from "./ar_screens.js";
 
 // Create a default screen with standardized functionality
 export function createDefaultScreen(position = new THREE.Vector3(0, 0, -1.5), screenId) {
-    console.log("Creating default screen with ID:", screenId, "at position:", position);
-    
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
     const title = `Screen ${screenId || "Default"}`;
     
-    console.log("Default screen config:", { size, title });
-    
-    // Check if videoTexture is available, create fallback if not
-    let screenTexture = videoTexture;
-    if (!screenTexture) {
-        console.warn("Video texture not available, creating fallback texture");
-        // Create a fallback texture
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 384;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#1a237e'); // Indigo
-        gradient.addColorStop(1, '#303f9f'); // Lighter indigo
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add welcome text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Welcome to AR Experience', canvas.width / 2, canvas.height / 2 - 40);
-        
-        ctx.font = '20px Arial';
-        ctx.fillText('Touch the control panel to create screens', canvas.width / 2, canvas.height / 2 + 20);
-        
-        screenTexture = new THREE.CanvasTexture(canvas);
-    }
+    console.log("Creating default screen with video");
     
     // Create the screen container 
-    console.log("Creating enhanced screen with title:", title);
     const defaultScreen = enhancedCreateScreen(
         position,
         size,
         title,
-        screenTexture
+        videoTexture
     );
-    
-    console.log("Enhanced screen created:", defaultScreen);
     
     // Add basic identification data
     defaultScreen.userData = { 
@@ -93,14 +58,12 @@ export function createDefaultScreen(position = new THREE.Vector3(0, 0, -1.5), sc
     if (topBar) {
         topBar.userData.screen = defaultScreen;
         defaultScreen.userData.dragHandle = topBar;
-    } else {
-        console.warn("No drag handle found in default screen");
     }
     
     // Add entrance animation
     animateScreenEntrance(defaultScreen);
     
-    console.log("Default screen creation complete, ID:", defaultScreen.userData.id);
+    console.log("Created default screen with ID:", defaultScreen.userData.id);
     
     return defaultScreen;
 }

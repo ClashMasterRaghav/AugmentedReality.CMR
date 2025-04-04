@@ -4,7 +4,7 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
-import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
+import { createNewBrowserScreen, createNewDefaultScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
@@ -37,21 +37,6 @@ export function setSelectedScreen(screen) {
 export function initAR() {
     try {
         console.log("Initializing AR application...");
-        
-        // Check if required imports are available
-        if (!createControlPanel || !createVirtualKeyboard || !setupControlPanel) {
-            console.error("Missing UI imports. Check ar_ui.js imports");
-        }
-        
-        if (!createNewBrowserScreen || !createNewDefaultScreen) {
-            console.error("Missing screen creation imports. Check ar_screens.js imports");
-        }
-        
-        if (!setupEventListeners) {
-            console.error("Missing interaction imports. Check ar_interaction.js imports");
-        }
-        
-        // Initialize the AR environment
         initAREnvironment();
         return true;
     } catch (error) {
@@ -83,183 +68,87 @@ function initAREnvironment() {
     container.appendChild(renderer.domElement);
 
     // AR Button with session end event handling
-    try {
-        const arButton = ARButton.createButton(renderer, {
-            optionalFeatures: ['dom-overlay'],
-            domOverlay: { root: document.body }
-        });
-        
-        document.body.appendChild(arButton);
-        
-        // Add event listener for session start
-        if (renderer && renderer.xr) {
-            renderer.xr.addEventListener('sessionstart', function() {
-                console.log("AR session started - showing panel instructions");
-                // Show instructions for draggable panel after a short delay
-                if (typeof showControlPanelInstructions === 'function') {
-                    showControlPanelInstructions();
-                }
-            });
-            
-            // Add event listener for session end
-            renderer.xr.addEventListener('sessionend', function() {
-                console.log("AR session ended");
-                // Reload the page to return to initial state
-                window.location.reload();
-            });
-        } else {
-            console.error("renderer.xr is not available");
-        }
-    } catch (error) {
-        console.error("Error setting up AR button or XR session:", error);
-    }
+    const arButton = ARButton.createButton(renderer, {
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: document.body }
+    });
+    
+    document.body.appendChild(arButton);
+    
+    // Add event listener for session start
+    renderer.xr.addEventListener('sessionstart', function() {
+        console.log("AR session started - showing panel instructions");
+        // Show instructions for draggable panel after a short delay
+        showControlPanelInstructions();
+    });
+    
+    // Add event listener for session end
+    renderer.xr.addEventListener('sessionend', function() {
+        console.log("AR session ended");
+        // Reload the page to return to initial state
+        window.location.reload();
+    });
 
     // Load font for text
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        console.log("Font loaded successfully");
         // Create UI controls once font is loaded
-        try {
-            if (typeof createControlPanel === 'function') {
-                createControlPanel();
-            }
-            if (typeof createVirtualKeyboard === 'function') {
-                createVirtualKeyboard();
-            }
-            console.log("UI controls created successfully");
-        } catch (error) {
-            console.error("Error creating UI controls:", error);
-        }
+        createControlPanel();
+        createVirtualKeyboard();
     });
 
     // Controller setup
-    try {
-        if (renderer && renderer.xr) {
-            controller = renderer.xr.getController(0);
-            
-            // Add controller event listeners
-            if (controller) {
-                controller.addEventListener('selectstart', function() {
-                    if (controller.userData) {
-                        controller.userData.isSelecting = true;
-                    }
-                });
-                
-                controller.addEventListener('selectend', function() {
-                    if (controller.userData) {
-                        controller.userData.isSelecting = false;
-                    }
-                });
-                
-                scene.add(controller);
-                
-                // Controller model
-                const controllerModelFactory = new XRControllerModelFactory();
-                controllerGrip = renderer.xr.getControllerGrip(0);
-                if (controllerGrip) {
-                    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-                    scene.add(controllerGrip);
-                }
+    controller = renderer.xr.getController(0);
+    
+    // Add controller event listeners
+    controller.addEventListener('selectstart', function() {
+        controller.userData.isSelecting = true;
+    });
+    
+    controller.addEventListener('selectend', function() {
+        controller.userData.isSelecting = false;
+    });
+    
+    scene.add(controller);
 
-                // Pointer for interaction - SMALLER SIZE
-                const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-                const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-                const pointer = new THREE.Mesh(geometry, material);
-                pointer.position.z = -0.1;
-                controller.add(pointer);
-            } else {
-                console.error("Controller is not available");
-            }
-        } else {
-            console.error("renderer.xr is not available for controller setup");
-        }
-    } catch (error) {
-        console.error("Error setting up controller:", error);
-    }
+    // Controller model
+    const controllerModelFactory = new XRControllerModelFactory();
+    controllerGrip = renderer.xr.getControllerGrip(0);
+    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+    scene.add(controllerGrip);
+
+    // Pointer for interaction - SMALLER SIZE
+    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+    const pointer = new THREE.Mesh(geometry, material);
+    pointer.position.z = -0.1;
+    controller.add(pointer);
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
     // Initialize UI elements
-    if (typeof initUI === 'function') {
-        initUI();
-    } else {
-        console.warn("initUI function not available");
-    }
+    initUI();
     
     // Preload video texture right after scene setup
     console.log("Initializing video functionality");
-    let videoTexture;
-    try {
-        if (typeof loadVideoTexture === 'function') {
-            videoTexture = loadVideoTexture();
-        } else {
-            console.warn("loadVideoTexture function not available");
-        }
-    } catch (error) {
-        console.error("Error loading video texture:", error);
-    }
+    const videoTexture = loadVideoTexture();
     
     // Connect video controls to the interaction module
-    try {
-        if (typeof setupVideoControls === 'function') {
-            setupVideoControls({
-                toggleVideoPlayback: typeof toggleVideoPlayback === 'function' ? toggleVideoPlayback : null,
-                toggleVideoMute: typeof toggleVideoMute === 'function' ? toggleVideoMute : null
-            });
-            console.log("Video controls connected successfully");
-        } else {
-            console.warn("setupVideoControls function not available");
-        }
-    } catch (error) {
-        console.error("Error connecting video controls:", error);
-    }
+    setupVideoControls({
+        toggleVideoPlayback,
+        toggleVideoMute
+    });
     
     // Setup event listeners
-    try {
-        if (typeof setupEventListeners === 'function') {
-            setupEventListeners();
-            console.log("Event listeners set up successfully");
-        } else {
-            console.warn("setupEventListeners function not available");
-        }
-    } catch (error) {
-        console.error("Error setting up event listeners:", error);
-    }
+    setupEventListeners();
     
     // Start animation loop
-    if (renderer) {
-        renderer.setAnimationLoop(animate);
-    }
+    renderer.setAnimationLoop(animate);
     
     // Create initial screen
-    try {
-        createStartScreen();
-    } catch (error) {
-        console.error("Error creating start screen:", error);
-        // Try fallback to browser screen if default screen fails
-        try {
-            if (typeof createNewBrowserScreen === 'function') {
-                createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
-                console.log("Created fallback browser screen");
-            } else {
-                console.warn("createNewBrowserScreen function not available");
-                // Create a simple fallback screen if nothing else works
-                const geometry = new THREE.PlaneGeometry(1, 0.75);
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: 0x0000ff,
-                    side: THREE.DoubleSide
-                });
-                const fallbackScreen = new THREE.Mesh(geometry, material);
-                fallbackScreen.position.set(0, 0, -1.5);
-                scene.add(fallbackScreen);
-                console.log("Created emergency fallback screen");
-            }
-        } catch (fallbackError) {
-            console.error("Error creating fallback screen:", fallbackError);
-        }
-    }
+    createStartScreen();
 }
 
 // Handle window resize
@@ -394,28 +283,8 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    console.log("Creating start screen using createNewDefaultScreen...");
-    try {
-        const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
-        console.log("Start screen created successfully:", startScreen);
-        
-        // Set up control panel initial position
-        setTimeout(setupControlPanel, 500);
-        
-        return startScreen;
-    } catch (error) {
-        console.error("Error creating start screen:", error);
-        // Fallback to a simple default screen if there's an error
-        const geometry = new THREE.PlaneGeometry(1, 0.75);
-        const material = new THREE.MeshBasicMaterial({ 
-            color: 0x0000ff,
-            side: THREE.DoubleSide
-        });
-        const fallbackScreen = new THREE.Mesh(geometry, material);
-        fallbackScreen.position.set(0, 0, -1.5);
-        scene.add(fallbackScreen);
-        
-        console.log("Created fallback screen due to error");
-        return fallbackScreen;
-    }
+    const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
+    
+    // Set up control panel initial position
+    setTimeout(setupControlPanel, 500);
 }

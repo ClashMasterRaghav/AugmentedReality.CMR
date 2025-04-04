@@ -79,25 +79,16 @@ export { createYouTubeScreen };
 
 // Create a new default screen wrapper function
 export function createNewDefaultScreen(position = new THREE.Vector3(0, 0, -1.5)) {
-    console.log("Creating new default screen at position:", position);
-    try {
-        const defaultScreen = createDefaultScreen(position, screens.length + 1);
-        console.log("Default screen created:", defaultScreen);
-        
-        // Add to scene and screens array
-        scene.add(defaultScreen);
-        screens.push(defaultScreen);
-        console.log("Added default screen to scene and screens array. Total screens:", screens.length);
-        
-        // Select this as the current screen
-        selectScreen(defaultScreen);
-        console.log("Selected default screen");
-        
-        return defaultScreen;
-    } catch (error) {
-        console.error("Error in createNewDefaultScreen:", error);
-        throw error; // Re-throw to allow upstream handling
-    }
+    const defaultScreen = createDefaultScreen(position, screens.length + 1);
+    
+    // Add to scene and screens array
+    scene.add(defaultScreen);
+    screens.push(defaultScreen);
+    
+    // Select this as the current screen
+    selectScreen(defaultScreen);
+    
+    return defaultScreen;
 }
 
 // Select a screen and update UI accordingly with enhanced visual feedback
@@ -288,7 +279,7 @@ function updateSelectedScreenGlow(screen) {
             0.1 * pulseIntensity, // R (low for blue)
             0.1 * pulseIntensity, // G (low for blue)
             0.5 * pulseIntensity  // B (higher for blue)
-                    );
+                );
             }
             
             // Update glow effect for selected screen

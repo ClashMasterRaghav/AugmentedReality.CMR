@@ -46,35 +46,15 @@ let videoControlFunctions = {
 
 // Setup event listeners
 export function setupEventListeners() {
-    console.log("Setting up AR event listeners...");
+    // Controller events
+    controller.addEventListener('select', onSelect);
+    controller.addEventListener('selectstart', onSelectStart);
+    controller.addEventListener('selectend', onSelectEnd);
     
-    try {
-        // Check if controller is defined before adding event listeners
-        if (typeof controller !== 'undefined' && controller) {
-            console.log("Adding event listeners to controller");
-            // Controller events
-            controller.addEventListener('select', onSelect);
-            controller.addEventListener('selectstart', onSelectStart);
-            controller.addEventListener('selectend', onSelectEnd);
-        } else {
-            console.error("Controller is undefined, cannot add event listeners");
-        }
-        
-        // Check if renderer and its domElement are defined before adding event listeners
-        if (typeof renderer !== 'undefined' && renderer && renderer.domElement) {
-            console.log("Adding touch event listeners to renderer.domElement");
-            // Touch events
-            renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-            renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
-        } else {
-            console.error("Renderer or renderer.domElement is undefined, cannot add touch event listeners");
-        }
-        
-        console.log("Event listeners set up successfully");
-    } catch (error) {
-        console.error("Error setting up event listeners:", error);
-    }
+    // Touch events
+    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 }
 
 // Handle controller selection start
@@ -312,120 +292,97 @@ function onSelect(event) {
     // Find intersections with all objects in the scene
     const intersects = raycaster.intersectObjects(scene.children, true);
     
+    console.log("Intersection count:", intersects.length);
+    
+    // Process the first valid intersection
     if (intersects.length > 0) {
-        console.log("Intersection detected:", intersects[0].object.userData);
-        
-        // Get first intersection
         const intersect = intersects[0];
+        const object = intersect.object;
         
-        // If this is a button
-        const button = getButtonFromIntersect(intersect.object);
+        console.log("Intersected object:", object.type, object.userData);
+        
+        // If we click on a screen, select it
+        let screenFound = false;
+        let screen = null;
+        let target = object;
+        
+        // Traverse up to find the screen object
+        for (let i = 0; i < 5; i++) {
+            if (!target) break;
+            
+            if (target.userData && target.userData.type === 'screen') {
+                screen = target;
+                screenFound = true;
+                break;
+            }
+            target = target.parent;
+        }
+        
+        if (screenFound) {
+            // Select this screen
+            console.log("Selected screen:", screen.userData.id);
+            selectScreen(screen);
+            
+            // Prevent double handling of screen buttons
+            if (object.userData && object.userData.type === 'button') {
+                console.log("Button in screen clicked");
+                
+                // Check if it's a video control button
+                if (object.userData.videoControl) {
+                    const action = object.userData.videoAction;
+                    const videoTexture = screen.children[0].material.map;
+                    
+                    if (videoTexture && videoTexture.userData && videoTexture.userData[action]) {
+                        console.log(`Executing video action: ${action}`);
+                        videoTexture.userData[action]();
+                    }
+                }
+                
+                return; // Early return to prevent further processing
+            }
+        }
+        
+        // Check for button intersections (including control panel buttons)
+        const button = getButtonFromIntersect(object);
         if (button) {
             console.log("Button clicked:", button.userData);
-            handleButtonAction(button);
-            return;
-        }
-        
-        // If this is a screen - get the parent screen object
-        const screen = getScreenFromIntersect(intersect.object);
-        if (screen) {
-            // If the screen is already selected, check for control buttons or video player interaction
-            if (screen.userData.isSelected) {
-                
-                // Try to relay the interaction to iframe content if applicable
-                if (relayInteractionToIframe(screen, intersect, 'click')) {
-                    // Interaction was handled by iframe
-            return;
-                }
-                
-                // Handle screen control buttons and interaction zones if not handled by iframe
-                
-                // Find if the intersection is with a control button
-                if (intersect.object.userData && 
-                    intersect.object.userData.type === 'button') {
-                    
-                    // Handle specific button actions
-                    if (intersect.object.userData.action === 'close') {
-                        // Handle close button
-                        scene.remove(screen);
-                        screens.splice(screens.indexOf(screen), 1);
-                        setSelectedScreen(null);
-                    } 
-                    else if (intersect.object.userData.action === 'minimize') {
-                        // Handle minimize button
-                        toggleMinimize(screen);
-                    } 
-                    else if (intersect.object.userData.action === 'maximize') {
-                        // Handle maximize/fullscreen button
-                        toggleFullscreen(screen);
-                    }
-                    else if (intersect.object.userData.action === 'playButton') {
-                        // Handle video play/pause button
-                        if (videoControlFunctions.togglePlayback) {
-                            videoControlFunctions.togglePlayback();
-        } else {
-                            console.warn("Video playback function not available");
-        }
-                    }
-                    else if (intersect.object.userData.action === 'volumeButton') {
-                        // Handle volume mute/unmute button
-                        if (videoControlFunctions.toggleMute) {
-                            videoControlFunctions.toggleMute();
-    } else {
-                            console.warn("Video mute function not available");
-                        }
-                    }
-                    return;
-                }
-                
-                // If no specific interaction was identified, just select the screen
-                selectScreen(screen);
-            } else {
-                // Select this screen if it wasn't already selected
-                selectScreen(screen);
-            }
-        }
-        
-        // If this is a control panel or its controls
-        if (intersect.object.userData && intersect.object.userData.type === 'controlPanel' ||
-            (intersect.object.parent && intersect.object.parent.userData && 
-            intersect.object.parent.userData.type === 'controlPanel') ||
-            intersect.object.userData && intersect.object.userData.parentPanel) {
             
-            // Get the actual panel
-            let controlPanel;
-            if (intersect.object.userData.type === 'controlPanel') {
-                controlPanel = intersect.object;
-            } else if (intersect.object.userData.parentPanel) {
-                controlPanel = intersect.object.userData.parentPanel;
-            } else if (intersect.object.parent && intersect.object.parent.userData && 
-                intersect.object.parent.userData.type === 'controlPanel') {
-                controlPanel = intersect.object.parent;
+            // Provide visual feedback
+            if (button.material) {
+                const originalColor = button.material.color.clone();
+                button.material.color.set(0x4FC3F7); // Highlight color
+                
+                setTimeout(() => {
+                    if (button.material) {
+                        button.material.color.copy(originalColor);
+                    }
+                }, 200);
             }
             
-            if (controlPanel) {
-                console.log("Control panel clicked");
+            // Handle screen type selection buttons
+            if (button.userData && button.userData.buttonType === 'screenTypeSelector') {
+                const buttonIndex = button.userData.index;
+                console.log("Screen type button clicked:", buttonIndex, "Action:", button.userData.action);
                 
-                // Check for control panel button clicks (like screen creation buttons)
-                const button = getButtonFromIntersect(intersect.object);
-                if (button && button.userData && button.userData.buttonType === 'screenTypeSelector') {
-                    console.log("Screen type button clicked:", button.userData.index);
-                    
-                    // Create new screen based on button index
-                    const cameraWorldPos = new THREE.Vector3();
-                    camera.getWorldPosition(cameraWorldPos);
-                    
-                    // Calculate position in front of the camera
-                    const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                    const screenPosition = cameraWorldPos.clone().add(
-                        cameraDirection.multiplyScalar(1.5)
-                    );
-                    
-                    // Determine screen type from button action
-                    let screenType = button.userData.action || '';
-                    
-                    // Create appropriate screen type
-                    let newScreen = null;
+                // Create new screen based on button index
+                const cameraWorldPos = new THREE.Vector3();
+                camera.getWorldPosition(cameraWorldPos);
+                
+                // Calculate position in front of the camera
+                const cameraDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const screenPosition = cameraWorldPos.clone().add(
+                    cameraDirection.multiplyScalar(1.5)
+                );
+                console.log("Creating screen at position:", screenPosition);
+                
+                // Determine screen type from button
+                let screenType = button.userData.action || 'default';
+                
+                // Create appropriate screen type
+                let newScreen = null;
+                console.log("Attempting to create screen of type:", screenType);
+                
+                try {
                     switch(screenType) {
                         case 'youtube':
                             newScreen = createNewYouTubeScreen(screenPosition);
@@ -444,11 +401,42 @@ function onSelect(event) {
                     }
                     
                     if (newScreen) {
+                        console.log("Successfully created screen:", newScreen.uuid);
                         showNotification(`Created new ${screenType} screen`, 'success');
-                        // Auto-select the new screen
                         selectScreen(newScreen);
+                    } else {
+                        console.error("Failed to create screen - returned null");
+                        showNotification(`Failed to create ${screenType} screen`, 'error');
                     }
+                } catch (error) {
+                    console.error("Error creating screen:", error);
+                    showNotification(`Error creating screen: ${error.message}`, 'error');
                 }
+                
+                return; // Early return after creating screen
+            }
+            
+            // Handle other button types...
+        }
+        
+        // Handle control panel detection and movement
+        if (object.userData && object.userData.type === 'controlPanel' ||
+            (object.parent && object.parent.userData && object.parent.userData.type === 'controlPanel') ||
+            object.userData && object.userData.parentPanel) {
+            
+            // Get the actual panel
+            let controlPanel;
+            if (object.userData.type === 'controlPanel') {
+                controlPanel = object;
+            } else if (object.userData.parentPanel) {
+                controlPanel = object.userData.parentPanel;
+            } else if (object.parent && object.parent.userData && object.parent.userData.type === 'controlPanel') {
+                controlPanel = object.parent;
+            }
+            
+            if (controlPanel) {
+                console.log("Control panel clicked");
+                // Handle any control panel specific logic here
             }
         }
     }
@@ -510,61 +498,150 @@ function getScreenFromIntersect(object) {
 
 // Handle different button actions
 function handleButtonAction(button) {
-    console.log("Handling button action:", button.userData);
-    
-    // Visual feedback
-    if (button.material) {
-        const originalColor = button.material.color.clone();
-        button.material.color.set(0x4FC3F7); // Highlight color
-        setTimeout(() => {
-            if (button && button.material) {
-                button.material.color.copy(originalColor);
-            }
-        }, 200);
-    }
-    
-    // Handle different button types
-    if (!button.userData) {
-        console.warn("Button has no userData");
+    if (!button || !button.userData) {
+        console.log("Invalid button object");
         return;
     }
     
-    // Handle screen type selector buttons
-    if (button.userData.buttonType === 'screenTypeSelector') {
-        createScreenOfType(button.userData.action || button.userData.screenType);
-        return;
+    console.log("Handling button action:", button.userData.action);
+    
+    // Extract the button action
+    const action = button.userData.action;
+    
+    // Provide haptic feedback for button press
+    if (navigator.vibrate) {
+        navigator.vibrate(30);
     }
     
-    // Handle video controls
-    if (button.userData.videoControl) {
-        const action = button.userData.videoAction;
-        
-        if (action === 'togglePlayback' && videoControlFunctions.togglePlayback) {
-            videoControlFunctions.togglePlayback();
-        }
-        else if (action === 'toggleMute' && videoControlFunctions.toggleMute) {
-            videoControlFunctions.toggleMute();
-        }
-        
-        return;
-    }
-    
-    // Handle other actions based on the action property
-    switch(button.userData.action) {
+    // Handle different button actions
+    switch (action) {
         case 'newScreen':
+            console.log("New screen button pressed");
+            // Create a new screen positioned in front of the camera
             createNewScreenInFrontOfCamera();
             break;
+            
         case 'deleteScreen':
+            console.log("Delete screen button pressed - calling deleteLastScreen()");
+            // Delete the last interacted screen
             deleteLastScreen();
+            
+            // Add haptic feedback for destructive action
+            if (navigator.vibrate) {
+                navigator.vibrate([30, 20, 80]);
+            }
+            
+            // Create visual indicator
+            createModeChangeIndicator('Screen Deleted');
             break;
+            
+        case 'selectScreenType':
+            console.log("Screen type button pressed:", button.userData.screenType);
+            // Get camera position and direction
+            const cameraPosition = new THREE.Vector3();
+            camera.getWorldPosition(cameraPosition);
+            
+            const cameraDirection = new THREE.Vector3(0, 0, -1);
+            cameraDirection.applyQuaternion(camera.quaternion);
+            
+            // Position screen in front of camera
+            const screenPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(1.5));
+            
+            // Create the appropriate screen type
+            let newScreen;
+            const screenType = button.userData.screenType;
+            
+            switch(screenType) {
+                case 'youtube':
+                    newScreen = createNewYouTubeScreen(screenPosition);
+                    break;
+                case 'duckduckgo':
+                    newScreen = createDuckDuckGoScreen(screenPosition);
+                    break;
+                case 'maps':
+                    newScreen = createNewGoogleMapsScreen(screenPosition);
+                    break;
+                case 'electron':
+                    newScreen = createNewElectronAppScreen(screenPosition);
+                    break;
+                default:
+                    newScreen = createNewBrowserScreen(screenPosition);
+                    break;
+            }
+            
+            // Make it face the camera
+            newScreen.lookAt(camera.position);
+            
+            // Add visual feedback
+            createModeChangeIndicator(`New ${screenType.charAt(0).toUpperCase() + screenType.slice(1)} Screen Created`);
+            
+            // Select this screen
+            selectScreen(newScreen);
+            break;
+            
         case 'moveMode':
-            toggleMoveMode(button);
+            console.log("Move mode button pressed");
+            // Toggle move mode
+            isMoveModeActive = !isMoveModeActive;
+            isRotateModeActive = false; // Disable rotate mode
+            
+            // Update button state
+            button.material.color.set(isMoveModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isMoveModeActive ? 'Move Mode Activated' : 'Move Mode Deactivated');
             break;
+            
         case 'rotateMode':
-            toggleRotateMode(button);
+            console.log("Rotate mode button pressed");
+            // Toggle rotate mode
+            isRotateModeActive = !isRotateModeActive;
+            isMoveModeActive = false; // Disable move mode
+            
+            // Update button state
+            button.material.color.set(isRotateModeActive ? button.userData.activeColor : button.userData.inactiveColor);
+            
+            // Create visual indicator
+            createModeChangeIndicator(isRotateModeActive ? 'Rotate Mode Activated' : 'Rotate Mode Deactivated');
             break;
+            
+        // FIXED: Add explicit handling for playButton and volumeButton from screens
+        case 'playButton':
+            console.log("Play/pause button pressed");
+            // Toggle video playback
+            if (videoControlFunctions.togglePlayback) {
+                videoControlFunctions.togglePlayback();
+            }
+            break;
+            
+        case 'volumeButton':
+            console.log("Mute/unmute button pressed");
+            // Toggle video mute
+            if (videoControlFunctions.toggleMute) {
+                videoControlFunctions.toggleMute();
+            }
+            break;
+            
+        // Keep generic play/pause and mute/unmute handlers for compatibility
+        case 'play':
+        case 'pause':
+            console.log("Play/pause button pressed");
+            if (videoControlFunctions.togglePlayback) {
+                videoControlFunctions.togglePlayback();
+            }
+            break;
+            
+        case 'mute':
+        case 'unmute':
+            console.log("Mute/unmute button pressed");
+            if (videoControlFunctions.toggleMute) {
+                videoControlFunctions.toggleMute();
+            }
+            break;
+            
         default:
-            console.log("Unhandled button action:", button.userData.action);
+            console.log("Unknown button action:", action);
+            break;
     }
 }
 
@@ -996,9 +1073,9 @@ function onTouchStart(event) {
             // Try to relay interaction to iframe content
             if (relayInteractionToIframe(screen, screenIntersect, 'click')) {
                 // Interaction was handled by iframe
-                return;
-            }
-            
+        return;
+    }
+    
             // If not handled by iframe, just select the screen
             selectScreen(screen);
             
@@ -1019,11 +1096,7 @@ function onTouchStart(event) {
                 // If it's a video screen, toggle playback
                 if (screen.userData.contentType === "video" || screen.userData.contentType === "youtube") {
                     console.log("Toggling video playback on double tap");
-                    if (videoControlFunctions.togglePlayback) {
-                        videoControlFunctions.togglePlayback();
-                    } else {
-                        console.warn("Video playback function not available");
-                    }
+                    mediaModule.toggleVideoPlayback();
                 }
             }
             
@@ -1549,10 +1622,11 @@ function findScreenFromDragHandle(dragHandle) {
 
 // Setup function to be called with imports
 export function setupVideoControls(mediaModule) {
-    console.log("Setting up video controls with:", mediaModule);
     if (mediaModule) {
-        videoControlFunctions.togglePlayback = mediaModule.toggleVideoPlayback || null;
-        videoControlFunctions.toggleMute = mediaModule.toggleVideoMute || null;
+        // Store references to functions rather than redefining them
+        videoControlFunctions.togglePlayback = mediaModule.toggleVideoPlayback;
+        videoControlFunctions.toggleMute = mediaModule.toggleVideoMute;
+        console.log("Video controls setup complete");
     }
 }
 

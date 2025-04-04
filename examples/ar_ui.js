@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controller } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
+import { createControlPanel as createARControlPanel, createScreenTypeSelector } from './ar_control_panel.js';
 
 // Global UI elements
 export let controlPanel = null;
@@ -513,52 +514,52 @@ function createButtonIcon(buttonIndex) {
             // Fallback to simple shapes with colors based on button type
             if (buttonIndex === 0) { // New Screen button
                 ctx.fillStyle = '#4CAF50'; // Green
-                ctx.beginPath();
+            ctx.beginPath();
                 ctx.arc(128, 128, 100, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        
+        ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(64, 118, 128, 20);
                 ctx.fillRect(118, 64, 20, 128);
             } else if (buttonIndex === 1) { // Delete button
                 ctx.fillStyle = '#F44336'; // Red
-                ctx.beginPath();
+            ctx.beginPath();
                 ctx.arc(128, 128, 100, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = '#FFFFFF';
-                ctx.beginPath();
+        ctx.fill();
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
                 ctx.moveTo(88, 88);
                 ctx.lineTo(168, 168);
                 ctx.lineTo(158, 178);
                 ctx.lineTo(78, 98);
-                ctx.closePath();
-                ctx.fill();
+        ctx.closePath();
+        ctx.fill();
                 
-                ctx.beginPath();
+        ctx.beginPath();
                 ctx.moveTo(168, 88);
                 ctx.lineTo(88, 168);
                 ctx.lineTo(78, 158);
                 ctx.lineTo(158, 78);
-                ctx.closePath();
-                ctx.fill();
+        ctx.closePath();
+        ctx.fill();
             } else {
                 // For other buttons, create a generic icon
                 ctx.fillStyle = '#2196F3'; // Blue
-                ctx.beginPath();
+        ctx.beginPath();
                 ctx.arc(128, 128, 100, 0, Math.PI * 2);
-                ctx.fill();
-                
+        ctx.fill();
+        
                 // Add button index
-                ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = '#FFFFFF';
                 ctx.font = '80px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(buttonIndex.toString(), 128, 128);
             }
             
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
             resolve(texture);
         };
         
@@ -574,8 +575,6 @@ function createButtonIcon(buttonIndex) {
 
 // Create a screen type selector with buttons for different content types
 function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
-    console.log("Creating screen type selector with button size:", buttonSize);
-    
     // Create a panel for content type selection
     const selectorGroup = new THREE.Group();
     
@@ -685,13 +684,11 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
     const buttonIcons = [2, 3, 4, 5]; // indices for the createButtonIcon function
     const buttonColors = [0xE62117, 0xDE5833, 0x4285F4, 0x47848F]; // colors matching each service
     
-    // MUCH BIGGER button size for better touch targets
-    const smallButtonSize = buttonSize * 1.7; // Significantly increase button size for easier touching
-    const spacing = smallButtonSize * 1.8; // Space between buttons (reduce to fit all buttons)
+    // BIGGER button size for better touch targets
+    const smallButtonSize = buttonSize * 1.1; // Increase from 1.0 to 1.1 (larger)
+    const spacing = smallButtonSize * 2.2; // Space between buttons
     const startX = -spacing * 1.5; // Starting position for first button
     const buttonY = -0.01; // Move buttons down slightly within the panel
-    
-    console.log("Creating screen type buttons with size:", smallButtonSize);
     
     buttonTypes.forEach((type, index) => {
         // Create button canvas for gradient effect
@@ -739,100 +736,148 @@ function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSi
         // Position with adjusted Y coordinate
         button.position.set(startX + spacing * index, buttonY, 0.003);
         button.renderOrder = 1005;
-        
-        // Add much more complete userData for button identification and behavior
         button.userData = {
             type: 'button',
-            buttonType: 'screenTypeSelector', // Help identify this is a screen type button
-            action: type, // Set action to match type (youtube, maps, etc.)
-            index: index, // Store the index
+            action: 'selectScreenType',
             screenType: buttonTypes[index],
             hoverColor: new THREE.Color(buttonColors[index]).lerp(new THREE.Color(0xFFFFFF), 0.3), // Lighter version for hover
             activeColor: buttonColors[index],
             inactiveColor: buttonColors[index],
             originalColor: buttonColors[index],
             isToggle: false,
-            isActive: true,
-            isInteractive: true
+            isActive: true
         };
         
-        // Create invisible larger hitbox for better interaction
-        const hitboxSize = smallButtonSize * 1.5; // 50% larger hitbox
-        const hitboxGeometry = new THREE.CircleGeometry(hitboxSize / 2, 32);
-        const hitboxMaterial = new THREE.MeshBasicMaterial({
+        // Add button shadow for depth
+        const shadowGeometry = new THREE.CircleGeometry(smallButtonSize / 2 * 1.05, 32);
+        const shadowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
             transparent: true,
-            opacity: 0.0, // Completely invisible
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+        shadowMesh.position.z = -0.001;
+        shadowMesh.renderOrder = 1004;
+        button.add(shadowMesh);
+        
+        // Add icon to button - LARGER
+        const iconSize = smallButtonSize * 0.8; // Keep at 0.8
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff, // Default white color until texture loads
+            transparent: true,
             side: THREE.DoubleSide
         });
         
-        const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
-        hitbox.position.z = 0.001; // Slightly in front of the button
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.z = 0.004;
+        iconMesh.renderOrder = 1006;
+        button.add(iconMesh);
         
-        // Copy userData to hitbox
-        hitbox.userData = {
-            type: 'button',
-            buttonType: 'screenTypeSelector',
-            action: type,
-            index: index,
-            screenType: buttonTypes[index],
-            isInteractive: true,
-            parentButton: button
+        // Direct loading of icons using image files rather than indices
+        const iconPaths = {
+            0: 'examples/textures/ar_icons/youtube.png',
+            1: 'examples/textures/ar_icons/DuckDuckGo_logo.png',
+            2: 'examples/textures/ar_icons/maps.png',
+            3: 'examples/textures/ar_icons/electron_app.png'
         };
         
-        button.add(hitbox);
+        // Load the icon texture directly using the file path
+        const img = new Image();
+        img.onload = function() {
+            // Create a canvas to draw the icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw image centered on canvas
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            
+            // Apply to icon material
+            iconMaterial.map = texture;
+            iconMaterial.needsUpdate = true;
+        };
         
-        console.log(`Created ${type} button with index ${index}`);
+        img.onerror = function() {
+            console.error("Error loading icon image for button: " + index);
+            // Fallback to text icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '80px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(buttonTypes[index].substring(0, 1).toUpperCase(), 128, 128);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            iconMaterial.map = texture;
+            iconMaterial.needsUpdate = true;
+        };
         
-        // Load icon on button - with simple retry logic
-        createButtonIcon(buttonIcons[index]).then(iconTexture => {
-            const iconSize = smallButtonSize * 0.6; // Icon slightly smaller than button
-            const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-            const iconMaterial = new THREE.MeshBasicMaterial({
-                map: iconTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.001;
-            button.add(iconMesh);
-            console.log(`Added icon to ${type} button`);
-        }).catch(err => {
-            console.error(`Failed to load icon for ${type} button:`, err);
-            // Create simple text instead
-            const textCanvas = document.createElement('canvas');
-            textCanvas.width = 64;
-            textCanvas.height = 64;
-            const textCtx = textCanvas.getContext('2d');
-            
-            textCtx.fillStyle = '#ffffff';
-            textCtx.font = 'bold 20px Arial';
-            textCtx.textAlign = 'center';
-            textCtx.textBaseline = 'middle';
-            textCtx.fillText(type.substring(0, 1).toUpperCase(), 32, 32);
-            
-            const textTexture = new THREE.CanvasTexture(textCanvas);
-            const iconSize = smallButtonSize * 0.6;
-            const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
-            const iconMaterial = new THREE.MeshBasicMaterial({
-                map: textTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.001;
-            button.add(iconMesh);
-            console.log(`Added text fallback to ${type} button`);
+        // Set image source to the appropriate path for this button
+        img.src = iconPaths[index];
+        
+        // Add label for each button with text shadow for better readability
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 128;
+        labelCanvas.height = 48; // Taller for better quality
+        const labelCtx = labelCanvas.getContext('2d');
+        
+        // Clear canvas and add text with shadow
+        labelCtx.clearRect(0, 0, labelCanvas.width, labelCanvas.height);
+        
+        labelCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        labelCtx.shadowBlur = 3;
+        labelCtx.shadowOffsetX = 1;
+        labelCtx.shadowOffsetY = 1;
+        
+        labelCtx.fillStyle = '#ffffff';
+        labelCtx.font = '600 14px Inter, SF Pro Display, Arial'; // Use consistent font with control panel
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        
+        // Choose appropriate text for each button
+        let labelText;
+        switch(index) {
+            case 0: labelText = 'YouTube'; break;
+            case 1: labelText = 'Search'; break;
+            case 2: labelText = 'Maps'; break;
+            case 3: labelText = 'App'; break;
+        }
+        
+        labelCtx.fillText(labelText, labelCanvas.width / 2, labelCanvas.height / 2);
+        labelCtx.shadowBlur = 0;
+        
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelGeometry = new THREE.PlaneGeometry(smallButtonSize * 1.8, smallButtonSize * 0.6);
+        const labelMaterial = new THREE.MeshBasicMaterial({
+            map: labelTexture,
+            transparent: true,
+            side: THREE.DoubleSide
         });
+        
+        const labelMesh = new THREE.Mesh(labelGeometry, labelMaterial);
+        labelMesh.position.set(0, -smallButtonSize * 0.8, 0.002);
+        labelMesh.renderOrder = 1006;
+        button.add(labelMesh);
         
         selectorGroup.add(button);
     });
     
-    // Position the entire selector group
-    selectorGroup.position.set(offsetX, offsetY, 0.002);
+    // Position the selector panel relative to the parent
+    selectorGroup.position.set(offsetX, offsetY - 0.13, 0.01); // Lower position
     parent.add(selectorGroup);
-    console.log("Screen type selector created and added to parent");
     
     return selectorGroup;
 }
@@ -1075,34 +1120,64 @@ export function setButtonPressed(button, isPressed) {
     }
 }
 
-// Position control panel in front of user
+// Position the control panel in front of the user
 export function setupControlPanel() {
-    if (!controlPanel) return;
+    if (!controlPanel) {
+        console.error("Control panel does not exist - cannot position it");
+        return;
+    }
     
-    // Only reposition if not being dragged AND not previously manually positioned
-    if (controlPanel.userData.isDragging || controlPanel.userData.manuallyPositioned) return;
+    console.log("Setting up control panel position");
     
-    // Position in front and below the user
-    const cameraDirection = new THREE.Vector3(0, 0, -1);
-    cameraDirection.applyQuaternion(camera.quaternion);
+    // Only reposition if:
+    // 1. The panel is not being dragged
+    // 2. The panel hasn't been manually positioned
+    if (controlPanel.userData.isBeingDragged) {
+        console.log("Control panel is being dragged - not repositioning");
+        return;
+    }
     
-    const position = new THREE.Vector3();
-    position.copy(camera.position).add(cameraDirection.multiplyScalar(-0.6)); // Further from user (0.6m instead of 0.4m)
+    if (controlPanel.userData.manuallyPositioned) {
+        console.log("Control panel was manually positioned - not repositioning");
+        return;
+    }
     
-    // Position BELOW the default screen position
-    position.y -= 0.4; // Position it much lower to appear below the screen
-    
-    // Update panel position and rotation
-    controlPanel.position.copy(position);
-    controlPanel.lookAt(camera.position);
-    
-    // Keep panel facing the user but upright
-    const euler = new THREE.Euler().setFromQuaternion(controlPanel.quaternion);
-    euler.x = 0; // Keep panel upright (no tilt)
-    euler.z = 0; // No roll
-    controlPanel.quaternion.setFromEuler(euler);
-    
-    console.log("Control panel positioned below screen");
+    try {
+        // Get camera position and direction
+        const cameraPosition = new THREE.Vector3();
+        camera.getWorldPosition(cameraPosition);
+        
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        
+        // Position the panel at a fixed distance in front of the camera
+        // but slightly lower than eye level for better ergonomics
+        const targetPosition = cameraPosition.clone().add(
+            direction.clone().multiplyScalar(0.8) // 0.8 meters in front
+        );
+        
+        // Lower the panel so it's not blocking the center of view
+        targetPosition.y -= 0.2; // 20cm below eye level
+        
+        console.log("Positioning control panel at:", 
+            targetPosition.x.toFixed(2), 
+            targetPosition.y.toFixed(2), 
+            targetPosition.z.toFixed(2)
+        );
+        
+        // Apply position
+        controlPanel.position.copy(targetPosition);
+        
+        // Make panel face the user
+        controlPanel.lookAt(cameraPosition);
+        
+        // Add subtle tilt for better visibility
+        controlPanel.rotation.x += 0.2;
+        
+        console.log("Control panel positioned successfully");
+    } catch (error) {
+        console.error("Error positioning control panel:", error);
+    }
 }
 
 // Add gentle floating animation to the control panel to make it look more interactive
