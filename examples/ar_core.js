@@ -120,31 +120,45 @@ function initAREnvironment() {
     });
 
     // Controller setup
-    controller = renderer.xr.getController(0);
-    
-    // Add controller event listeners
-    controller.addEventListener('selectstart', function() {
-        controller.userData.isSelecting = true;
-    });
-    
-    controller.addEventListener('selectend', function() {
-        controller.userData.isSelecting = false;
-    });
-    
-    scene.add(controller);
-
-    // Controller model
-    const controllerModelFactory = new XRControllerModelFactory();
-    controllerGrip = renderer.xr.getControllerGrip(0);
-    controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
-    scene.add(controllerGrip);
-
-    // Pointer for interaction - SMALLER SIZE
-    const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
-    const pointer = new THREE.Mesh(geometry, material);
-    pointer.position.z = -0.1;
-    controller.add(pointer);
+    try {
+        controller = renderer.xr.getController(0);
+        
+        if (controller) {
+            // Add controller event listeners
+            controller.addEventListener('selectstart', function() {
+                controller.userData.isSelecting = true;
+            });
+            
+            controller.addEventListener('selectend', function() {
+                controller.userData.isSelecting = false;
+            });
+            
+            scene.add(controller);
+            
+            // Pointer for interaction - SMALLER SIZE
+            const geometry = new THREE.SphereGeometry(0.005, 16, 16); // Reduced size
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Cyan for better visibility
+            const pointer = new THREE.Mesh(geometry, material);
+            pointer.position.z = -0.1;
+            controller.add(pointer);
+        } else {
+            console.warn("XR controller not available - touch input will be used instead");
+        }
+        
+        // Controller model
+        controllerGrip = renderer.xr.getControllerGrip(0);
+        if (controllerGrip) {
+            const controllerModelFactory = new XRControllerModelFactory();
+            controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+            scene.add(controllerGrip);
+        }
+    } catch (error) {
+        console.error("Error setting up XR controller:", error);
+        // Create a fallback controller for debugging
+        controller = new THREE.Group();
+        controller.userData = { isSelecting: false };
+        scene.add(controller);
+    }
 
     // Window resize handler
     window.addEventListener('resize', onWindowResize);

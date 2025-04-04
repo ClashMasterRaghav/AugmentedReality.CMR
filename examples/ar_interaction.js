@@ -46,17 +46,33 @@ let videoControlFunctions = {
 
 // Setup event listeners
 export function setupEventListeners() {
-    // Controller events
-    controller.addEventListener('select', onSelect);
-    controller.addEventListener('selectstart', onSelectStart);
-    controller.addEventListener('selectend', onSelectEnd);
+    console.log("Setting up event listeners...");
     
-    // Touch events
-    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
-    
-    console.log("Event listeners set up successfully");
+    try {
+        // Controller events - only add if controller exists
+        if (controller) {
+            controller.addEventListener('select', onSelect);
+            controller.addEventListener('selectstart', onSelectStart);
+            controller.addEventListener('selectend', onSelectEnd);
+            console.log("Controller event listeners added");
+        } else {
+            console.warn("Controller is not available - controller events not set up");
+        }
+        
+        // Touch events - only add if renderer dom element exists
+        if (renderer && renderer.domElement) {
+            renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+            renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+            console.log("Touch event listeners added");
+        } else {
+            console.warn("Renderer DOM element is not available - touch events not set up");
+        }
+        
+        console.log("Event listeners set up successfully");
+    } catch (error) {
+        console.error("Error setting up event listeners:", error);
+    }
 }
 
 // Handle controller selection start

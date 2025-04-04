@@ -80,79 +80,119 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize AR experience
     function initializeAR() {
-        // Check WebXR and AR support
-        isWebXRSupported().then(supported => {
-            const loadingMessage = document.getElementById('loadingMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            if (!supported) {
-                // Show error message for unsupported browsers
-                if (loadingMessage) loadingMessage.style.display = 'none';
-                if (errorMessage) {
-                    errorMessage.style.display = 'block';
-                    console.error('WebXR AR is not supported on this device or browser');
-                } else {
-                    // If error message element doesn't exist, create one
-                    const errorDiv = document.createElement('div');
-                    errorDiv.id = 'errorMessage';
-                    errorDiv.style.position = 'absolute';
-                    errorDiv.style.top = '50%';
-                    errorDiv.style.left = '50%';
-                    errorDiv.style.transform = 'translate(-50%, -50%)';
-                    errorDiv.style.color = '#fff';
-                    errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
-                    errorDiv.style.padding = '20px';
-                    errorDiv.style.borderRadius = '10px';
-                    errorDiv.style.fontFamily = 'Arial, sans-serif';
-                    errorDiv.style.fontSize = '18px';
-                    errorDiv.style.textAlign = 'center';
-                    errorDiv.style.zIndex = '1000';
+        console.log("Initializing AR experience...");
+        
+        // Check WebXR and AR support with better error handling
+        isWebXRSupported()
+            .then(supported => {
+                const loadingMessage = document.getElementById('loadingMessage');
+                const errorMessage = document.getElementById('errorMessage');
+                
+                if (!supported) {
+                    // Show error message for unsupported browsers
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    if (errorMessage) {
+                        errorMessage.style.display = 'block';
+                        errorMessage.innerHTML = `
+                            <h2>WebXR AR Not Supported</h2>
+                            <p>Your browser or device does not support WebXR Augmented Reality.</p>
+                            <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
+                        `;
+                        console.error('WebXR AR is not supported on this device or browser');
+                    } else {
+                        // If error message element doesn't exist, create one
+                        createErrorMessage('WebXR AR Not Supported', 
+                            'Your browser or device does not support WebXR Augmented Reality. ' +
+                            'Please try using a compatible browser like Chrome on an AR-capable Android device.');
+                    }
+                    return;
+                }
+                
+                // Initialize the AR experience
+                try {
+                    console.log("WebXR is supported, initializing AR components...");
                     
-                    errorDiv.innerHTML = `
-                        <h2>WebXR AR Not Supported</h2>
-                        <p>Your browser or device does not support WebXR Augmented Reality.</p>
-                        <p>Please try using a compatible browser like Chrome on an AR-capable Android device.</p>
-                    `;
+                    // Initialize video texture
+                    loadVideoTexture();
                     
-                    document.body.appendChild(errorDiv);
+                    // Initialize AR
+                    if (!initAR()) {
+                        throw new Error("Failed to initialize AR components");
+                    }
+                    
+                    // Set up event listeners with better error handling
+                    try {
+                        setupEventListeners();
+                    } catch (eventError) {
+                        console.error("Error setting up event listeners, but continuing:", eventError);
+                        // Continue even if event setup fails
+                    }
+                    
+                    // Start animation loop
+                    animate();
+                    
+                    // Hide loading message once everything is initialized
+                    if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                    }
+                    
+                    console.log("AR initialization complete");
+                } catch (error) {
+                    // Handle initialization errors
+                    console.error('Failed to initialize AR experience:', error);
+                    
+                    // Hide loading message and show error
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    
+                    createErrorMessage('AR Initialization Failed', 
+                        `There was a problem starting the AR experience: ${error.message}. ` +
+                        'Please try reloading the page or using a different device.');
                 }
-                return;
-            }
-            
-            // Initialize the AR experience
-            try {
-                // Initialize video texture
-                loadVideoTexture();
-                
-                // Initialize AR
-                initAR();
-                
-                // Set up event listeners
-                setupEventListeners();
-                
-                // Start animation loop
-                animate();
-                
-                // Hide loading message once everything is initialized
-                if (loadingMessage) {
-                    loadingMessage.style.display = 'none';
-                }
-            } catch (error) {
-                // Handle initialization errors
-                console.error('Failed to initialize AR experience:', error);
-                
-                // Hide loading message and show error
-                if (loadingMessage) loadingMessage.style.display = 'none';
-                if (errorMessage) {
-                    errorMessage.innerHTML = `
-                        <h2>AR Initialization Failed</h2>
-                        <p>There was a problem starting the AR experience: ${error.message}</p>
-                        <p>Please try reloading the page or using a different device.</p>
-                    `;
-                    errorMessage.style.display = 'block';
-                }
-            }
-        });
+            })
+            .catch(error => {
+                console.error("Error checking WebXR support:", error);
+                createErrorMessage('WebXR Check Failed', 
+                    'Could not determine if your device supports AR. ' +
+                    'Please ensure you have granted the necessary permissions.');
+            });
+    }
+    
+    // Helper function to create error messages
+    function createErrorMessage(title, message) {
+        const existingError = document.getElementById('errorMessage');
+        
+        if (existingError) {
+            existingError.innerHTML = `
+                <h2>${title}</h2>
+                <p>${message}</p>
+                <p>Please try reloading the page or using a different device.</p>
+            `;
+            existingError.style.display = 'block';
+            return;
+        }
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'errorMessage';
+        errorDiv.style.position = 'absolute';
+        errorDiv.style.top = '50%';
+        errorDiv.style.left = '50%';
+        errorDiv.style.transform = 'translate(-50%, -50%)';
+        errorDiv.style.color = '#fff';
+        errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.borderRadius = '10px';
+        errorDiv.style.fontFamily = 'Arial, sans-serif';
+        errorDiv.style.fontSize = '18px';
+        errorDiv.style.textAlign = 'center';
+        errorDiv.style.zIndex = '1000';
+        
+        errorDiv.innerHTML = `
+            <h2>${title}</h2>
+            <p>${message}</p>
+            <p>Please try reloading the page or using a different device.</p>
+        `;
+        
+        document.body.appendChild(errorDiv);
     }
     
     // On desktop or WebXR-supported devices, initialize immediately
