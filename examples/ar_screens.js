@@ -3,10 +3,10 @@ import * as THREE from "three";
 import { scene, camera, selectedScreen, setSelectedScreen } from "./ar_core.js";
 import { virtualKeyboard } from "./ar_ui.js";
 import { createDefaultScreen } from "./ar_default_screen.js"; 
-import { createYouTubeScreen as importedCreateYouTubeScreen } from "./ar_youtube.js";
+import { createYouTubeScreen } from "./ar_youtube.js";
 import { createBrowserScreen } from "./ar_browser.js";
 import { createMapsScreen } from "./ar_maps.js";
-import { createElectronAppScreen as importedCreateElectronAppScreen } from "./ar_electron.js";
+import { createElectronAppScreen } from "./ar_electron.js";
 
 // Array to store screen objects
 export let screens = [];
@@ -27,7 +27,7 @@ export function createNewBrowserScreen(position = new THREE.Vector3(0, 0, -1.5))
 
 // Create a new YouTube screen wrapper function
 export function createNewYouTubeScreen(position = new THREE.Vector3(0, 0, -1.5)) {
-    const youtubeScreen = importedCreateYouTubeScreen(position, screens.length + 1);
+    const youtubeScreen = createYouTubeScreen(position, screens.length + 1);
     
     // Add to scene and screens array
     scene.add(youtubeScreen);
@@ -61,7 +61,7 @@ export const createGoogleMapsScreen = createNewGoogleMapsScreen;
 
 // Create a new Electron app screen wrapper function
 export function createNewElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5)) {
-    const electronScreen = importedCreateElectronAppScreen(position, screens.length + 1);
+    const electronScreen = createElectronAppScreen(position, screens.length + 1);
     
     // Add to scene and screens array
     scene.add(electronScreen);
@@ -72,10 +72,6 @@ export function createNewElectronAppScreen(position = new THREE.Vector3(0, 0, -1
     
     return electronScreen;
 }
-
-// Export the imported functions directly
-export const createElectronAppScreen = importedCreateElectronAppScreen;
-export const createYouTubeScreen = importedCreateYouTubeScreen;
 
 // Create a new default screen wrapper function
 export function createNewDefaultScreen(position = new THREE.Vector3(0, 0, -1.5)) {
