@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controller } from './ar_core.js';
 import { createNewBrowserScreen, screens, selectScreen } from './ar_screens.js';
-import { createControlPanel as createARControlPanel, createScreenTypeSelector } from './ar_control_panel.js';
+import { createControlPanel as createARControlPanel, createScreenTypeSelector as createPanelScreenSelector } from './ar_control_panel.js';
 
 // Global UI elements
 export let controlPanel = null;
@@ -468,7 +468,7 @@ export function createControlPanel() {
     scene.add(controlPanel);
     
     // Add screen type selector below the main panel
-    createScreenTypeSelector(controlPanel, 0, -0.08, 0.04);
+    createPanelScreenSelector(controlPanel, 0, -0.08, 0.04);
     
     return controlPanel;
 }
@@ -574,7 +574,7 @@ function createButtonIcon(buttonIndex) {
 }
 
 // Create a screen type selector with buttons for different content types
-function createScreenTypeSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
+function createPanelScreenSelector(parent, offsetX = 0, offsetY = -0.05, buttonSize = 0.04) {
     // Create a panel for content type selection
     const selectorGroup = new THREE.Group();
     
