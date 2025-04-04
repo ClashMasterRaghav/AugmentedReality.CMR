@@ -164,22 +164,21 @@ function createBrowserTexture(url) {
     iframe.style.left = '-9999px';
     iframe.style.top = '-9999px';
     iframe.width = canvas.width;
-    iframe.height = canvas.height - 40; // Account for top bar
-    iframe.src = url || 'https://duckduckgo.com/';
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
-    iframe.allowFullscreen = true;
-    iframe.sandbox = "allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts";
+    iframe.height = canvas.height - 40; // Account for the title bar
+    iframe.src = url;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.sandbox = "allow-same-origin allow-scripts allow-popups allow-forms";
     iframe.frameBorder = "0";
     iframe.id = `browser-frame-${Date.now()}`;
     document.body.appendChild(iframe);
     
-    // Add viewport meta tag for better mobile experience
+    // Add viewport meta tag for better mobile-friendly rendering
     const viewportMeta = document.createElement('meta');
     viewportMeta.name = 'viewport';
     viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
     document.head.appendChild(viewportMeta);
     
-    // Create proxy browser controls
+    // Create browser controls
     const browserControls = document.createElement('div');
     browserControls.style.position = 'absolute';
     browserControls.style.left = '-9999px';
@@ -216,7 +215,7 @@ function createBrowserTexture(url) {
     // URL input box
     const urlInput = document.createElement('input');
     urlInput.type = 'text';
-    urlInput.value = url || 'https://duckduckgo.com/';
+    urlInput.value = url;
     urlInput.style.flex = '1';
     urlInput.style.marginLeft = '10px';
     urlInput.style.marginRight = '10px';
@@ -231,161 +230,129 @@ function createBrowserTexture(url) {
     browserControls.appendChild(urlInput);
     document.body.appendChild(browserControls);
     
-    // Try to forward user interactions to the iframe
+    // Function to forward user interactions to the iframe
     function forwardInteraction(event) {
+        // Ignore interactions in title bar area
+        if (event.y < 40) return false;
+        
         try {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'interaction',
-                    event: {
-                        type: event.type,
-                        x: event.clientX,
-                        y: event.clientY - 40 // Adjust for toolbar
-                    }
-                }, '*');
+            // Position iframe on-screen temporarily to receive the event
+            const originalPosition = iframe.style.position;
+            const originalLeft = iframe.style.left;
+            const originalTop = iframe.style.top;
+            
+            iframe.style.position = 'fixed';
+            iframe.style.left = '0';
+            iframe.style.top = '0';
+            iframe.style.zIndex = '9999';
+            
+            // Create and dispatch event
+            let browserEvent;
+            if (event.type === 'click') {
+                browserEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40 // Adjust for title bar
+                });
+            } else if (event.type === 'drag') {
+                // For drag, send both mousedown and mousemove
+                const downEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.startX,
+                    clientY: event.startY - 40
+                });
+                
+                const moveEvent = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.startX, event.startY - 40)?.dispatchEvent(downEvent);
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(moveEvent);
+                }
+            } else if (event.type === 'scroll') {
+                // Handle scrolling - simulate wheel event
+                const wheelEvent = new WheelEvent('wheel', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40,
+                    deltaY: event.deltaY
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(wheelEvent);
+                }
             }
+            
+            // For simple click events
+            if (event.type === 'click' && iframe.contentDocument) {
+                const element = iframe.contentDocument.elementFromPoint(event.x, event.y - 40);
+                if (element) element.dispatchEvent(browserEvent);
+            }
+            
+            // Return iframe to its original position
+            iframe.style.position = originalPosition;
+            iframe.style.left = originalLeft;
+            iframe.style.top = originalTop;
+            
+            return true;
         } catch (e) {
-            console.warn('Unable to forward interaction:', e);
+            console.error('Error forwarding interaction to browser iframe:', e);
+            return false;
         }
     }
     
-    // Setup button functionalities
+    // Setup browser functionality
     backButton.addEventListener('click', function() {
-        try {
+        if (iframe.contentWindow && iframe.contentWindow.history) {
             iframe.contentWindow.history.back();
-        } catch (e) {
-            console.warn('Unable to go back:', e);
+            setTimeout(captureIframeToTexture, 500);
         }
     });
     
     forwardButton.addEventListener('click', function() {
-        try {
+        if (iframe.contentWindow && iframe.contentWindow.history) {
             iframe.contentWindow.history.forward();
-        } catch (e) {
-            console.warn('Unable to go forward:', e);
+            setTimeout(captureIframeToTexture, 500);
         }
     });
     
     refreshButton.addEventListener('click', function() {
-        try {
+        if (iframe.contentWindow) {
             iframe.contentWindow.location.reload();
-        } catch (e) {
-            console.warn('Unable to refresh:', e);
-            // Alternative method
-            iframe.src = iframe.src;
+            setTimeout(captureIframeToTexture, 500);
         }
     });
     
     urlInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            try {
-                // Format URL properly if needed
-                let target = urlInput.value.trim();
-                if (!target.startsWith('http')) {
-                    // Check if it's a URL or a search term
-                    if (target.includes('.') && !target.includes(' ')) {
-                        target = 'https://' + target;
-                    } else {
-                        // Search query
-                        target = 'https://duckduckgo.com/?q=' + encodeURIComponent(target);
-                    }
-                }
-                
-                // Navigate to the URL
-                iframe.src = target;
-                urlInput.value = target;
-            } catch (e) {
-                console.warn('Unable to navigate:', e);
+            let newUrl = urlInput.value.trim();
+            
+            // Format the URL properly
+            if (newUrl.indexOf(' ') !== -1 || !newUrl.includes('.')) {
+                // If the input has spaces or doesn't have a dot, treat as search query
+                newUrl = `https://duckduckgo.com/?q=${encodeURIComponent(newUrl)}`;
+            } else if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                newUrl = 'https://' + newUrl;
             }
+            
+            iframe.src = newUrl;
+            urlInput.value = newUrl;
+            
+            // Capture the new content after it loads
+            setTimeout(captureIframeToTexture, 1000);
         }
     });
-    
-    // Listen for message from iframe when URL changes
-    window.addEventListener('message', function(event) {
-        // Check if message is from our iframe
-        if (event.source === iframe.contentWindow) {
-            // Update URL in input box if location changed
-            if (event.data && event.data.type === 'locationChange') {
-                urlInput.value = event.data.url;
-            }
-        }
-    });
-    
-    // Function to draw browser UI
-    function drawBrowserUI() {
-        // Clear the canvas
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw browser toolbar
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, 40);
-        
-        // Draw URL bar
-        ctx.fillStyle = '#f5f5f5';
-        ctx.fillRect(80, 8, canvas.width - 160, 24);
-        ctx.strokeStyle = '#dddddd';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(80, 8, canvas.width - 160, 24);
-        
-        // Draw the current URL
-        ctx.fillStyle = '#333333';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        // Truncate URL if too long
-        let displayUrl = urlInput.value;
-        if (displayUrl.length > 50) {
-            displayUrl = displayUrl.substring(0, 20) + '...' + displayUrl.substring(displayUrl.length - 27);
-        }
-        ctx.fillText(displayUrl, 85, 20);
-        
-        // Draw buttons
-        // Back button
-        ctx.fillStyle = '#f2f2f2';
-        ctx.fillRect(10, 8, 24, 24);
-        ctx.strokeStyle = '#dddddd';
-        ctx.strokeRect(10, 8, 24, 24);
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('←', 22, 20);
-        
-        // Forward button
-        ctx.fillStyle = '#f2f2f2';
-        ctx.fillRect(44, 8, 24, 24);
-        ctx.strokeStyle = '#dddddd';
-        ctx.strokeRect(44, 8, 24, 24);
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('→', 56, 20);
-        
-        // Refresh button
-        ctx.fillStyle = '#f2f2f2';
-        ctx.fillRect(canvas.width - 68, 8, 24, 24);
-        ctx.strokeStyle = '#dddddd';
-        ctx.strokeRect(canvas.width - 68, 8, 24, 24);
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('↻', canvas.width - 56, 20);
-        
-        // Draw menu button
-        ctx.fillStyle = '#f2f2f2';
-        ctx.fillRect(canvas.width - 34, 8, 24, 24);
-        ctx.strokeStyle = '#dddddd';
-        ctx.strokeRect(canvas.width - 34, 8, 24, 24);
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('☰', canvas.width - 22, 20);
-    }
     
     // Function to capture iframe content to texture
     function captureIframeToTexture() {
@@ -393,46 +360,78 @@ function createBrowserTexture(url) {
             // Try to use html2canvas to capture the iframe content
             if (window.html2canvas && iframe.contentDocument) {
                 html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
-                    ctx.clearRect(0, 40, canvas.width, canvas.height - 40);
-                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
+                    // Clear canvas and draw the browser UI
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     drawBrowserUI();
+                    
+                    // Draw the captured iframe content below the UI
+                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
                     texture.needsUpdate = true;
                 });
             } else {
-                // Draw placeholder content
-                drawBrowserUI();
-                
-                // Show a message that the real content would be here
+                // Fallback method
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                ctx.fillStyle = '#333333';
-                ctx.font = 'bold 18px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('DuckDuckGo Private Browser', canvas.width / 2, 120);
-                
-                ctx.font = '14px Arial';
-                ctx.fillText('This browser window protects your privacy.', canvas.width / 2, 150);
-                ctx.fillText('Tap on the screen to interact with the webpage.', canvas.width / 2, 180);
-                
-                if (logo.complete) {
-                    const logoWidth = 200;
-                    const logoHeight = 100;
-                    ctx.drawImage(
-                        logo, 
-                        canvas.width / 2 - logoWidth / 2,
-                        250,
-                        logoWidth, 
-                        logoHeight
-                    );
-                }
+                // Draw the browser UI
+                drawBrowserUI();
                 
                 texture.needsUpdate = true;
             }
         } catch (e) {
             console.warn('Error capturing iframe content:', e);
         }
+    }
+    
+    // Function to draw the browser UI
+    function drawBrowserUI() {
+        // Draw browser chrome (top bar)
+        ctx.fillStyle = '#f2f2f2';
+        ctx.fillRect(0, 0, canvas.width, 40);
+        
+        // Draw border line
+        ctx.strokeStyle = '#dddddd';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, 40);
+        ctx.lineTo(canvas.width, 40);
+        ctx.stroke();
+        
+        // Draw DuckDuckGo logo (small)
+        if (logo.complete) {
+            ctx.drawImage(logo, 10, 5, 30, 15);
+        }
+        
+        // Draw URL bar
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(80, 5, canvas.width - 160, 30);
+        ctx.strokeStyle = '#dddddd';
+        ctx.strokeRect(80, 5, canvas.width - 160, 30);
+        
+        // Draw URL text
+        const displayUrl = iframe.src.length > 50 ? 
+            iframe.src.substring(0, 47) + '...' : 
+            iframe.src;
+            
+        ctx.fillStyle = '#333333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayUrl, 90, 20);
+        
+        // Draw navigation buttons
+        // Back button
+        ctx.fillStyle = '#dddddd';
+        ctx.beginPath();
+        ctx.moveTo(65, 20);
+        ctx.lineTo(50, 20);
+        ctx.stroke();
+        
+        // Forward button
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - 65, 20);
+        ctx.lineTo(canvas.width - 50, 20);
+        ctx.stroke();
     }
     
     // Try to load html2canvas if not already available
@@ -446,9 +445,6 @@ function createBrowserTexture(url) {
         document.head.appendChild(script);
     }
     
-    // Initial draw
-    drawBrowserUI();
-    
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
@@ -458,77 +454,90 @@ function createBrowserTexture(url) {
     // Add metadata and methods
     texture.userData = {
         isBrowser: true,
+        url: url,
         iframe: iframe,
         canvas: canvas,
         ctx: ctx,
         controls: browserControls,
         updateInterval: updateInterval,
         
-        // Handle click interactions on the browser
+        // Handle click interaction
         onClick: function(x, y) {
-            // If click is in the toolbar area
+            // Handle UI element clicks in the title bar
             if (y < 40) {
-                // Back button
-                if (x > 10 && x < 34 && y > 8 && y < 32) {
-                    backButton.click();
+                // Back button area
+                if (x < 70) {
+                    if (iframe.contentWindow && iframe.contentWindow.history) {
+                        iframe.contentWindow.history.back();
+                        setTimeout(captureIframeToTexture, 500);
+                    }
                     return true;
                 }
                 
-                // Forward button
-                if (x > 44 && x < 68 && y > 8 && y < 32) {
-                    forwardButton.click();
+                // Forward button area
+                if (x > canvas.width - 70) {
+                    if (iframe.contentWindow && iframe.contentWindow.history) {
+                        iframe.contentWindow.history.forward();
+                        setTimeout(captureIframeToTexture, 500);
+                    }
                     return true;
                 }
                 
-                // Refresh button
-                if (x > canvas.width - 68 && x < canvas.width - 44 && y > 8 && y < 32) {
-                    refreshButton.click();
-                    return true;
-                }
-                
-                // URL bar - focus the input
-                if (x > 80 && x < canvas.width - 160 && y > 8 && y < 32) {
-                    urlInput.focus();
+                // Refresh (middle of the bar)
+                if (x > 70 && x < 80) {
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.location.reload();
+                        setTimeout(captureIframeToTexture, 500);
+                    }
                     return true;
                 }
                 
                 return false;
             }
             
-            // Content area - forward the click
-            forwardInteraction({
+            // Forward the click to iframe content
+            return forwardInteraction({
                 type: 'click',
-                clientX: x,
-                clientY: y
+                x: x,
+                y: y
             });
-            
-            return true;
         },
         
-        // Handle drag on the browser content
+        // Handle drag interaction for scrolling
         onDrag: function(startX, startY, endX, endY) {
-            // Don't handle drag on toolbar
-            if (startY < 40) {
-                return false;
-            }
+            if (startY < 40) return false;
             
-            forwardInteraction({
+            return forwardInteraction({
                 type: 'drag',
-                clientX: endX,
-                clientY: endY,
                 startX: startX,
-                startY: startY
+                startY: startY,
+                x: endX,
+                y: endY
             });
+        },
+        
+        // Handle scroll gesture
+        onScroll: function(x, y, deltaY) {
+            if (y < 40) return false;
             
-            return true;
+            return forwardInteraction({
+                type: 'scroll',
+                x: x,
+                y: y,
+                deltaY: deltaY
+            });
         },
         
         // Navigate to URL
-        navigate: function(url) {
-            if (!url) return;
+        navigate: function(newUrl) {
+            // Format the URL properly
+            if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                newUrl = 'https://' + newUrl;
+            }
             
-            iframe.src = url;
-            urlInput.value = url;
+            iframe.src = newUrl;
+            urlInput.value = newUrl;
+            captureIframeToTexture();
         },
         
         // Dispose resources
@@ -539,6 +548,9 @@ function createBrowserTexture(url) {
             }
             if (browserControls && browserControls.parentNode) {
                 browserControls.parentNode.removeChild(browserControls);
+            }
+            if (viewportMeta && viewportMeta.parentNode) {
+                viewportMeta.parentNode.removeChild(viewportMeta);
             }
         }
     };

@@ -4,7 +4,7 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { createControlPanel, createVirtualKeyboard, setupControlPanel } from './ar_ui.js';
-import { createNewBrowserScreen, createNewDefaultScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
+import { createNewBrowserScreen, selectScreen, screens, updateScreenEffects } from './ar_screens.js';
 import { setupEventListeners, setupVideoControls, showControlPanelInstructions } from './ar_interaction.js';
 import { initUI, createNotification } from './ar_ui.js';
 import { loadVideoTexture, toggleVideoPlayback, toggleVideoMute, updateVideoTextures } from './ar_media.js';
@@ -93,17 +93,8 @@ function initAREnvironment() {
     const fontLoader = new FontLoader();
     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(loadedFont) {
         font = loadedFont;
-        console.log("Font loaded - creating UI controls");
-        
         // Create UI controls once font is loaded
-        const panel = createControlPanel();
-        if (panel) {
-            console.log("Control panel created successfully");
-            setupControlPanel(); // Initialize position
-        } else {
-            console.error("Failed to create control panel");
-        }
-        
+        createControlPanel();
         createVirtualKeyboard();
     });
 
@@ -264,9 +255,9 @@ export function render() {
     const currentCameraPosition = camera.position.clone();
     const currentCameraRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
     
-    // Calculate movement thresholds - increased thresholds to reduce control panel repositioning
-    const positionThreshold = 1.2; // Increased from 0.5 to 1.2 units of movement
-    const rotationThreshold = 0.8; // Increased from 0.3 to 0.8 radians (about 45 degrees)
+    // Calculate movement thresholds
+    const positionThreshold = 0.5; // Units of movement
+    const rotationThreshold = 0.3; // Radians (about 17 degrees)
     
     // Check for significant camera movement
     const hasMoved = currentCameraPosition.distanceTo(lastCameraPosition) > positionThreshold;
@@ -274,19 +265,13 @@ export function render() {
         Math.abs(currentCameraRotation.x - lastCameraRotation.x) > rotationThreshold ||
         Math.abs(currentCameraRotation.y - lastCameraRotation.y) > rotationThreshold;
     
-    // Only update the control panel position if:
-    // 1. Camera has moved significantly AND
-    // 2. We haven't updated in the last 2 seconds (throttle updates)
-    const currentTime = Date.now();
-    if ((hasMoved || hasRotated) && (!window.lastPanelUpdateTime || currentTime - window.lastPanelUpdateTime > 2000)) {
+    // If camera has moved significantly, update the control panel position
+    if (hasMoved || hasRotated) {
         setupControlPanel();
         
         // Update last known position and rotation
         lastCameraPosition.copy(currentCameraPosition);
         lastCameraRotation.copy(currentCameraRotation);
-        
-        // Track when we last updated
-        window.lastPanelUpdateTime = currentTime;
     }
     
     // Update screen visual effects
@@ -298,9 +283,8 @@ export function render() {
 
 // Create a welcome screen at the start
 function createStartScreen() {
-    const startScreen = createNewDefaultScreen(new THREE.Vector3(0, 0, -1.5));
+    const startScreen = createNewBrowserScreen(new THREE.Vector3(0, 0, -1.5));
     
-    console.log("Initial screen created, setting up control panel in 500ms");
     // Set up control panel initial position
     setTimeout(setupControlPanel, 500);
 }

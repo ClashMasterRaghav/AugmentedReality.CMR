@@ -1,95 +1,502 @@
-// Electron app screen component for AR
+// Default screen functionality for AR
 import * as THREE from "three";
-import { scene } from "./ar_core.js";
-// Remove circular dependency
-// import { selectScreen, screens } from "./ar_screens.js";
-import { enhancedCreateScreen, addDropShadow, animateScreenEntrance } from "./ar_default_screen.js";
+import { scene, camera } from "./ar_core.js";
+import { videoTexture } from "./ar_media.js";
+import { selectScreen } from "./ar_screens.js";
 
-// Create an Electron app screen
-export function createElectronAppScreen(position = new THREE.Vector3(0, 0, -1.5), screenId) {
+// Create a default screen with standardized functionality
+export function createDefaultScreen(position = new THREE.Vector3(0, 0, -1.5), screenId) {
     // Screen dimensions
     const screenWidth = 1.0;
     const screenHeight = 0.75;
     const size = { x: screenWidth, y: screenHeight };
-    const title = `Electron App ${screenId || ""}`;
+    const title = `Screen ${screenId || "Default"}`;
     
-    console.log("Creating Electron App screen");
+    console.log("Creating default screen with video");
     
-    // Create Electron app texture
-    const electronTexture = createElectronAppTexture();
-    
-    // Create the screen container
-    const electronScreen = enhancedCreateScreen(
+    // Create the screen container 
+    const defaultScreen = enhancedCreateScreen(
         position,
         size,
         title,
-        electronTexture
+        videoTexture
     );
     
-    // Add electron-specific identification data
-    electronScreen.userData = { 
+    // Add basic identification data
+    defaultScreen.userData = { 
         type: "screen",
         id: screenId,
         isSelected: false,
         isInteractive: true,
         originalScale: new THREE.Vector3(1, 1, 1),
-        contentType: "electron"
+        contentType: "default"
     };
     
-    // Add shadow for depth
-    addDropShadow(electronScreen, screenWidth, screenHeight);
+    // Add drop shadow for depth
+    addDropShadow(defaultScreen, screenWidth, screenHeight);
     
-    // Add Electron app-branded border
+    // Add border with styling
     const borderGeometry = new THREE.PlaneGeometry(
         screenWidth + 0.02,
         screenHeight + 0.02
     );
     const borderMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x2F3241, // Electron dark blue color
+        color: 0x444444, // Dark gray border
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8,
-        depthTest: true
+        opacity: 0.8
     });
     const borderPanel = new THREE.Mesh(borderGeometry, borderMaterial);
     borderPanel.position.z = -0.001;
-    borderPanel.renderOrder = 990;
-    electronScreen.add(borderPanel);
+    defaultScreen.add(borderPanel);
     
     // Set up drag handle
-    const topBar = electronScreen.children.find(
+    const topBar = defaultScreen.children.find(
         (child) => child.userData && child.userData.type === "dragHandle"
     );
     
     if (topBar) {
-        topBar.userData.screen = electronScreen;
-        electronScreen.userData.dragHandle = topBar;
+        topBar.userData.screen = defaultScreen;
+        defaultScreen.userData.dragHandle = topBar;
     }
     
     // Add entrance animation
-    animateScreenEntrance(electronScreen);
+    animateScreenEntrance(defaultScreen);
     
-    console.log("Created Electron App screen with ID:", electronScreen.userData.id);
+    console.log("Created default screen with ID:", defaultScreen.userData.id);
     
-    return electronScreen;
+    return defaultScreen;
 }
 
-// Create an Electron app texture simulating the app interface
+// Enhanced screen creation function with modern UI
+export function enhancedCreateScreen(position, size, title = "Screen", content = null) {
+    // Create the screen container
+    const screen = new THREE.Group();
+    
+    // Define screen dimensions
+    const screenWidth = size.x;
+    const screenHeight = size.y;
+    const topBarHeight = 0.06; // Thinner top bar
+    
+    // Content background - create this first so it's behind the top bar
+    const backgroundGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+    let backgroundMaterial;
+    
+    if (content && content.isTexture) {
+        // Use provided texture
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: content,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+    } else {
+        // Default subtle dark background with gradient
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 384;
+        const ctx = canvas.getContext("2d");
+        
+        // Create gradient background
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, "#1a1a2e");
+        gradient.addColorStop(1, "#16213e");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add subtle pattern
+        ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            const size = Math.random() * 3 + 1;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        
+        backgroundMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+            depthTest: true
+        });
+    }
+    
+    const background = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+    background.position.z = 0.003;
+    background.renderOrder = 1010;
+    screen.add(background);
+    
+    // Create a solid black top bar that spans the entire width
+    const topBarGeometry = new THREE.PlaneGeometry(screenWidth, topBarHeight);
+    const topBarMaterial = new THREE.MeshBasicMaterial({
+        color: 0x111111,
+        transparent: false,
+        side: THREE.DoubleSide,
+        depthTest: true
+    });
+    const topBar = new THREE.Mesh(topBarGeometry, topBarMaterial);
+    topBar.position.set(0, screenHeight / 2 - topBarHeight / 2, 0.004);
+    topBar.renderOrder = 10;
+    topBar.userData = {
+        type: "dragHandle",
+        isTopBar: true,
+        screen: screen,
+        originalColor: topBarMaterial.color.getHex()
+    };
+    screen.add(topBar);
+    
+    // Create a modern grip pattern to indicate draggability
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    
+    // Create a gradient background for the top bar
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#1a1a2e");
+    gradient.addColorStop(1, "#0f3460");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add a subtle border at the bottom
+    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+    ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
+    
+    // Draw screen title with improved typography
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 26px Inter, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    // Add text shadow for better readability
+    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2);
+    ctx.shadowColor = "transparent";
+    
+    // Add modern grip indicator
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    const dotRadius = 1.5;
+    const dotSpacing = 12;
+    const dotsStartX = canvas.width - 100;
+    const dotsY = canvas.height / 2;
+    
+    // Draw the dots with a more modern arrangement
+    for (let i = 0; i < 3; i++) {
+        const x = dotsStartX + i * dotSpacing;
+        ctx.beginPath();
+        ctx.arc(x, dotsY, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Apply the canvas as a texture to the top bar
+    const topBarTexture = new THREE.CanvasTexture(canvas);
+    topBarTexture.anisotropy = 4;
+    topBarMaterial.map = topBarTexture;
+    topBarMaterial.needsUpdate = true;
+    
+    // Add video control buttons if content is a video texture
+    if (content && content.isVideoTexture) {
+        // Add play/pause button to bottom left
+        const playButton = addControlButton(
+            screen,
+            "pause",
+            -screenWidth / 2 + 0.05,
+            -screenHeight / 2 + 0.05,
+            0.03
+        );
+        playButton.userData.videoControl = true;
+        playButton.userData.videoAction = "togglePlayback";
+        playButton.userData.action = "playButton";
+        
+        // Add volume button to bottom right
+        const volumeButton = addControlButton(
+            screen,
+            "muted",
+            screenWidth / 2 - 0.05,
+            -screenHeight / 2 + 0.05,
+            0.03
+        );
+        volumeButton.userData.videoControl = true;
+        volumeButton.userData.videoAction = "toggleMute";
+        volumeButton.userData.action = "volumeButton";
+        
+        // Store controls in userData
+        screen.userData.controls = {
+            isPlaying: true,
+            isMuted: true,
+            playButton: playButton,
+            volumeButton: volumeButton
+        };
+    }
+    
+    // Position the entire screen
+    screen.position.copy(position);
+    
+    return screen;
+}
+
+// Add a control button to the screen
+function addControlButton(screen, type, x, y, size) {
+    // Create button with circular background
+    const buttonGeometry = new THREE.CircleGeometry(size, 32);
+    const buttonMaterial = new THREE.MeshBasicMaterial({
+        color: 0x333333,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+    });
+    
+    const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    button.position.set(x, y, 0.005);
+    button.renderOrder = 1020;
+    button.userData = {
+        type: "button",
+        action: type
+    };
+    
+    // Create icon
+    createControlIcon(type).then(iconTexture => {
+        const iconSize = size * 0.8;
+        const iconGeometry = new THREE.PlaneGeometry(iconSize, iconSize);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            map: iconTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        
+        const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.z = 0.001;
+        button.add(iconMesh);
+    });
+    
+    screen.add(button);
+    return button;
+}
+
+// Create control button icons
+function createControlIcon(type) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128; // Increased size for better quality
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Map icon types to local file paths
+    const logoURLs = {
+        play: "examples/textures/ar_icons/play-buttton.png",
+        pause: "examples/textures/ar_icons/pause-button.png",
+        volume: "examples/textures/ar_icons/unmute.png",
+        muted: "examples/textures/ar_icons/mute.png"
+    };
+    
+    // Create a promise to handle async loading
+    return new Promise((resolve) => {
+        // Create a fallback icon using canvas drawing
+        function createFallbackIcon() {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "30px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            
+            // Draw different icons based on type
+            switch(type) {
+                case 'play':
+                    // Draw play triangle
+                    ctx.beginPath();
+                    ctx.moveTo(42, 32);
+                    ctx.lineTo(42, 96);
+                    ctx.lineTo(96, 64);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                case 'pause':
+                    // Draw pause bars
+                    ctx.fillRect(42, 32, 20, 64);
+                    ctx.fillRect(72, 32, 20, 64);
+                    break;
+                case 'volume':
+                    // Draw speaker icon
+                    ctx.beginPath();
+                    ctx.moveTo(40, 48);
+                    ctx.lineTo(56, 48);
+                    ctx.lineTo(72, 32);
+                    ctx.lineTo(72, 96);
+                    ctx.lineTo(56, 80);
+                    ctx.lineTo(40, 80);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw sound waves
+                    ctx.beginPath();
+                    ctx.arc(80, 64, 12, -Math.PI/3, Math.PI/3);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(80, 64, 24, -Math.PI/3, Math.PI/3);
+                    ctx.stroke();
+                    break;
+                case 'muted':
+                    // Draw muted speaker
+                    ctx.beginPath();
+                    ctx.moveTo(40, 48);
+                    ctx.lineTo(56, 48);
+                    ctx.lineTo(72, 32);
+                    ctx.lineTo(72, 96);
+                    ctx.lineTo(56, 80);
+                    ctx.lineTo(40, 80);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Draw X over it
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(80, 48);
+                    ctx.lineTo(104, 80);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(104, 48);
+                    ctx.lineTo(80, 80);
+                    ctx.stroke();
+                    break;
+                default:
+                    // Text fallback for unknown types
+                    ctx.fillText(type.toUpperCase(), canvas.width / 2, canvas.height / 2);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            resolve(texture);
+        }
+        
+        // Try to load image if URL exists
+        if (logoURLs[type]) {
+            const img = new Image();
+            img.onload = function() {
+                // Draw image centered on canvas
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Create texture from canvas
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.needsUpdate = true;
+                resolve(texture);
+            };
+            
+            img.onerror = function() {
+                console.warn(`Failed to load icon image for: ${type}, using fallback`);
+                createFallbackIcon();
+            };
+            
+            // Set image source
+            img.src = logoURLs[type];
+        } else {
+            // Fallback if no logo URL is available
+            console.warn(`No icon URL defined for type: ${type}, using fallback`);
+            createFallbackIcon();
+        }
+    });
+}
+
+// Add a drop shadow for better depth perception
+export function addDropShadow(screen, width, height) {
+    // Create a larger, darker plane behind the screen
+    const shadowWidth = width + 0.06; 
+    const shadowHeight = height + 0.06;
+    const shadowGeometry = new THREE.PlaneGeometry(shadowWidth, shadowHeight);
+    const shadowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide,
+        depthTest: true
+    });
+    
+    const shadowMesh = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowMesh.position.z = -0.005; // Behind the screen
+    shadowMesh.renderOrder = 980; // Even lower render order
+    shadowMesh.userData.type = "shadow";
+    
+    screen.add(shadowMesh);
+    
+    // Add a subtle glow with darker blue color
+    const glowGeometry = new THREE.PlaneGeometry(width + 0.01, height + 0.01);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0x1a237e, // Dark blue glow (indigo 900)
+        transparent: true,
+        opacity: 0.0, // Start invisible, will show when selected
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthTest: true
+    });
+    
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowMesh.position.z = -0.003; // Between screen and shadow
+    glowMesh.renderOrder = 985; // Between shadow and border
+    glowMesh.userData.type = "glow";
+    
+    screen.add(glowMesh);
+    screen.userData.glowMesh = glowMesh;
+}
+
+// Animate screen entrance with a scale-up and fade-in effect
+export function animateScreenEntrance(screen) {
+    // Store original scale
+    const targetScale = screen.scale.clone();
+    
+    // Start small and scale up
+    screen.scale.set(0.5, 0.5, 0.5);
+    
+    // Animate to full size
+    const duration = 300; // milliseconds
+    const startTime = performance.now();
+    
+    function animate() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease in-out for smoother animation
+        const easedProgress = progress < 0.5
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+        
+        // Scale up
+        screen.scale.lerpVectors(
+            new THREE.Vector3(0.5, 0.5, 0.5),
+            targetScale,
+            easedProgress
+        );
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    
+    requestAnimationFrame(animate);
+}
+
+// Create a texture for the Electron app screen
 function createElectronAppTexture() {
-    // Use canvas to draw Electron-like window
+    // Create a canvas for the app display
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 768;
     const ctx = canvas.getContext('2d');
     
     // Create a loading message
-    ctx.fillStyle = '#2F3241'; // Electron dark background
+    ctx.fillStyle = '#1c2128'; // GitHub dark background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Loading Electron app...', canvas.width / 2, canvas.height / 2);
+    ctx.fillText('Loading GitHub...', canvas.width / 2, canvas.height / 2);
     
     // Load Electron logo
     const logo = new Image();
@@ -101,46 +508,36 @@ function createElectronAppTexture() {
         
         // Create a temporary canvas for the logo
         const logoCanvas = document.createElement('canvas');
-        logoCanvas.width = 120;
-        logoCanvas.height = 120;
+        logoCanvas.width = 100;
+        logoCanvas.height = 100;
         const logoCtx = logoCanvas.getContext('2d');
         
-        // Draw electron orbits
-        logoCtx.strokeStyle = '#9FEAF9'; // Electron blue
-        logoCtx.lineWidth = 6;
+        // Draw a stylized electron orbit symbol
+        logoCtx.fillStyle = '#9feaf9'; // Electron blue
         
-        // Draw electron nucleus
-        logoCtx.fillStyle = '#2F3241'; // Dark background
+        // Draw center circle
         logoCtx.beginPath();
-        logoCtx.arc(60, 60, 20, 0, Math.PI * 2);
+        logoCtx.arc(50, 50, 10, 0, Math.PI * 2);
         logoCtx.fill();
         
-        // Draw electron orbits
+        // Draw orbit ellipses
+        logoCtx.strokeStyle = '#9feaf9';
+        logoCtx.lineWidth = 2;
+        
+        // Orbit 1
         logoCtx.beginPath();
-        logoCtx.ellipse(60, 60, 50, 15, 0, 0, Math.PI * 2);
+        logoCtx.ellipse(50, 50, 40, 20, 0, 0, Math.PI * 2);
         logoCtx.stroke();
         
+        // Orbit 2
         logoCtx.beginPath();
-        logoCtx.ellipse(60, 60, 40, 50, Math.PI / 3, 0, Math.PI * 2);
+        logoCtx.ellipse(50, 50, 40, 20, Math.PI/3, 0, Math.PI * 2);
         logoCtx.stroke();
         
+        // Orbit 3
         logoCtx.beginPath();
-        logoCtx.ellipse(60, 60, 40, 50, -Math.PI / 3, 0, Math.PI * 2);
+        logoCtx.ellipse(50, 50, 40, 20, -Math.PI/3, 0, Math.PI * 2);
         logoCtx.stroke();
-        
-        // Draw electrons
-        logoCtx.fillStyle = '#9FEAF9';
-        logoCtx.beginPath();
-        logoCtx.arc(60, 10, 7, 0, Math.PI * 2);
-        logoCtx.fill();
-        
-        logoCtx.beginPath();
-        logoCtx.arc(105, 85, 7, 0, Math.PI * 2);
-        logoCtx.fill();
-        
-        logoCtx.beginPath();
-        logoCtx.arc(15, 85, 7, 0, Math.PI * 2);
-        logoCtx.fill();
         
         // Store the image data
         const logoImage = new Image();
@@ -152,17 +549,17 @@ function createElectronAppTexture() {
     
     // Draw logo on loading screen
     if (logo.complete) {
-        const logoSize = 120;
+        const logoSize = 100;
         ctx.drawImage(
             logo, 
             canvas.width / 2 - logoSize / 2,
-            canvas.height / 2 - logoSize - 20,
+            canvas.height / 2 - logoSize - 50,
             logoSize, 
             logoSize
         );
     }
     
-    // Create an iframe for embedding a website
+    // Create an iframe for GitHub content
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.left = '-9999px';
@@ -170,224 +567,215 @@ function createElectronAppTexture() {
     iframe.width = canvas.width;
     iframe.height = canvas.height - 40; // Account for the title bar
     iframe.src = 'https://www.github.com/';
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
-    iframe.allowFullscreen = true;
+    iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms';
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope";
     iframe.frameBorder = "0";
-    iframe.id = `electron-app-${Date.now()}`;
+    iframe.id = `electron-frame-${Date.now()}`;
     document.body.appendChild(iframe);
     
-    // Add viewport meta tag for better interactivity  
+    // Add viewport meta tag for better mobile-friendly rendering
     const viewportMeta = document.createElement('meta');
     viewportMeta.name = 'viewport';
     viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
     document.head.appendChild(viewportMeta);
     
-    // Create electron app window frame
-    function drawElectronFrame() {
-        // Title bar
-        ctx.fillStyle = '#1F2232';
-        ctx.fillRect(0, 0, canvas.width, 40);
-        
-        // Window controls (macOS style)
-        // Close button
-        ctx.fillStyle = '#FF5F57';
-        ctx.beginPath();
-        ctx.arc(20, 20, 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Minimize button
-        ctx.fillStyle = '#FFBD2E';
-        ctx.beginPath();
-        ctx.arc(40, 20, 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Maximize button
-        ctx.fillStyle = '#28CA42';
-        ctx.beginPath();
-        ctx.arc(60, 20, 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // App title - use the website domain from the iframe
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Extract domain from iframe src
-        let domain = "Electron App";
-        try {
-            const url = new URL(iframe.src);
-            domain = url.hostname || "Electron App";
-        } catch (e) {
-            console.warn("Failed to parse URL:", e);
-        }
-        
-        ctx.fillText(domain + ' - Electron', canvas.width / 2, 20);
-        
-        // Draw small Electron logo in top right corner
-        if (logo.complete) {
-            const logoSize = 30;
-            ctx.drawImage(
-                logo, 
-                canvas.width - logoSize - 10,
-                5,
-                logoSize, 
-                logoSize
-            );
-        }
-    }
+    // Create app window controls
+    const windowControls = document.createElement('div');
+    windowControls.style.position = 'absolute';
+    windowControls.style.left = '-9999px';
+    windowControls.style.top = '-9999px';
+    windowControls.style.width = '400px';
+    windowControls.style.background = '#1c2128';
+    windowControls.style.borderRadius = '5px';
+    windowControls.style.padding = '10px';
+    windowControls.style.display = 'flex';
+    windowControls.style.justifyContent = 'space-between';
     
-    // Draw the electron frame
-    drawElectronFrame();
+    // Add window control buttons (mimic Electron)
+    const closeButton = document.createElement('button');
+    closeButton.textContent = '✕';
+    closeButton.style.backgroundColor = 'transparent';
+    closeButton.style.color = '#FFFFFF';
+    closeButton.style.border = 'none';
+    closeButton.style.borderRadius = '50%';
+    closeButton.style.width = '15px';
+    closeButton.style.height = '15px';
+    closeButton.style.lineHeight = '15px';
+    closeButton.style.textAlign = 'center';
+    closeButton.style.padding = '0';
+    closeButton.style.marginRight = '5px';
+    closeButton.style.backgroundColor = '#ff5f56';
     
-    // Create electron app controls
-    const electronControls = document.createElement('div');
-    electronControls.style.position = 'absolute';
-    electronControls.style.left = '-9999px';
-    electronControls.style.top = '-9999px';
-    electronControls.style.width = '400px';
-    electronControls.style.background = 'rgba(47, 50, 65, 0.9)';
-    electronControls.style.borderRadius = '5px';
-    electronControls.style.padding = '10px';
-    electronControls.style.display = 'flex';
-    electronControls.style.justifyContent = 'space-between';
+    const minimizeButton = document.createElement('button');
+    minimizeButton.textContent = '−';
+    minimizeButton.style.backgroundColor = 'transparent';
+    minimizeButton.style.color = '#000000';
+    minimizeButton.style.border = 'none';
+    minimizeButton.style.borderRadius = '50%';
+    minimizeButton.style.width = '15px';
+    minimizeButton.style.height = '15px';
+    minimizeButton.style.lineHeight = '15px';
+    minimizeButton.style.textAlign = 'center';
+    minimizeButton.style.padding = '0';
+    minimizeButton.style.marginRight = '5px';
+    minimizeButton.style.backgroundColor = '#ffbd2e';
     
-    // Add back, home, refresh buttons
-    const backButton = document.createElement('button');
-    backButton.textContent = '← Back';
-    backButton.style.backgroundColor = '#1F2232';
-    backButton.style.color = '#FFFFFF';
-    backButton.style.border = 'none';
-    backButton.style.padding = '5px 10px';
-    backButton.style.borderRadius = '3px';
-    
-    const homeButton = document.createElement('button');
-    homeButton.textContent = 'Home';
-    homeButton.style.backgroundColor = '#1F2232';
-    homeButton.style.color = '#FFFFFF';
-    homeButton.style.border = 'none';
-    homeButton.style.padding = '5px 10px';
-    homeButton.style.borderRadius = '3px';
-    
-    const refreshButton = document.createElement('button');
-    refreshButton.textContent = 'Refresh';
-    refreshButton.style.backgroundColor = '#1F2232';
-    refreshButton.style.color = '#FFFFFF';
-    refreshButton.style.border = 'none';
-    refreshButton.style.padding = '5px 10px';
-    refreshButton.style.borderRadius = '3px';
+    const maximizeButton = document.createElement('button');
+    maximizeButton.textContent = '+';
+    maximizeButton.style.backgroundColor = 'transparent';
+    maximizeButton.style.color = '#000000';
+    maximizeButton.style.border = 'none';
+    maximizeButton.style.borderRadius = '50%';
+    maximizeButton.style.width = '15px';
+    maximizeButton.style.height = '15px';
+    maximizeButton.style.lineHeight = '15px';
+    maximizeButton.style.textAlign = 'center';
+    maximizeButton.style.padding = '0';
+    maximizeButton.style.marginRight = '10px';
+    maximizeButton.style.backgroundColor = '#27c93f';
     
     // URL input box
     const urlInput = document.createElement('input');
     urlInput.type = 'text';
-    urlInput.value = 'https://www.github.com/';
+    urlInput.value = 'https://github.com/';
     urlInput.style.flex = '1';
     urlInput.style.marginLeft = '10px';
     urlInput.style.marginRight = '10px';
     urlInput.style.padding = '5px';
-    urlInput.style.border = '1px solid #444';
+    urlInput.style.border = '1px solid #30363d';
     urlInput.style.borderRadius = '3px';
-    urlInput.style.backgroundColor = '#242633';
-    urlInput.style.color = '#FFFFFF';
+    urlInput.style.backgroundColor = '#0d1117';
+    urlInput.style.color = '#c9d1d9';
     
-    // Navigation controls row
-    const navControls = document.createElement('div');
-    navControls.style.display = 'flex';
-    navControls.style.width = '100%';
-    navControls.style.marginBottom = '10px';
-    navControls.appendChild(backButton);
-    navControls.appendChild(homeButton);
-    navControls.appendChild(refreshButton);
+    // Create refresh button
+    const refreshButton = document.createElement('button');
+    refreshButton.textContent = '↻';
+    refreshButton.style.backgroundColor = '#21262d';
+    refreshButton.style.color = '#c9d1d9';
+    refreshButton.style.border = 'none';
+    refreshButton.style.padding = '5px 10px';
+    refreshButton.style.borderRadius = '3px';
     
-    // URL row
-    const urlControls = document.createElement('div');
-    urlControls.style.display = 'flex';
-    urlControls.style.width = '100%';
-    urlControls.appendChild(urlInput);
+    // Add controls to container
+    const windowButtonsContainer = document.createElement('div');
+    windowButtonsContainer.style.display = 'flex';
+    windowButtonsContainer.style.alignItems = 'center';
+    windowButtonsContainer.appendChild(closeButton);
+    windowButtonsContainer.appendChild(minimizeButton);
+    windowButtonsContainer.appendChild(maximizeButton);
     
-    // Add controls to the div
-    electronControls.appendChild(navControls);
-    electronControls.appendChild(urlControls);
-    document.body.appendChild(electronControls);
+    windowControls.appendChild(windowButtonsContainer);
+    windowControls.appendChild(urlInput);
+    windowControls.appendChild(refreshButton);
+    document.body.appendChild(windowControls);
     
-    // Try to forward user interactions to the iframe
+    // Function to forward user interactions to the iframe
     function forwardInteraction(event) {
+        // Ignore interactions in title bar area
+        if (event.y < 40) return false;
+        
         try {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'interaction',
-                    event: {
-                        type: event.type,
-                        x: event.clientX,
-                        y: event.clientY - 40 // Adjust for title bar
-                    }
-                }, '*');
+            // Position iframe on-screen temporarily to receive the event
+            const originalPosition = iframe.style.position;
+            const originalLeft = iframe.style.left;
+            const originalTop = iframe.style.top;
+            
+            iframe.style.position = 'fixed';
+            iframe.style.left = '0';
+            iframe.style.top = '0';
+            iframe.style.zIndex = '9999';
+            
+            // Create and dispatch event
+            let appEvent;
+            if (event.type === 'click') {
+                appEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40 // Adjust for title bar
+                });
+            } else if (event.type === 'drag') {
+                // For drag, send both mousedown and mousemove
+                const downEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.startX,
+                    clientY: event.startY - 40
+                });
+                
+                const moveEvent = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.startX, event.startY - 40)?.dispatchEvent(downEvent);
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(moveEvent);
+                }
+            } else if (event.type === 'scroll') {
+                // Handle scrolling - simulate wheel event
+                const wheelEvent = new WheelEvent('wheel', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40,
+                    deltaY: event.deltaY
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(wheelEvent);
+                }
             }
+            
+            // For simple click events
+            if (event.type === 'click' && iframe.contentDocument) {
+                const element = iframe.contentDocument.elementFromPoint(event.x, event.y - 40);
+                if (element) element.dispatchEvent(appEvent);
+            }
+            
+            // Return iframe to its original position
+            iframe.style.position = originalPosition;
+            iframe.style.left = originalLeft;
+            iframe.style.top = originalTop;
+            
+            return true;
         } catch (e) {
-            console.warn('Unable to forward interaction:', e);
+            console.error('Error forwarding interaction to Electron iframe:', e);
+            return false;
         }
     }
     
-    // Setup button functionality
-    backButton.addEventListener('click', function() {
-        try {
-            iframe.contentWindow.history.back();
-        } catch (e) {
-            console.warn('Unable to go back:', e);
-        }
-    });
-    
-    homeButton.addEventListener('click', function() {
-        iframe.src = 'https://www.github.com/';
-        urlInput.value = iframe.src;
-    });
-    
+    // Setup window controls functionality
     refreshButton.addEventListener('click', function() {
-        try {
+        if (iframe.contentWindow) {
             iframe.contentWindow.location.reload();
-        } catch (e) {
-            console.warn('Unable to refresh:', e);
-            // Alternative method
-            iframe.src = iframe.src;
+            setTimeout(captureIframeToTexture, 500);
         }
     });
     
     urlInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            try {
-                // Format URL properly if needed
-                let target = urlInput.value.trim();
-                if (!target.startsWith('http')) {
-                    // Check if it's a URL or a search term
-                    if (target.includes('.') && !target.includes(' ')) {
-                        target = 'https://' + target;
-                    } else {
-                        // Search query using DuckDuckGo
-                        target = 'https://duckduckgo.com/?q=' + encodeURIComponent(target);
-                    }
-                }
-                
-                // Navigate to the URL
-                iframe.src = target;
-                urlInput.value = target;
-                
-                // Update title bar with new domain
-                drawElectronFrame();
-            } catch (e) {
-                console.warn('Unable to navigate:', e);
+            let newUrl = urlInput.value.trim();
+            
+            // Format the URL properly
+            if (newUrl.indexOf(' ') !== -1 || !newUrl.includes('.')) {
+                // If the input has spaces or doesn't have a dot, treat as search query
+                newUrl = `https://github.com/search?q=${encodeURIComponent(newUrl)}`;
+            } else if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                newUrl = 'https://' + newUrl;
             }
-        }
-    });
-    
-    // Listen for messages from the iframe
-    window.addEventListener('message', function(event) {
-        // Check if message is from our iframe
-        if (event.source === iframe.contentWindow) {
-            // Handle location changes
-            if (event.data && event.data.type === 'locationChange' && event.data.url) {
-                urlInput.value = event.data.url;
-                drawElectronFrame();
-            }
+            
+            iframe.src = newUrl;
+            urlInput.value = newUrl;
+            
+            // Capture the new content after it loads
+            setTimeout(captureIframeToTexture, 1000);
         }
     });
     
@@ -397,66 +785,34 @@ function createElectronAppTexture() {
             // Try to use html2canvas to capture the iframe content
             if (window.html2canvas && iframe.contentDocument) {
                 html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
-                    // Clear content area and draw iframe content
-                    ctx.clearRect(0, 40, canvas.width, canvas.height - 40);
+                    // Clear canvas and draw the Electron app UI
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawElectronUI();
+                    
+                    // Draw the captured iframe content below the UI
                     ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
-                    
-                    // Redraw the electron frame
-                    drawElectronFrame();
-                    
                     texture.needsUpdate = true;
+                    
+                    // Update URL display with current page
+                    const currentUrl = iframe.contentWindow.location.href;
+                    urlInput.value = currentUrl;
+                    
+                    // Extract domain for title bar
+                    try {
+                        const urlObj = new URL(currentUrl);
+                        const domain = urlObj.hostname;
+                        drawTitleText(domain);
+                    } catch (e) {
+                        drawTitleText('GitHub');
+                    }
                 });
             } else {
-                // Draw content placeholder
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                // Fallback method
+                ctx.fillStyle = '#1c2128';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Add a GitHub-like content simulation if using GitHub
-                if (iframe.src.includes('github.com')) {
-                    // GitHub header
-                    ctx.fillStyle = '#24292e';
-                    ctx.fillRect(0, 40, canvas.width, 60);
-                    
-                    // GitHub logo
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.font = 'bold 28px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('GitHub', 20, 70);
-                    
-                    // Content area
-                    ctx.fillStyle = '#f6f8fa';
-                    ctx.fillRect(30, 120, canvas.width - 60, canvas.height - 180);
-                    
-                    // Fake repository name
-                    ctx.fillStyle = '#24292e';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
-                    ctx.fillText('electron / electron', 40, 130);
-                    
-                    // Description
-                    ctx.fillStyle = '#586069';
-                    ctx.font = '16px Arial';
-                    ctx.fillText('Build cross-platform desktop apps with JavaScript, HTML, and CSS', 40, 165);
-                    
-                    // Stars, forks, etc.
-                    ctx.fillStyle = '#24292e';
-                    ctx.font = '14px Arial';
-                    ctx.fillText('★ 104k', 40, 200);
-                    ctx.fillText('⑂ 14.2k', 100, 200);
-                    ctx.fillText('👁 2.3k', 160, 200);
-                }
-                
-                // Redraw the frame
-                drawElectronFrame();
-                
-                // Message about interaction
-                ctx.fillStyle = '#333333';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('Tap the screen to interact with the app', canvas.width / 2, canvas.height - 40);
+                // Draw the Electron app UI
+                drawElectronUI();
                 
                 texture.needsUpdate = true;
             }
@@ -465,12 +821,73 @@ function createElectronAppTexture() {
         }
     }
     
+    // Function to draw the Electron app UI
+    function drawElectronUI() {
+        // Draw window title bar (OS X style)
+        ctx.fillStyle = '#1c2128'; // GitHub dark theme color
+        ctx.fillRect(0, 0, canvas.width, 40);
+        
+        // Draw window buttons (close, minimize, maximize)
+        // Close button (red)
+        ctx.fillStyle = '#ff5f56';
+        ctx.beginPath();
+        ctx.arc(15, 20, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Minimize button (yellow)
+        ctx.fillStyle = '#ffbd2e';
+        ctx.beginPath();
+        ctx.arc(35, 20, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Maximize button (green)
+        ctx.fillStyle = '#27c93f';
+        ctx.beginPath();
+        ctx.arc(55, 20, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw title text centered
+        drawTitleText(urlInput.value);
+        
+        // Draw GitHub icon if available
+        if (logo.complete) {
+            ctx.drawImage(logo, canvas.width - 35, 5, 30, 30);
+        }
+    }
+    
+    function drawTitleText(title) {
+        let displayTitle = 'GitHub';
+        
+        // If title is a URL, extract domain
+        if (title.includes('//')) {
+            try {
+                const urlObj = new URL(title);
+                displayTitle = urlObj.hostname;
+            } catch (e) {
+                displayTitle = title;
+            }
+        } else {
+            displayTitle = title;
+        }
+        
+        // Limit length
+        if (displayTitle.length > 30) {
+            displayTitle = displayTitle.substring(0, 27) + '...';
+        }
+        
+        ctx.fillStyle = '#c9d1d9'; // GitHub text color
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayTitle, canvas.width / 2, 20);
+    }
+    
     // Try to load html2canvas if not already available
     if (!window.html2canvas) {
         const script = document.createElement('script');
         script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
         script.onload = function() {
-            console.log('html2canvas loaded for Electron app');
+            console.log('html2canvas loaded for GitHub');
             captureIframeToTexture();
         };
         document.head.appendChild(script);
@@ -479,99 +896,108 @@ function createElectronAppTexture() {
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
-    // Update texture periodically to reflect iframe content
+    // Update texture periodically
     const updateInterval = setInterval(captureIframeToTexture, 1000);
     
-    // Add properties and methods to texture
+    // Add metadata and methods
     texture.userData = {
         isElectronApp: true,
         iframe: iframe,
         canvas: canvas,
         ctx: ctx,
-        controls: electronControls,
+        controls: windowControls,
         updateInterval: updateInterval,
         
-        // Handle click interactions on the Electron app
+        // Handle click interaction
         onClick: function(x, y) {
-            // If click is in the title bar
+            // Handle UI element clicks in the title bar
             if (y < 40) {
-                // Window controls
-                if (y < 30) {
-                    // Close button
-                    if (x < 26) {
-                        return true; // Just acknowledge the click, don't close the app
-                    }
-                    
-                    // Minimize button
-                    if (x > 32 && x < 48) {
-                        return true; // Just acknowledge the click
-                    }
-                    
-                    // Maximize button
-                    if (x > 54 && x < 70) {
-                        return true; // Just acknowledge the click
-                    }
+                // Close button area
+                if (Math.sqrt(Math.pow(x - 15, 2) + Math.pow(y - 20, 2)) < 6) {
+                    // Implement close behavior here
+                    return true;
+                }
+                
+                // Minimize button area
+                if (Math.sqrt(Math.pow(x - 35, 2) + Math.pow(y - 20, 2)) < 6) {
+                    // Implement minimize behavior here
+                    return true;
+                }
+                
+                // Maximize button area
+                if (Math.sqrt(Math.pow(x - 55, 2) + Math.pow(y - 20, 2)) < 6) {
+                    // Implement maximize behavior here
+                    return true;
                 }
                 
                 return false;
             }
             
-            // Content area - forward the click
-            forwardInteraction({
+            // Forward the click to iframe content
+            return forwardInteraction({
                 type: 'click',
-                clientX: x,
-                clientY: y
+                x: x,
+                y: y
             });
-            
-            return true;
         },
         
-        // Handle dragging on the content
+        // Handle drag interaction
         onDrag: function(startX, startY, endX, endY) {
-            // If drag starts in the title bar, handle as window drag
-            if (startY < 40) {
-                return false; // Let the parent handle dragging
-            }
+            // If drag starts in title bar, don't forward
+            if (startY < 40) return false;
             
-            // Forward drag to iframe content
-            forwardInteraction({
+            return forwardInteraction({
                 type: 'drag',
-                clientX: endX,
-                clientY: endY,
                 startX: startX,
-                startY: startY
+                startY: startY,
+                x: endX,
+                y: endY
             });
-            
-            return true;
         },
         
-        // Method to navigate to a specific URL
-        navigate: function(url) {
-            if (!url) return;
+        // Handle scroll gesture
+        onScroll: function(x, y, deltaY) {
+            if (y < 40) return false;
             
-            // Format URL properly if needed
-            if (!url.startsWith('http')) {
-                if (url.includes('.') && !url.includes(' ')) {
-                    url = 'https://' + url;
-                } else {
-                    // Search query
-                    url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
-                }
+            return forwardInteraction({
+                type: 'scroll',
+                x: x,
+                y: y,
+                deltaY: deltaY
+            });
+        },
+        
+        // Navigate to a new URL
+        navigate: function(newUrl) {
+            // Format the URL properly
+            if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                newUrl = 'https://' + newUrl;
             }
             
-            iframe.src = url;
-            urlInput.value = url;
-            drawElectronFrame();
+            iframe.src = newUrl;
+            urlInput.value = newUrl;
+            captureIframeToTexture();
         },
         
-        // Cleanup resources
+        // Refresh the page
+        refresh: function() {
+            if (iframe.contentWindow) {
+                iframe.contentWindow.location.reload();
+                captureIframeToTexture();
+            }
+        },
+        
+        // Dispose resources
         dispose: function() {
             clearInterval(updateInterval);
             if (iframe && iframe.parentNode) {
                 iframe.parentNode.removeChild(iframe);
             }
-            if (electronControls && electronControls.parentNode) {
-                electronControls.parentNode.removeChild(electronControls);
+            if (windowControls && windowControls.parentNode) {
+                windowControls.parentNode.removeChild(windowControls);
+            }
+            if (viewportMeta && viewportMeta.parentNode) {
+                viewportMeta.parentNode.removeChild(viewportMeta);
             }
         }
     };

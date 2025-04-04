@@ -82,19 +82,6 @@ function createYouTubeVideoTexture(videoId) {
     canvas.height = 768;
     const ctx = canvas.getContext('2d');
     
-    // Create an invisible iframe to load YouTube embed
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.left = '-9999px';
-    iframe.style.top = '-9999px';
-    iframe.width = canvas.width;
-    iframe.height = canvas.height - 40; // Account for top bar
-    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&enablejsapi=1`;
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
-    iframe.frameBorder = "0";
-    iframe.id = `youtube-player-${Date.now()}`;
-    document.body.appendChild(iframe);
-    
     // Initial blank state with loading message
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -102,6 +89,19 @@ function createYouTubeVideoTexture(videoId) {
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('Loading YouTube video...', canvas.width / 2, canvas.height / 2);
+    
+    // Create an invisible iframe to load YouTube embed
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '-9999px';
+    iframe.width = canvas.width;
+    iframe.height = canvas.height - 40; // Account for the title bar
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&enablejsapi=1`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.frameBorder = "0";
+    iframe.id = `youtube-player-${Date.now()}`;
+    document.body.appendChild(iframe);
     
     // YouTube logo
     const logo = new Image();
@@ -180,7 +180,7 @@ function createYouTubeVideoTexture(videoId) {
     youtubeControls.style.position = 'absolute';
     youtubeControls.style.left = '-9999px';
     youtubeControls.style.top = '-9999px';
-    youtubeControls.style.width = '300px';
+    youtubeControls.style.width = '400px';
     youtubeControls.style.background = 'rgba(0,0,0,0.7)';
     youtubeControls.style.borderRadius = '5px';
     youtubeControls.style.padding = '10px';
@@ -211,7 +211,7 @@ function createYouTubeVideoTexture(videoId) {
     muteButton.style.padding = '5px 10px';
     muteButton.style.borderRadius = '3px';
     
-    // Search input for YouTube
+    // Add search input for YouTube videos
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Search YouTube...';
@@ -222,7 +222,6 @@ function createYouTubeVideoTexture(videoId) {
     searchInput.style.border = '1px solid #ddd';
     searchInput.style.borderRadius = '3px';
     
-    // Search button
     const searchButton = document.createElement('button');
     searchButton.textContent = 'Search';
     searchButton.style.backgroundColor = '#FF0000';
@@ -231,25 +230,80 @@ function createYouTubeVideoTexture(videoId) {
     searchButton.style.padding = '5px 10px';
     searchButton.style.borderRadius = '3px';
     
-    // Add first row of controls - playback
-    const playbackControls = document.createElement('div');
-    playbackControls.style.display = 'flex';
-    playbackControls.style.justifyContent = 'space-between';
-    playbackControls.style.marginBottom = '10px';
-    playbackControls.appendChild(playButton);
-    playbackControls.appendChild(pauseButton);
-    playbackControls.appendChild(muteButton);
-    
-    // Add second row - search
-    const searchControls = document.createElement('div');
-    searchControls.style.display = 'flex';
-    searchControls.appendChild(searchInput);
-    searchControls.appendChild(searchButton);
-    
-    // Add both rows to controls
-    youtubeControls.appendChild(playbackControls);
-    youtubeControls.appendChild(searchControls);
+    youtubeControls.appendChild(playButton);
+    youtubeControls.appendChild(pauseButton);
+    youtubeControls.appendChild(muteButton);
+    youtubeControls.appendChild(searchInput);
+    youtubeControls.appendChild(searchButton);
     document.body.appendChild(youtubeControls);
+    
+    // Function to forward user interactions to the iframe
+    function forwardInteraction(event) {
+        // Ignore interactions in title bar area
+        if (event.y < 40) return false;
+        
+        try {
+            // Position iframe on-screen temporarily to receive the event
+            const originalPosition = iframe.style.position;
+            const originalLeft = iframe.style.left;
+            const originalTop = iframe.style.top;
+            
+            iframe.style.position = 'fixed';
+            iframe.style.left = '0';
+            iframe.style.top = '0';
+            iframe.style.zIndex = '9999';
+            
+            // Create and dispatch event
+            let youtubeEvent;
+            if (event.type === 'click') {
+                youtubeEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40 // Adjust for title bar
+                });
+            } else if (event.type === 'drag') {
+                // For drag, we'll send both mousedown and mousemove
+                const downEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.startX,
+                    clientY: event.startY - 40
+                });
+                
+                const moveEvent = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.startX, event.startY - 40)?.dispatchEvent(downEvent);
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(moveEvent);
+                }
+            }
+            
+            // For simple click events
+            if (event.type === 'click' && iframe.contentDocument) {
+                const element = iframe.contentDocument.elementFromPoint(event.x, event.y - 40);
+                if (element) element.dispatchEvent(youtubeEvent);
+            }
+            
+            // Return iframe to its original position
+            iframe.style.position = originalPosition;
+            iframe.style.left = originalLeft;
+            iframe.style.top = originalTop;
+            
+            return true;
+        } catch (e) {
+            console.error('Error forwarding interaction to YouTube iframe:', e);
+            return false;
+        }
+    }
     
     // Setup YouTube API
     let player = null;
@@ -284,10 +338,12 @@ function createYouTubeVideoTexture(videoId) {
         // Setup button event listeners
         playButton.addEventListener('click', function() {
             player.playVideo();
+            captureIframeToTexture();
         });
         
         pauseButton.addEventListener('click', function() {
             player.pauseVideo();
+            captureIframeToTexture();
         });
         
         muteButton.addEventListener('click', function() {
@@ -298,101 +354,41 @@ function createYouTubeVideoTexture(videoId) {
                 player.mute();
                 muteButton.textContent = 'Unmute';
             }
+            captureIframeToTexture();
         });
         
         // Setup search functionality
         searchButton.addEventListener('click', function() {
-            const query = searchInput.value.trim();
-            if (query) {
-                // Use YouTube search as the iframe source
-                iframe.src = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-                
-                // Reset player since we've changed the iframe source
-                setTimeout(setupYouTubePlayer, 500);
-            }
+            searchYouTube();
         });
         
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                searchButton.click();
+                searchYouTube();
             }
         });
+        
+        function searchYouTube() {
+            const query = searchInput.value.trim();
+            if (query) {
+                // For a real implementation, you would use the YouTube Data API to search
+                // Here we'll just load a search results page in the iframe
+                iframe.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`;
+                captureIframeToTexture();
+            }
+        }
     }
     
     function onPlayerStateChange(event) {
-        switch(event.data) {
-            case YT.PlayerState.PLAYING:
-                isPlaying = true;
-                break;
-            case YT.PlayerState.PAUSED:
-            case YT.PlayerState.ENDED:
-                isPlaying = false;
-                break;
+        if (event.data === YT.PlayerState.PLAYING) {
+            isPlaying = true;
+            // Update UI to show the video is playing
+            drawYoutubeUI(true);
+        } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+            isPlaying = false;
+            // Update UI to show the video is paused
+            drawYoutubeUI(false);
         }
-    }
-    
-    // Function to draw YouTube UI
-    function drawYouTubeUI() {
-        // Draw YouTube-styled toolbar
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, 40);
-        
-        // YouTube logo
-        if (logo.complete) {
-            const logoWidth = 80;
-            const logoHeight = 40;
-            ctx.drawImage(
-                logo, 
-                10,
-                0,
-                logoWidth, 
-                logoHeight
-            );
-        } else {
-            // Fallback YouTube text
-            ctx.fillStyle = '#FF0000';
-            ctx.font = 'bold 18px Arial';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('YouTube', 20, 20);
-        }
-        
-        // Search bar
-        ctx.fillStyle = '#f5f5f5';
-        ctx.fillRect(120, 8, canvas.width - 300, 24);
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(120, 8, canvas.width - 300, 24);
-        
-        // Search icon
-        ctx.fillStyle = '#999999';
-        ctx.beginPath();
-        ctx.arc(130, 20, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#999999';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(135, 25);
-        ctx.lineTo(140, 30);
-        ctx.stroke();
-        
-        // Search text placeholder
-        ctx.fillStyle = '#999999';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Search YouTube', 145, 20);
-        
-        // User icon (circle)
-        ctx.fillStyle = '#FF0000';
-        ctx.beginPath();
-        ctx.arc(canvas.width - 20, 20, 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('U', canvas.width - 20, 20);
     }
     
     // Function to capture iframe content to texture
@@ -401,66 +397,81 @@ function createYouTubeVideoTexture(videoId) {
             // Try to use html2canvas to capture the iframe content
             if (window.html2canvas && iframe.contentDocument) {
                 html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
-                    // Clear content area and draw iframe content
-                    ctx.clearRect(0, 40, canvas.width, canvas.height - 40);
+                    // Clear canvas and draw the YouTube UI
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawYoutubeUI(isPlaying);
+                    
+                    // Draw the captured iframe content below the UI
                     ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
-                    
-                    // Redraw YouTube UI
-                    drawYouTubeUI();
-                    
                     texture.needsUpdate = true;
                 });
             } else {
-                // Draw a placeholder YouTube interface
+                // Fallback with basic UI
                 ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 40, canvas.width, canvas.height - 40);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Draw YouTube UI
-                drawYouTubeUI();
-                
-                // Show a message about interacting
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 18px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('YouTube', canvas.width / 2, canvas.height / 2 - 60);
-                ctx.font = '16px Arial';
-                ctx.fillText('Tap the screen to interact with YouTube videos', canvas.width / 2, canvas.height / 2 - 30);
-                
-                // Video thumbnail placeholder
-                ctx.fillStyle = '#333333';
-                ctx.fillRect(canvas.width / 2 - 160, canvas.height / 2, 320, 180);
-                
-                // Play button overlay
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.beginPath();
-                ctx.arc(canvas.width / 2, canvas.height / 2 + 90, 30, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = '#FFFFFF';
-                ctx.beginPath();
-                ctx.moveTo(canvas.width / 2 - 10, canvas.height / 2 + 80);
-                ctx.lineTo(canvas.width / 2 - 10, canvas.height / 2 + 100);
-                ctx.lineTo(canvas.width / 2 + 15, canvas.height / 2 + 90);
-                ctx.closePath();
-                ctx.fill();
-                
-                // Video title
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 16px Arial';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-                ctx.fillText('Sample YouTube Video', canvas.width / 2 - 160, canvas.height / 2 + 190);
-                
-                // Channel name
-                ctx.fillStyle = '#AAAAAA';
-                ctx.font = '14px Arial';
-                ctx.fillText('Channel name • 100K views • 2 days ago', canvas.width / 2 - 160, canvas.height / 2 + 215);
+                // Draw the YouTube UI
+                drawYoutubeUI(isPlaying);
                 
                 texture.needsUpdate = true;
             }
         } catch (e) {
-            console.warn('Error capturing iframe content:', e);
+            console.warn('Error capturing YouTube iframe content:', e);
+        }
+    }
+    
+    // Function to draw the YouTube UI overlay
+    function drawYoutubeUI(isPlaying) {
+        // Draw the top bar
+        ctx.fillStyle = '#212121'; // YouTube dark theme color
+        ctx.fillRect(0, 0, canvas.width, 40);
+        
+        // Draw YouTube logo
+        if (logo.complete) {
+            ctx.drawImage(logo, 10, 5, 80, 30);
+        } else {
+            // Text fallback
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('YouTube', 15, 20);
+        }
+        
+        // Draw search bar
+        ctx.fillStyle = '#323232';
+        ctx.fillRect(canvas.width / 2 - 150, 5, 300, 30);
+        ctx.strokeStyle = '#666666';
+        ctx.strokeRect(canvas.width / 2 - 150, 5, 300, 30);
+        
+        // Search text
+        ctx.fillStyle = '#AAAAAA';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Search YouTube', canvas.width / 2 - 140, 20);
+        
+        // User icon at right
+        ctx.fillStyle = '#555555';
+        ctx.beginPath();
+        ctx.arc(canvas.width - 20, 20, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw play/pause icon based on state
+        if (player && isPlaying) {
+            // Draw pause icon in timeline
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(20, canvas.height - 20, 5, 15);
+            ctx.fillRect(30, canvas.height - 20, 5, 15);
+        } else {
+            // Draw play icon in timeline
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.moveTo(20, canvas.height - 25);
+            ctx.lineTo(20, canvas.height - 5);
+            ctx.lineTo(35, canvas.height - 15);
+            ctx.closePath();
+            ctx.fill();
         }
     }
     
@@ -475,31 +486,10 @@ function createYouTubeVideoTexture(videoId) {
         document.head.appendChild(script);
     }
     
-    // Initial draw
-    drawYouTubeUI();
-    
-    // Try to forward user interactions to the iframe
-    function forwardInteraction(event) {
-        try {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'interaction',
-                    event: {
-                        type: event.type,
-                        x: event.clientX,
-                        y: event.clientY - 40 // Adjust for toolbar
-                    }
-                }, '*');
-            }
-        } catch (e) {
-            console.warn('Unable to forward interaction to YouTube:', e);
-        }
-    }
-    
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
-    // Update texture periodically to reflect iframe content
+    // Set up update interval
     const updateInterval = setInterval(captureIframeToTexture, 1000);
     
     // Add properties and methods to the texture
@@ -513,95 +503,110 @@ function createYouTubeVideoTexture(videoId) {
         controls: youtubeControls,
         updateInterval: updateInterval,
         
-        // Handle click interactions on the YouTube UI
+        // Handle click interaction
         onClick: function(x, y) {
-            // If click is in the toolbar area
+            // Handle toolbar interactions
             if (y < 40) {
-                // YouTube logo - go to home
+                // Logo area - do nothing
                 if (x < 100) {
-                    iframe.src = 'https://www.youtube.com/';
                     return true;
                 }
                 
-                // Search bar
-                if (x > 120 && x < canvas.width - 180 && y > 8 && y < 32) {
+                // Search area
+                if (x > canvas.width / 2 - 150 && x < canvas.width / 2 + 150) {
+                    // Open search UI
                     searchInput.focus();
                     return true;
                 }
                 
-                // User icon (right side)
-                if (x > canvas.width - 40) {
-                    // Show sign-in options or account info
-                    return true;
-                }
-                
                 return false;
             }
             
-            // Content area - forward the click directly
-            forwardInteraction({
-                type: 'click',
-                clientX: x,
-                clientY: y
-            });
+            // Center play/pause button area
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
             
-            return true;
+            // Extra check for the play button at center (for when video isn't playing)
+            if (distance < 50 && !isPlaying) {
+                if (player) {
+                    player.playVideo();
+                    isPlaying = true;
+                }
+                return true;
+            }
+            
+            // Forward the click to the iframe content
+            return forwardInteraction({
+                type: 'click',
+                x: x,
+                y: y
+            });
         },
         
-        // Handle dragging on the content
+        // Handle drag interaction for video scrubbing
         onDrag: function(startX, startY, endX, endY) {
-            // Don't handle drag on toolbar
-            if (startY < 40) {
+            // If in the bottom area - treat as timeline scrubbing
+            if (startY > canvas.height - 30) {
+                if (player) {
+                    // Calculate position in video as percentage of width
+                    const percentage = endX / canvas.width;
+                    if (percentage >= 0 && percentage <= 1) {
+                        // Get duration and set current time
+                        const duration = player.getDuration();
+                        player.seekTo(duration * percentage, true);
+                        return true;
+                    }
+                }
                 return false;
             }
             
-            forwardInteraction({
+            // Otherwise forward the drag to the iframe
+            return forwardInteraction({
                 type: 'drag',
-                clientX: endX,
-                clientY: endY,
                 startX: startX,
-                startY: startY
+                startY: startY,
+                x: endX,
+                y: endY
             });
-            
-            return true;
         },
         
         // Methods to control video
         playVideo: function() {
             if (player && player.playVideo) {
                 player.playVideo();
+                isPlaying = true;
+                captureIframeToTexture();
             }
         },
         
         pauseVideo: function() {
             if (player && player.pauseVideo) {
                 player.pauseVideo();
+                isPlaying = false;
+                captureIframeToTexture();
             }
         },
         
-        loadVideo: function(newVideoId) {
-            if (player && player.loadVideoById) {
-                player.loadVideoById(newVideoId);
-                this.videoId = newVideoId;
+        togglePlayback: function() {
+            if (!player) return;
+            
+            if (isPlaying) {
+                player.pauseVideo();
             } else {
-                // Fallback method
-                iframe.src = `https://www.youtube.com/embed/${newVideoId}?autoplay=1&controls=1&enablejsapi=1`;
-                this.videoId = newVideoId;
-                
-                // Reset player since we've changed the iframe source
-                setTimeout(setupYouTubePlayer, 500);
+                player.playVideo();
             }
+            
+            captureIframeToTexture();
         },
         
-        // Search YouTube
-        search: function(query) {
-            if (!query) return;
-            
-            iframe.src = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-            searchInput.value = query;
-            
-            // Reset player since we've changed the iframe source
-            setTimeout(setupYouTubePlayer, 500);
+        // Load a different video
+        loadVideo: function(newVideoId) {
+            if (player) {
+                player.loadVideoById(newVideoId);
+                texture.userData.videoId = newVideoId;
+                captureIframeToTexture();
+            }
         },
         
         // Cleanup resources

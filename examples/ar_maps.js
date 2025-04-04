@@ -131,65 +131,6 @@ function createMapsTexture() {
         logo.src = logoImage.src;
     };
     
-    // Create custom map tiles
-    const mapTile = new Image();
-    mapTile.src = 'examples/textures/ar_icons/map_texture.png';
-    
-    // Create a map texture directly if the image isn't found
-    mapTile.onerror = function() {
-        console.warn("Map texture image not found - creating a simple grid texture");
-        
-        // Create a temporary canvas for the tile
-        const tileCanvas = document.createElement('canvas');
-        tileCanvas.width = 256;
-        tileCanvas.height = 256;
-        const tileCtx = tileCanvas.getContext('2d');
-        
-        // Fill with light color
-        tileCtx.fillStyle = '#EEEEEE';
-        tileCtx.fillRect(0, 0, tileCanvas.width, tileCanvas.height);
-        
-        // Draw grid
-        tileCtx.strokeStyle = '#DDDDDD';
-        tileCtx.lineWidth = 1;
-        
-        // Horizontal lines
-        for (let i = 0; i <= tileCanvas.height; i += 32) {
-            tileCtx.beginPath();
-            tileCtx.moveTo(0, i);
-            tileCtx.lineTo(tileCanvas.width, i);
-            tileCtx.stroke();
-        }
-        
-        // Vertical lines
-        for (let i = 0; i <= tileCanvas.width; i += 32) {
-            tileCtx.beginPath();
-            tileCtx.moveTo(i, 0);
-            tileCtx.lineTo(i, tileCanvas.height);
-            tileCtx.stroke();
-        }
-        
-        // Add a thicker line for main road
-        tileCtx.strokeStyle = '#FFFFFF';
-        tileCtx.lineWidth = 6;
-        tileCtx.beginPath();
-        tileCtx.moveTo(0, 128);
-        tileCtx.lineTo(256, 128);
-        tileCtx.stroke();
-        
-        tileCtx.beginPath();
-        tileCtx.moveTo(128, 0);
-        tileCtx.lineTo(128, 256);
-        tileCtx.stroke();
-        
-        // Store the image data
-        const tileImage = new Image();
-        tileImage.src = tileCanvas.toDataURL();
-        
-        // Replace the original tile reference
-        mapTile.src = tileImage.src;
-    };
-    
     // Draw logo on loading screen
     if (logo.complete) {
         const logoSize = 100;
@@ -202,28 +143,37 @@ function createMapsTexture() {
         );
     }
     
-    // Create an iframe for Google Maps
+    // Create an iframe for Google Maps - with a specific location embedded
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.left = '-9999px';
     iframe.style.top = '-9999px';
     iframe.width = canvas.width;
-    iframe.height = canvas.height;
-    // Use proper Google Maps embed URL - an actual map location
-    iframe.src = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3153.482669885054!2d-122.08400706868343!3d37.42214076844029!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808fba02425dad8f%3A0x715f435f946a95a8!2sGoogle!5e0!3m2!1sen!2sus!4v1696534256356!5m2!1sen!2sus';
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; camera; microphone";
-    iframe.allowFullscreen = true;
+    iframe.height = canvas.height - 40; // Account for the title bar
+    
+    // Use Google Maps embed with an API key (if available, otherwise default to a simple embed)
+    // In a real app, you should use your own Google Maps API key
+    const mapsAPIKey = 'AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg'; // This is a placeholder - replace with your own key
+    iframe.src = `https://www.google.com/maps/embed/v1/place?key=${mapsAPIKey}&q=Googleplex`;
+    
+    // Fallback if the API key is not valid
+    iframe.onerror = function() {
+        iframe.src = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3168.639290621105!2d-122.08529!3d37.423!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDI1JzIyLjgiTiAxMjLCsDA1JzA3LjAiVw!5e0!3m2!1sen!2sus!4v1635357774300!5m2!1sen!2sus';
+    };
+    
     iframe.frameBorder = "0";
+    iframe.allowFullscreen = true;
     iframe.id = `maps-frame-${Date.now()}`;
+    iframe.allow = "geolocation";
     document.body.appendChild(iframe);
     
-    // Add viewport meta tag for better mobile experience
+    // Add metadata tag to make maps more mobile friendly
     const viewportMeta = document.createElement('meta');
     viewportMeta.name = 'viewport';
     viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
     document.head.appendChild(viewportMeta);
     
-    // Create map controls
+    // Create map controls for zoom and search
     const mapControls = document.createElement('div');
     mapControls.style.position = 'absolute';
     mapControls.style.left = '-9999px';
@@ -270,68 +220,118 @@ function createMapsTexture() {
     mapControls.appendChild(zoomInButton);
     document.body.appendChild(mapControls);
     
-    // Try to forward user interactions to the iframe
+    // Function to forward user interactions to the iframe
     function forwardInteraction(event) {
+        // Ignore interactions in title bar area
+        if (event.y < 40) return false;
+        
         try {
-            if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'interaction',
-                    event: {
-                        type: event.type,
-                        x: event.clientX,
-                        y: event.clientY,
-                        deltaY: event.deltaY // For zoom
-                    }
-                }, '*');
+            // Position iframe on-screen temporarily to receive the event
+            const originalPosition = iframe.style.position;
+            const originalLeft = iframe.style.left;
+            const originalTop = iframe.style.top;
+            
+            iframe.style.position = 'fixed';
+            iframe.style.left = '0';
+            iframe.style.top = '0';
+            iframe.style.zIndex = '9999';
+            
+            // Create and dispatch event
+            let mapEvent;
+            if (event.type === 'click') {
+                mapEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40 // Adjust for title bar
+                });
+            } else if (event.type === 'drag') {
+                // For drag, we'll send both mousedown and mousemove
+                const downEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.startX,
+                    clientY: event.startY - 40
+                });
+                
+                const moveEvent = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.startX, event.startY - 40)?.dispatchEvent(downEvent);
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(moveEvent);
+                }
+            } else if (event.type === 'pinch') {
+                // Handle pinch to zoom - simulate wheel event
+                const wheelEvent = new WheelEvent('wheel', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: event.x,
+                    clientY: event.y - 40,
+                    deltaY: event.scale > 1 ? -100 : 100 // Negative is zoom in
+                });
+                
+                if (iframe.contentDocument) {
+                    iframe.contentDocument.elementFromPoint(event.x, event.y - 40)?.dispatchEvent(wheelEvent);
+                }
             }
+            
+            // For simple click events
+            if (event.type === 'click' && iframe.contentDocument) {
+                const element = iframe.contentDocument.elementFromPoint(event.x, event.y - 40);
+                if (element) element.dispatchEvent(mapEvent);
+            }
+            
+            // Return iframe to its original position
+            iframe.style.position = originalPosition;
+            iframe.style.left = originalLeft;
+            iframe.style.top = originalTop;
+            
+            return true;
         } catch (e) {
-            console.warn('Unable to forward interaction to maps:', e);
+            console.error('Error forwarding interaction to Maps iframe:', e);
+            return false;
         }
     }
     
-    // Add interaction handlers
+    // Set up button functionality
     zoomInButton.addEventListener('click', function() {
+        // Create and forward a zoom in wheel event
         forwardInteraction({
-            type: 'zoom',
-            deltaY: -100 // Negative for zoom in
+            type: 'pinch',
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            scale: 1.5 // Zoom in
         });
-        
-        // Also try direct embedding interaction
-        try {
-            if (iframe.contentWindow && iframe.contentWindow.google && iframe.contentWindow.google.maps) {
-                const map = iframe.contentWindow.google.maps.Map;
-                const zoom = map.getZoom();
-                map.setZoom(zoom + 1);
-            }
-        } catch (e) {
-            console.warn('Could not programmatically zoom map:', e);
-        }
     });
     
     zoomOutButton.addEventListener('click', function() {
+        // Create and forward a zoom out wheel event
         forwardInteraction({
-            type: 'zoom',
-            deltaY: 100 // Positive for zoom out
+            type: 'pinch',
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            scale: 0.5 // Zoom out
         });
-        
-        // Also try direct embedding interaction
-        try {
-            if (iframe.contentWindow && iframe.contentWindow.google && iframe.contentWindow.google.maps) {
-                const map = iframe.contentWindow.google.maps.Map;
-                const zoom = map.getZoom();
-                map.setZoom(zoom - 1);
-            }
-        } catch (e) {
-            console.warn('Could not programmatically zoom map:', e);
-        }
     });
     
     searchInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            const searchTerm = searchInput.value;
-            if (searchTerm.trim()) {
-                // Update the iframe URL with the search term
-                iframe.src = `https://www.google.com/maps/embed/v1/search?q=${encodeURIComponent(searchTerm)}&key=YOUR_API_KEY_IF_NEEDED`;
+            const query = searchInput.value.trim();
+            if (query) {
+                // Update iframe src with search query
+                iframe.src = `https://www.google.com/maps/embed/v1/search?key=${mapsAPIKey}&q=${encodeURIComponent(query)}`;
+                
+                // If we're capturing to canvas, update it
+                captureIframeToTexture();
             }
         }
     });
@@ -342,117 +342,67 @@ function createMapsTexture() {
             // Try to use html2canvas to capture the iframe content
             if (window.html2canvas && iframe.contentDocument) {
                 html2canvas(iframe.contentDocument.body).then(function(renderedCanvas) {
-                    ctx.drawImage(renderedCanvas, 0, 0, canvas.width, canvas.height);
+                    // Clear the canvas and draw the title bar
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawMapsUI();
+                    
+                    // Draw the captured iframe content below the title bar
+                    ctx.drawImage(renderedCanvas, 0, 40, canvas.width, canvas.height - 40);
                     texture.needsUpdate = true;
                 });
             } else {
-                // Fallback method - show a map placeholder with controls
-                if (mapTile.complete) {
-                    // Create pattern from the map tile
-                    const pattern = ctx.createPattern(mapTile, 'repeat');
-                    ctx.fillStyle = pattern;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                } else {
-                    // Draw placeholder map grid
-                    ctx.fillStyle = '#f2f2f2';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    // Draw grid lines
-                    ctx.strokeStyle = '#e0e0e0';
-                    ctx.lineWidth = 1;
-                    
-                    // Draw grid
-                    for (let i = 0; i < canvas.width; i += 50) {
-                        ctx.beginPath();
-                        ctx.moveTo(i, 0);
-                        ctx.lineTo(i, canvas.height);
-                        ctx.stroke();
-                    }
-                    
-                    for (let i = 0; i < canvas.height; i += 50) {
-                        ctx.beginPath();
-                        ctx.moveTo(0, i);
-                        ctx.lineTo(canvas.width, i);
-                        ctx.stroke();
-                    }
-                }
+                // Fallback - draw a static maps interface
+                ctx.fillStyle = '#f2f2f2';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Add Google Maps UI elements
-                
-                // Top search bar
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-                ctx.shadowBlur = 5;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 2;
-                ctx.fillRect(20, 20, canvas.width - 40, 50);
-                ctx.shadowColor = 'transparent';
-                
-                // Search text
-                ctx.fillStyle = '#888888';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('Search Google Maps', 40, 45);
-                
-                // Zoom controls
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-                ctx.shadowBlur = 5;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 2;
-                ctx.fillRect(canvas.width - 70, 100, 50, 120);
-                ctx.shadowColor = 'transparent';
-                
-                // Plus and minus symbols
-                ctx.fillStyle = '#666666';
-                ctx.fillRect(canvas.width - 55, 115, 20, 5);
-                ctx.fillRect(canvas.width - 47.5, 107.5, 5, 20);
-                ctx.fillRect(canvas.width - 55, 200, 20, 5);
-                
-                // Draw Google Maps logo
-                if (logo.complete) {
-                    const logoWidth = 80;
-                    const logoHeight = 80;
-                    ctx.drawImage(
-                        logo, 
-                        30, 
-                        canvas.height - 100,
-                        logoWidth, 
-                        logoHeight
-                    );
-                }
-                
-                // Draw center pin
-                ctx.fillStyle = '#EA4335'; // Google Maps red color
-                ctx.beginPath();
-                ctx.arc(canvas.width / 2, canvas.height / 2, 10, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(canvas.width / 2 - 10, canvas.height / 2);
-                ctx.lineTo(canvas.width / 2, canvas.height / 2 + 20);
-                ctx.lineTo(canvas.width / 2 + 10, canvas.height / 2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(canvas.width / 2, canvas.height / 2, 5, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Text informational message
-                ctx.fillStyle = '#333333';
-                ctx.font = 'bold 18px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('Google Maps', canvas.width / 2, canvas.height / 2 + 60);
-                ctx.font = '14px Arial';
-                ctx.fillText('Tap the screen to interact with the map', canvas.width / 2, canvas.height / 2 + 90);
+                // Draw the Maps UI
+                drawMapsUI();
                 
                 texture.needsUpdate = true;
             }
         } catch (e) {
             console.warn('Error capturing iframe content:', e);
         }
+    }
+    
+    // Function to draw Maps UI elements
+    function drawMapsUI() {
+        // Draw the Maps UI header
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, 40);
+        
+        // Draw top border line
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, 40);
+        ctx.lineTo(canvas.width, 40);
+        ctx.stroke();
+        
+        // Add Google Maps logo
+        if (logo.complete) {
+            ctx.drawImage(logo, 10, 5, 30, 30);
+        }
+        
+        // Add title text
+        ctx.fillStyle = '#333333';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Google Maps', 50, 20);
+        
+        // Add search box
+        ctx.fillStyle = '#f1f1f1';
+        ctx.fillRect(canvas.width - 300, 5, 290, 30);
+        ctx.strokeStyle = '#ddd';
+        ctx.strokeRect(canvas.width - 300, 5, 290, 30);
+        
+        // Add search text
+        ctx.fillStyle = '#888888';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Search Google Maps', canvas.width - 280, 20);
     }
     
     // Try to load html2canvas if not already available
@@ -469,7 +419,7 @@ function createMapsTexture() {
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     
-    // Update texture periodically to reflect iframe content
+    // Update texture periodically
     const updateInterval = setInterval(captureIframeToTexture, 1000);
     
     // Add metadata and methods
@@ -481,57 +431,52 @@ function createMapsTexture() {
         controls: mapControls,
         updateInterval: updateInterval,
         
-        // Handle click interactions on the maps screen
+        // Handle click interaction
         onClick: function(x, y) {
-            // If click is in the title bar area, don't forward
-            if (y < 40) {
-                return false;
-            }
+            // If click is in the title bar, don't forward to iframe
+            if (y < 40) return false;
             
-            // Try to forward the click to the map
-            forwardInteraction({
+            return forwardInteraction({
                 type: 'click',
-                clientX: x,
-                clientY: y
+                x: x,
+                y: y
             });
-            
-            // Always return true to indicate handling the click
-            return true;
         },
         
-        // Handle dragging on the map
+        // Handle drag interaction
         onDrag: function(startX, startY, endX, endY) {
-            // If drag is in the title bar area, don't forward
-            if (startY < 40) {
-                return false;
-            }
+            // If drag starts in title bar, don't forward to iframe
+            if (startY < 40) return false;
             
-            // Try to forward the drag to the map
-            forwardInteraction({
+            return forwardInteraction({
                 type: 'drag',
-                clientX: endX,
-                clientY: endY,
                 startX: startX,
-                startY: startY
+                startY: startY,
+                x: endX,
+                y: endY
             });
-            
-            return true;
         },
         
-        // Handle pinch for zooming
-        onPinch: function(scale) {
-            forwardInteraction({
-                type: 'zoom',
-                deltaY: scale > 1 ? -100 : 100 // Negative for zoom in, positive for zoom out
+        // Handle pinch (zoom) interaction
+        onPinch: function(x, y, scale) {
+            // If pinch is in title bar, don't forward to iframe
+            if (y < 40) return false;
+            
+            return forwardInteraction({
+                type: 'pinch',
+                x: x,
+                y: y,
+                scale: scale
             });
-            return true;
         },
         
         // Search for location
         searchLocation: function(query) {
             if (query) {
-                iframe.src = `https://www.google.com/maps/embed/v1/search?q=${encodeURIComponent(query)}&key=AIzaSyBkd9sIQSK_Xv5awQ3mruSUP0RRcRDX-yo`;
+                // Use a proper API key for your application
+                iframe.src = `https://www.google.com/maps/embed/v1/search?key=${mapsAPIKey}&q=${encodeURIComponent(query)}`;
                 searchInput.value = query;
+                captureIframeToTexture();
             }
         },
         
@@ -543,6 +488,9 @@ function createMapsTexture() {
             }
             if (mapControls && mapControls.parentNode) {
                 mapControls.parentNode.removeChild(mapControls);
+            }
+            if (viewportMeta && viewportMeta.parentNode) {
+                viewportMeta.parentNode.removeChild(viewportMeta);
             }
         }
     };
