@@ -4,6 +4,7 @@ import { ARButton, XR, Controllers, Hands, useXR } from '@react-three/xr';
 import { Environment, OrbitControls, Html } from '@react-three/drei';
 import { useScreenStore } from './store/screenStore';
 import ControlPanel from './components/ControlPanel';
+import XRBackgroundFix from './components/XRBackgroundFix';
 
 // Import screen components
 import DefaultScreen from './components/screens/DefaultScreen';
@@ -85,11 +86,38 @@ const App = () => {
   useEffect(() => {
     if (!('xr' in navigator)) {
       setIsCompatible(false);
+      console.log('WebXR not supported in this browser');
     } else {
+      console.log('Checking WebXR AR session support...');
       navigator.xr?.isSessionSupported('immersive-ar')
-        .then(supported => setIsCompatible(supported))
-        .catch(() => setIsCompatible(false));
+        .then(supported => {
+          console.log('WebXR AR session supported:', supported);
+          setIsCompatible(supported);
+        })
+        .catch((err) => {
+          console.error('Error checking AR support:', err);
+          setIsCompatible(false);
+        });
     }
+  }, []);
+  
+  useEffect(() => {
+    // Listen for session changes to debug
+    const handleSessionStarted = () => {
+      console.log('XR Session started successfully');
+    };
+    
+    const handleSessionEnded = () => {
+      console.log('XR Session ended');
+    };
+    
+    window.addEventListener('sessionStarted', handleSessionStarted);
+    window.addEventListener('sessionEnded', handleSessionEnded);
+    
+    return () => {
+      window.removeEventListener('sessionStarted', handleSessionStarted);
+      window.removeEventListener('sessionEnded', handleSessionEnded);
+    };
   }, []);
   
   return (
@@ -97,7 +125,7 @@ const App = () => {
       <ARButton 
         sessionInit={{ 
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay'], 
+          optionalFeatures: ['dom-overlay'],
           domOverlay: { root: document.body }
         }}
         style={{ 
@@ -136,11 +164,25 @@ const App = () => {
         </div>
       )}
       
-      <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
+      <Canvas 
+        camera={{ position: [0, 0, 5], fov: 75 }}
+        gl={{ 
+          alpha: true,
+          antialias: true,
+          preserveDrawingBuffer: true,
+        }}
+        onClick={() => console.log('Canvas clicked')}
+        onCreated={state => {
+          console.log('Canvas created with state:', state);
+        }}
+      >
         <XR
-          referenceSpace="local-floor"
-          defaultCamera={true}
+          referenceSpace="local"
+          sessionGranded="floor"
         >
+          {/* Fix for black screen in AR */}
+          <XRBackgroundFix />
+          
           {/* Controllers for interaction */}
           <Controllers />
           <Hands />
