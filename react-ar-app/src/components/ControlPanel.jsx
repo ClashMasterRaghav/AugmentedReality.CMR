@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
-import { Interactive, useXR, useXRFrame } from '@react-three/xr';
+import { useThree, useFrame } from '@react-three/fiber';
+import { Interactive, useXR } from '@react-three/xr';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useScreenStore } from '../store/screenStore';
@@ -56,8 +56,8 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
     );
   };
   
-  // Use XRFrame hook to continually update position in AR mode
-  useXRFrame(() => {
+  // Use Frame hook to continually update position in AR mode
+  useFrame(() => {
     if (isPresenting) {
       updatePanelPosition();
     }
