@@ -2,7 +2,7 @@
   "name": "react-ar-app",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://ClashMasterRaghav.github.io/AugmentedReality.CMR",
+  "homepage": "https://ClashMasterRaghav.github.io/AugmentedReality.CMR/",
   "dependencies": {
     "@react-three/drei": "^9.90.0",
     "@react-three/fiber": "^8.15.11",

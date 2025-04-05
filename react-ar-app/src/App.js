@@ -92,31 +92,12 @@ const App = () => {
     }
   }, []);
   
-  // Request camera permissions early
-  useEffect(() => {
-    const requestCameraPermission = async () => {
-      try {
-        // Try to get camera access before AR session starts
-        console.log('Requesting camera permission...');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        
-        // Stop the stream immediately as we just need the permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log('Camera permission granted');
-      } catch (err) {
-        console.warn('Camera permission request failed:', err);
-      }
-    };
-    
-    requestCameraPermission();
-  }, []);
-  
   return (
     <>
       <ARButton 
         sessionInit={{ 
-          requiredFeatures: ['hit-test', 'local-floor', 'bounded-floor'],
-          optionalFeatures: ['dom-overlay', 'camera-access', 'depth-sensing'], 
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['dom-overlay'], 
           domOverlay: { root: document.body }
         }}
         style={{ 
