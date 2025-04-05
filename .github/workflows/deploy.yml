@@ -36,8 +36,10 @@ jobs:
       - name: 📥 Install Dependencies
         run: |
           cd react-ar-app
-          # Use npm install to resolve dependency conflicts
-          npm install
+          # Use npm install with legacy-peer-deps to resolve conflicts
+          npm install --legacy-peer-deps
+          # Install specific compatible versions
+          npm install three@0.160.0 @react-three/fiber@8.15.11 @react-three/drei@9.90.0 @react-three/xr@5.7.1 --save --legacy-peer-deps
 
       - name: 🛠️ Build React App
         run: |

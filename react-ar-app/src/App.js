@@ -115,8 +115,8 @@ const App = () => {
     <>
       <ARButton 
         sessionInit={{ 
-          requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay', 'camera-access'],
+          requiredFeatures: ['hit-test', 'local-floor', 'bounded-floor'],
+          optionalFeatures: ['dom-overlay', 'camera-access', 'depth-sensing'], 
           domOverlay: { root: document.body }
         }}
         style={{ 
