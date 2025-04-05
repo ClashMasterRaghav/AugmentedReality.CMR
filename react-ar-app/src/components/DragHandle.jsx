@@ -1,98 +1,118 @@
-import React, { useRef } from 'react';
-import { Interactive } from '@react-three/xr';
+import React, { useRef, useState } from 'react';
+import { useThree } from '@react-three/fiber';
+import { Interactive, useXR } from '@react-three/xr';
+import * as THREE from 'three';
 import { useScreenStore } from '../store/screenStore';
 
 /**
- * A draggable handle component for screens
+ * Draggable handle component for screens
  */
-const DragHandle = ({ 
-  screenId, 
-  position = [0, 0, 0], 
-  width = 0.5, 
-  height = 0.05,
-  color = '#333333',
-  opacity = 0.5
-}) => {
-  const ref = useRef();
-  const dragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0, z: 0 });
-  const screenPosStart = useRef({ x: 0, y: 0, z: 0 });
+const DragHandle = ({ screenId, position, screenRef }) => {
+  const { isPresenting, player } = useXR();
+  const { camera } = useThree();
+  const handleRef = useRef();
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef(null);
+  const screenStartPos = useRef(null);
   
-  // Get screen from store
-  const screens = useScreenStore(state => state.screens);
+  // Get screen update function from store
   const updateScreenPosition = useScreenStore(state => state.updateScreenPosition);
-  const selectScreen = useScreenStore(state => state.selectScreen);
   
-  const screen = screens.find(s => s.id === screenId);
-  
-  const handleSelectStart = (e) => {
-    if (!screen) return;
+  // Start dragging
+  const handleDragStart = (e) => {
+    e.stopPropagation();
     
-    // Select this screen
-    selectScreen(screenId);
+    if (!screenRef.current) return;
     
-    // Start drag operation
-    dragging.current = true;
+    setIsDragging(true);
+    dragStartPos.current = new THREE.Vector3().copy(e.intersection.point);
+    screenStartPos.current = new THREE.Vector3().copy(screenRef.current.position);
     
-    // Store starting positions
-    if (e.controller) {
-      dragStart.current = {
-        x: e.controller.controller.position.x,
-        y: e.controller.controller.position.y,
-        z: e.controller.controller.position.z
-      };
-      
-      screenPosStart.current = {
-        x: screen.position[0],
-        y: screen.position[1],
-        z: screen.position[2]
-      };
-    }
+    console.log('Drag started at', dragStartPos.current);
   };
   
-  const handleSelectEnd = () => {
-    dragging.current = false;
+  // Continue dragging
+  const handleDrag = (e) => {
+    if (!isDragging || !dragStartPos.current || !screenRef.current) return;
+    
+    // Get current controller/pointer position
+    const currentPoint = e.intersection.point;
+    
+    // Calculate offset from drag start position
+    const offset = new THREE.Vector3().subVectors(currentPoint, dragStartPos.current);
+    
+    // Apply offset to screen position
+    const newPosition = new THREE.Vector3().addVectors(screenStartPos.current, offset);
+    
+    // Update screen reference position
+    screenRef.current.position.copy(newPosition);
+    
+    // Update position in store
+    updateScreenPosition(screenId, [newPosition.x, newPosition.y, newPosition.z]);
   };
   
-  const handleMove = (e) => {
-    if (!dragging.current || !screen) return;
+  // End dragging
+  const handleDragEnd = () => {
+    setIsDragging(false);
     
-    if (e.controller) {
-      // Calculate movement delta
-      const deltaX = e.controller.controller.position.x - dragStart.current.x;
-      const deltaY = e.controller.controller.position.y - dragStart.current.y;
-      const deltaZ = e.controller.controller.position.z - dragStart.current.z;
-      
-      // Apply delta to original screen position
-      const newPosition = [
-        screenPosStart.current.x + deltaX,
-        screenPosStart.current.y + deltaY,
-        screenPosStart.current.z + deltaZ
-      ];
-      
-      // Update screen position in store
-      updateScreenPosition(screenId, newPosition);
-    }
+    if (!screenRef.current) return;
+    
+    // Update final position in store
+    const position = screenRef.current.position;
+    updateScreenPosition(screenId, [position.x, position.y, position.z]);
+    
+    console.log('Drag ended at', position);
+  };
+  
+  // Handle rotation using the controller
+  const handleRotate = (e) => {
+    e.stopPropagation();
+    
+    if (!screenRef.current) return;
+    
+    // Get direction to look at (towards the camera/player)
+    const lookAtPos = isPresenting && player
+      ? player.position.clone()
+      : camera.position.clone();
+    
+    // Only rotate horizontally (y-axis)
+    lookAtPos.y = screenRef.current.position.y;
+    
+    // Face the screen towards the user
+    screenRef.current.lookAt(lookAtPos);
   };
   
   return (
-    <Interactive
-      onSelect={handleSelectStart}
-      onSelectEnd={handleSelectEnd}
-      onMove={handleMove}
-    >
-      <mesh
-        ref={ref}
-        position={position}
+    <group position={position}>
+      {/* Drag handle */}
+      <Interactive 
+        onSelect={handleDragStart}
+        onSelectEnd={handleDragEnd}
+        onSelectMissed={handleDragEnd}
+        onMove={handleDrag}
       >
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial 
-          color={color} 
-          transparent={true} 
-          opacity={opacity}
-        />
-      </mesh>
-    </Interactive>
+        <mesh ref={handleRef}>
+          <boxGeometry args={[0.25, 0.08, 0.02]} />
+          <meshStandardMaterial 
+            color="#1a73e8" 
+            emissive="#1a73e8"
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+      </Interactive>
+      
+      {/* Rotate button */}
+      <Interactive onSelect={handleRotate}>
+        <mesh position={[0.2, 0, 0]}>
+          <sphereGeometry args={[0.04, 16, 16]} />
+          <meshStandardMaterial 
+            color="#EA4335" 
+            emissive="#EA4335"
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+      </Interactive>
+    </group>
   );
 };
 

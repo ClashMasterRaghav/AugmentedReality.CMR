@@ -1,117 +1,86 @@
 import { create } from 'zustand';
 import { Vector3 } from 'three';
 
+// Generate a unique ID for each screen
+const generateId = () => `screen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+/**
+ * Store for managing screens in AR
+ */
 export const useScreenStore = create((set, get) => ({
+  // Array of screen objects
   screens: [],
+  
+  // ID of the currently selected screen
   selectedScreenId: null,
   
-  // Add a new screen of specified type
+  // Add a new screen
   addScreen: (type, position = [0, 0, -1.5]) => {
+    // Create screen object
     const newScreen = {
-      id: Date.now().toString(),
+      id: generateId(),
       type,
-      position: position instanceof Vector3 ? position.toArray() : position,
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-      isSelected: false,
+      position: position instanceof Vector3 ? [position.x, position.y, position.z] : position,
       createdAt: Date.now()
     };
     
-    // Deselect any selected screen
-    const updatedScreens = get().screens.map(screen => ({
-      ...screen,
-      isSelected: false
-    }));
+    console.log(`Adding screen: ${type} at position:`, position);
     
-    set({
-      screens: [...updatedScreens, { ...newScreen, isSelected: true }],
-      selectedScreenId: newScreen.id
-    });
+    // Add to screens array
+    set(state => ({ 
+      screens: [...state.screens, newScreen],
+      selectedScreenId: newScreen.id // Automatically select new screen
+    }));
     
     return newScreen.id;
   },
   
-  // Select a screen by ID
-  selectScreen: (id) => {
-    set(state => ({
-      screens: state.screens.map(screen => ({
-        ...screen,
-        isSelected: screen.id === id
-      })),
-      selectedScreenId: id
-    }));
+  // Remove a screen by ID
+  removeScreen: (id) => {
+    console.log(`Removing screen: ${id}`);
+    
+    set(state => {
+      const updatedScreens = state.screens.filter(screen => screen.id !== id);
+      
+      // Update selected screen if needed
+      let newSelectedId = state.selectedScreenId;
+      
+      if (state.selectedScreenId === id) {
+        // If the removed screen was selected, select another screen or null
+        newSelectedId = updatedScreens.length > 0 ? updatedScreens[0].id : null;
+      }
+      
+      return { 
+        screens: updatedScreens,
+        selectedScreenId: newSelectedId
+      };
+    });
   },
   
-  // Update screen position
+  // Update position of a screen
   updateScreenPosition: (id, position) => {
     set(state => ({
       screens: state.screens.map(screen => 
         screen.id === id 
-          ? { ...screen, position: position instanceof Vector3 ? position.toArray() : position } 
+          ? { ...screen, position } 
           : screen
       )
     }));
   },
   
-  // Update screen rotation
-  updateScreenRotation: (id, rotation) => {
-    set(state => ({
-      screens: state.screens.map(screen => 
-        screen.id === id 
-          ? { ...screen, rotation } 
-          : screen
-      )
-    }));
+  // Set the selected screen
+  setSelectedScreenId: (id) => {
+    set({ selectedScreenId: id });
   },
   
-  // Update screen scale
-  updateScreenScale: (id, scale) => {
-    set(state => ({
-      screens: state.screens.map(screen => 
-        screen.id === id 
-          ? { ...screen, scale } 
-          : screen
-      )
-    }));
+  // Get a screen by ID
+  getScreenById: (id) => {
+    return get().screens.find(screen => screen.id === id);
   },
   
-  // Remove a screen by ID
-  removeScreen: (id) => {
-    const { screens, selectedScreenId } = get();
-    const newScreens = screens.filter(screen => screen.id !== id);
-    
-    // If deleted the selected screen, select another one if available
-    const newSelectedId = id === selectedScreenId
-      ? newScreens.length > 0 ? newScreens[newScreens.length - 1].id : null
-      : selectedScreenId;
-    
-    set({
-      screens: newScreens,
-      selectedScreenId: newSelectedId
-    });
-    
-    // If we have a new selected screen, mark it as selected
-    if (newSelectedId) {
-      set(state => ({
-        screens: state.screens.map(screen => ({
-          ...screen,
-          isSelected: screen.id === newSelectedId
-        }))
-      }));
-    }
-  },
-  
-  // Remove all screens
+  // Clear all screens
   clearScreens: () => {
-    set({
-      screens: [],
-      selectedScreenId: null
-    });
-  },
-  
-  // Get selected screen
-  getSelectedScreen: () => {
-    const { screens, selectedScreenId } = get();
-    return screens.find(screen => screen.id === selectedScreenId) || null;
+    console.log('Clearing all screens');
+    set({ screens: [], selectedScreenId: null });
   }
 })); 

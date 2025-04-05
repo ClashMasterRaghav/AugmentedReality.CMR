@@ -1,116 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { Text } from '@react-three/drei';
-import { Interactive } from '@react-three/xr';
+import React, { useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useScreenInteraction } from '../../hooks/useScreenInteraction';
+import { Text } from '@react-three/drei';
+import { useXR, Interactive } from '@react-three/xr';
+import * as THREE from 'three';
 import DragHandle from '../DragHandle';
+import { useScreenStore } from '../../store/screenStore';
 
 /**
- * Base screen component that provides common functionality for all screen types
+ * Base component for all screen types
  */
-const BaseScreen = ({
-  id,
-  position = [0, 0, -1.5],
-  title = "Screen",
-  width = 1.0,
-  height = 0.75,
-  children,
+const BaseScreen = ({ 
+  id, 
+  position = [0, 0, -1.5], 
+  rotation = [0, 0, 0], 
+  width = 1.0, 
+  height = 0.75, 
+  title = 'Screen', 
+  children 
 }) => {
-  const [scale, setScale] = useState(0.01);
-  const { 
-    ref, 
-    isSelected,
-    handleSelect,
-    handleHover,
-    handleUnhover
-  } = useScreenInteraction({ screenId: id, position });
-
-  // Entrance animation
+  const { isPresenting } = useXR();
+  const frameRef = useRef();
+  const screenGroup = useRef();
+  const [isSelected, setIsSelected] = useState(false);
+  
+  // Access screen store
+  const setSelectedScreenId = useScreenStore(state => state.setSelectedScreenId);
+  const selectedScreenId = useScreenStore(state => state.selectedScreenId);
+  
+  // Set initial position
   useEffect(() => {
-    const timer = setTimeout(() => setScale(1.0), 100);
-    return () => clearTimeout(timer);
+    if (screenGroup.current) {
+      screenGroup.current.position.set(position[0], position[1], position[2]);
+      
+      if (rotation) {
+        screenGroup.current.rotation.set(rotation[0], rotation[1], rotation[2]);
+      }
+    }
   }, []);
-
-  // Add subtle floating animation for selected screens
+  
+  // Update selection state when selected screen changes
+  useEffect(() => {
+    setIsSelected(selectedScreenId === id);
+  }, [selectedScreenId, id]);
+  
+  // Select this screen
+  const handleSelect = (e) => {
+    e.stopPropagation();
+    setSelectedScreenId(id);
+    console.log(`Selected screen: ${id}`);
+  };
+  
+  // Add a subtle animation to make the screen more noticeable in AR
   useFrame(({ clock }) => {
-    if (ref.current && isSelected) {
-      // Very subtle y-axis movement
-      ref.current.position.y += Math.sin(clock.getElapsedTime() * 2) * 0.0001;
+    if (screenGroup.current && isPresenting) {
+      // Small hover animation when selected
+      if (isSelected) {
+        const hoverOffset = Math.sin(clock.getElapsedTime() * 2) * 0.005;
+        screenGroup.current.position.y = position[1] + hoverOffset;
+      }
+      
+      // Add a subtle pulsing glow to make it more visible in AR
+      if (frameRef.current) {
+        const intensity = 0.8 + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+        const material = frameRef.current.material;
+        if (material && material.emissiveIntensity !== undefined) {
+          material.emissiveIntensity = intensity;
+          material.needsUpdate = true;
+        }
+      }
     }
   });
-
+  
   return (
-    <Interactive
-      onSelect={handleSelect}
-      onHover={handleHover}
-      onBlur={handleUnhover}
-    >
-      <group 
-        ref={ref}
-        position={position}
-        scale={[scale, scale, scale]}
-      >
-        {/* Screen content background */}
-        <mesh>
-          <planeGeometry args={[width, height]} />
-          <meshBasicMaterial color="#222222" />
-        </mesh>
-
-        {/* Border/highlight for the screen */}
-        <mesh position={[0, 0, -0.001]}>
-          <planeGeometry args={[width + 0.02, height + 0.02]} />
-          <meshBasicMaterial 
-            color={isSelected ? "#1a73e8" : "#444444"} 
-            transparent 
-            opacity={isSelected ? 0.8 : 0.5} 
+    <group ref={screenGroup}>
+      {/* Screen frame with glow effect */}
+      <Interactive onSelect={handleSelect}>
+        <mesh 
+          ref={frameRef}
+          position={[0, 0, -0.01]}
+          onClick={handleSelect}
+        >
+          <boxGeometry args={[width + 0.05, height + 0.05, 0.01]} />
+          <meshStandardMaterial 
+            color={isSelected ? "#4285F4" : "#2a2a2a"} 
+            emissive={isSelected ? "#4285F4" : "#333333"}
+            emissiveIntensity={0.8}
+            transparent={true} 
+            opacity={0.9}
           />
         </mesh>
-        
-        {/* Selection glow effect */}
-        {isSelected && (
-          <mesh position={[0, 0, -0.002]}>
-            <planeGeometry args={[width + 0.05, height + 0.05]} />
-            <meshBasicMaterial 
-              color="#6495ED" 
-              transparent 
-              opacity={0.3} 
-              blending={2} // Additive blending for glow effect
-            />
-          </mesh>
-        )}
-
-        {/* Title bar */}
-        <mesh position={[0, height/2 + 0.03, 0]}>
-          <planeGeometry args={[width, 0.06]} />
-          <meshBasicMaterial color="#333333" />
-        </mesh>
-
-        {/* Title text */}
-        <Text
-          position={[0, height/2 + 0.03, 0.001]}
-          fontSize={0.03}
-          color="white"
-          anchorX="center"
-          anchorY="middle"
-        >
-          {title}
-        </Text>
-
-        {/* Drag handle */}
-        <DragHandle
-          screenId={id}
-          position={[0, height/2 + 0.03, 0.002]}
-          width={width - 0.1}
-          height={0.06}
-          opacity={0}
+      </Interactive>
+      
+      {/* Screen title */}
+      <Text
+        position={[0, height / 2 + 0.05, 0]}
+        fontSize={0.04}
+        color="white"
+        anchorX="center"
+        anchorY="bottom"
+        outlineWidth={0.005}
+        outlineColor="#000000"
+      >
+        {title}
+      </Text>
+      
+      {/* Screen content (passed as children) */}
+      {children}
+      
+      {/* Drag handle (only visible when selected) */}
+      {isSelected && (
+        <DragHandle 
+          screenId={id} 
+          position={[0, height / 2 + 0.1, 0]} 
+          screenRef={screenGroup} 
         />
-
-        {/* Screen content (passed as children) */}
-        <group position={[0, 0, 0.001]}>
-          {children}
-        </group>
-      </group>
-    </Interactive>
+      )}
+    </group>
   );
 };
 

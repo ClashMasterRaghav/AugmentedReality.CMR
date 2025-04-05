@@ -17,6 +17,17 @@ const Screens = () => {
   const screens = useScreenStore(state => state.screens);
   const { isPresenting } = useXR();
   
+  // Initialize with a default screen when entering AR mode
+  useEffect(() => {
+    const addScreen = useScreenStore.getState().addScreen;
+    
+    // Add a default welcome screen when entering AR mode if no screens exist
+    if (isPresenting && screens.length === 0) {
+      console.log('Adding default screen for AR mode');
+      addScreen('default', [0, 0, -1.5]);
+    }
+  }, [isPresenting, screens.length]);
+  
   return (
     <>
       {screens.map(screen => {
@@ -41,11 +52,6 @@ const Screens = () => {
             return <DefaultScreen key={id} id={id} position={pos} />;
         }
       })}
-      
-      {/* Add a default screen if no screens exist and we're in AR */}
-      {screens.length === 0 && isPresenting && (
-        <DefaultScreen id="default" position={[0, 0, -1.5]} />
-      )}
     </>
   );
 };

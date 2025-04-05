@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Interactive, useXR } from '@react-three/xr';
+import { Interactive, useXR, useXRFrame } from '@react-three/xr';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useScreenStore } from '../store/screenStore';
@@ -27,11 +27,11 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
     if (!panelRef.current || !visible) return;
     
     // Get position in front of user/camera
-    const viewerPosition = isPresenting
+    const viewerPosition = isPresenting && player
       ? player.position.clone()
       : camera.position.clone();
     
-    const viewerDirection = isPresenting
+    const viewerDirection = isPresenting && player
       ? new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion)
       : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     
@@ -56,6 +56,18 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
     );
   };
   
+  // Use XRFrame hook to continually update position in AR mode
+  useXRFrame(() => {
+    if (isPresenting) {
+      updatePanelPosition();
+    }
+  });
+  
+  // Also update position on regular component updates
+  useEffect(() => {
+    updatePanelPosition();
+  }, [isPresenting, visible]);
+  
   // Toggle panel open/closed
   const togglePanel = () => {
     setIsOpen(!isOpen);
@@ -64,11 +76,11 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
   // Create new screen of specified type
   const createScreen = (type) => {
     // Get position in front of user/camera
-    const viewerPosition = isPresenting
+    const viewerPosition = isPresenting && player
       ? player.position.clone()
       : camera.position.clone();
     
-    const viewerDirection = isPresenting
+    const viewerDirection = isPresenting && player
       ? new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion)
       : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     
@@ -79,6 +91,9 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
     
     // Add screen and get its ID
     addScreen(type, screenPosition);
+    
+    // Log for debugging
+    console.log(`Creating ${type} screen at`, screenPosition);
   };
   
   // Switch between tabs
@@ -88,9 +103,6 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
   
   // Panel is always visible if requested
   if (!visible) return null;
-  
-  // Update panel position
-  updatePanelPosition();
   
   return (
     <group ref={panelRef} position={position}>
