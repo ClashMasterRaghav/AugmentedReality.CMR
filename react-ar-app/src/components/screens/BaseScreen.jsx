@@ -22,54 +22,19 @@ const BaseScreen = ({
   const frameRef = useRef();
   const screenGroup = useRef();
   const [isSelected, setIsSelected] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const [initialPlacement, setInitialPlacement] = useState(true);
   
   // Access screen store
   const setSelectedScreenId = useScreenStore(state => state.setSelectedScreenId);
   const selectedScreenId = useScreenStore(state => state.selectedScreenId);
   
-  // Set initial position with a small delay for better AR placement
+  // Set initial position
   useEffect(() => {
     if (screenGroup.current) {
-      // Set initial rotation
+      screenGroup.current.position.set(position[0], position[1], position[2]);
+      
       if (rotation) {
         screenGroup.current.rotation.set(rotation[0], rotation[1], rotation[2]);
       }
-      
-      // Add initial scale animation for better visibility
-      screenGroup.current.scale.set(0.01, 0.01, 0.01);
-      
-      // Delayed placement for AR initialization
-      const timer = setTimeout(() => {
-        // Set position
-        screenGroup.current.position.set(position[0], position[1], position[2]);
-        
-        // Animate to full size
-        const duration = 500; // ms
-        const startTime = Date.now();
-        
-        function animateScale() {
-          const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const easeOutCubic = 1 - Math.pow(1 - progress, 3); // Easing function
-          
-          if (screenGroup.current) {
-            const scale = 0.01 + easeOutCubic * 0.99; // Grow from 0.01 to 1.0
-            screenGroup.current.scale.set(scale, scale, scale);
-          }
-          
-          if (progress < 1) {
-            requestAnimationFrame(animateScale);
-          } else {
-            setInitialPlacement(false);
-          }
-        }
-        
-        animateScale();
-      }, 300);
-      
-      return () => clearTimeout(timer);
     }
   }, []);
   
@@ -85,25 +50,14 @@ const BaseScreen = ({
     console.log(`Selected screen: ${id}`);
   };
   
-  // Track visibility based on camera position
-  useFrame(({ camera, clock }) => {
-    if (!screenGroup.current || initialPlacement) return;
-    
-    // Check if screen is in view
-    const screenPos = new THREE.Vector3();
-    screenGroup.current.getWorldPosition(screenPos);
-    const cameraDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const screenDir = screenPos.clone().sub(camera.position).normalize();
-    const dotProduct = cameraDir.dot(screenDir);
-    
-    // If screen is behind camera or too far from view center, consider it not visible
-    const isInView = dotProduct > 0.3; // Within about 70 degrees of center view
-    setIsVisible(isInView);
-    
-    // Small hover animation when selected
-    if (isSelected && isPresenting) {
-      const hoverOffset = Math.sin(clock.getElapsedTime() * 2) * 0.005;
-      screenGroup.current.position.y = position[1] + hoverOffset;
+  // Add a subtle animation to make the screen more noticeable in AR
+  useFrame(({ clock }) => {
+    if (screenGroup.current && isPresenting) {
+      // Small hover animation when selected
+      if (isSelected) {
+        const hoverOffset = Math.sin(clock.getElapsedTime() * 2) * 0.005;
+        screenGroup.current.position.y = position[1] + hoverOffset;
+      }
       
       // Add a subtle pulsing glow to make it more visible in AR
       if (frameRef.current) {
@@ -152,23 +106,6 @@ const BaseScreen = ({
       
       {/* Screen content (passed as children) */}
       {children}
-      
-      {/* Visibility indicator for screens outside of view */}
-      {!isVisible && isPresenting && (
-        <mesh position={[0, 0, 0.02]} rotation={[0, 0, 0]}>
-          <planeGeometry args={[width, height]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.7} />
-          <Text
-            position={[0, 0, 0.01]}
-            fontSize={0.05}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-          >
-            Look this way to see screen
-          </Text>
-        </mesh>
-      )}
       
       {/* Drag handle (only visible when selected) */}
       {isSelected && (
