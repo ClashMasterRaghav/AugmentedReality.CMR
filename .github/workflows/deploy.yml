@@ -38,8 +38,6 @@ jobs:
           cd react-ar-app
           # Use npm install to resolve dependency conflicts
           npm install
-          # Ensure latest WebXR-compatible packages
-          npm install @react-three/xr@latest three@latest @react-three/drei@latest @react-three/fiber@latest --save
 
       - name: 🛠️ Build React App
         run: |
