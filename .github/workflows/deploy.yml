@@ -37,11 +37,14 @@ jobs:
         run: |
           cd react-ar-app
           npm install
+          # Fix permission issues
+          chmod +x node_modules/.bin/react-scripts
+          chmod -R +x node_modules
 
       - name: 🛠️ Build React App
         run: |
           cd react-ar-app
-          npx react-scripts build
+          npm run build
         env:
           CI: false
 
