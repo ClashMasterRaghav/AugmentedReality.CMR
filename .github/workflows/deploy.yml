@@ -21,33 +21,30 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    
+    # Use container to avoid permission issues and ensure consistent environment
+    container:
+      image: node:18
 
     steps:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-          cache-dependency-path: './react-ar-app/package-lock.json'
-
-      - name: 📥 Install Dependencies
+      - name: 📥 Setup and Build
         run: |
           cd react-ar-app
-          # Use npm install with legacy-peer-deps to resolve conflicts
-          npm install --legacy-peer-deps
-          # Install specific compatible versions
+          echo "Installing dependencies with fallback options..."
+          npm install --no-fund --no-audit --legacy-peer-deps || npm install --force
+          
+          echo "Installing specific Three.js compatibility packages..."
           npm install three@0.160.0 @react-three/fiber@8.15.11 @react-three/drei@9.90.0 @react-three/xr@5.7.1 --save --legacy-peer-deps
-
-      - name: 🛠️ Build React App
-        run: |
-          cd react-ar-app
-          # Fix permissions or use npx
-          chmod +x node_modules/.bin/react-scripts
-          # Run build with npx as a fallback if chmod doesn't work
-          npm run build || npx react-scripts build
+          
+          echo "Setting permissions for build scripts..."
+          chmod -R 755 node_modules/.bin
+          
+          echo "Building application..."
+          export NODE_OPTIONS=--max_old_space_size=4096
+          npm run build || npx react-scripts build || NODE_ENV=production npx react-scripts build
         env:
           CI: false
 
