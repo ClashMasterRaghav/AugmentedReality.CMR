@@ -77,7 +77,7 @@ const App = () => {
   
   // Check for WebXR compatibility
   useEffect(() => {
-    if (!'xr' in navigator) {
+    if (!('xr' in navigator)) {
       setIsCompatible(false);
     } else {
       navigator.xr?.isSessionSupported('immersive-ar')
