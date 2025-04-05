@@ -127,12 +127,18 @@ const App = () => {
       
       <ARButton 
         sessionInit={{ 
-          requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay', 'camera-access'],
+          requiredFeatures: ['hit-test', 'camera-access'],
+          optionalFeatures: ['dom-overlay'],
           domOverlay: { root: document.body }
         }}
-        onSessionStarted={() => setArStarted(true)}
-        onSessionEnded={() => setArStarted(false)}
+        onSessionStarted={() => {
+          setArStarted(true);
+          console.log('AR Session started');
+        }}
+        onSessionEnded={() => {
+          setArStarted(false);
+          console.log('AR Session ended');
+        }}
         style={{ 
           position: 'fixed', 
           bottom: '24px',
@@ -165,10 +171,22 @@ const App = () => {
         </div>
       )}
       
-      <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
+      <Canvas 
+        camera={{ position: [0, 0, 5], fov: 75 }}
+        gl={{ 
+          alpha: true,
+          antialias: true,
+          preserveDrawingBuffer: true
+        }}
+      >
         <XR
-          referenceSpace="local"
+          referenceSpace="local-floor"
           foveation={2}
+          sessionInit={{
+            requiredFeatures: ['hit-test'],
+            optionalFeatures: ['dom-overlay', 'camera-access'],
+            domOverlay: { root: document.body }
+          }}
         >
           {/* Controllers for interaction */}
           <Controllers rayMaterial={{ color: 'blue' }} hideRaysOnBlur={false} />
