@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/AugmentedReality.CMR/static/css/main.3b2e1dc7.css",
-    "main.js": "/AugmentedReality.CMR/static/js/main.9aeb1b30.js",
+    "main.js": "/AugmentedReality.CMR/static/js/main.61849591.js",
     "index.html": "/AugmentedReality.CMR/index.html",
     "main.3b2e1dc7.css.map": "/AugmentedReality.CMR/static/css/main.3b2e1dc7.css.map",
-    "main.9aeb1b30.js.map": "/AugmentedReality.CMR/static/js/main.9aeb1b30.js.map"
+    "main.61849591.js.map": "/AugmentedReality.CMR/static/js/main.61849591.js.map"
   },
   "entrypoints": [
     "static/css/main.3b2e1dc7.css",
-    "static/js/main.9aeb1b30.js"
+    "static/js/main.61849591.js"
   ]
 }

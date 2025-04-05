@@ -38,6 +38,10 @@ jobs:
           cd react-ar-app
           # Use npm install to resolve dependency conflicts
           npm install
+          # Install Three.js version that supports BatchedMesh
+          npm install three@0.160.0 --save
+          # Fix permission issues on Linux
+          chmod -R +x node_modules/.bin
 
       - name: 🛠️ Build React App
         run: |

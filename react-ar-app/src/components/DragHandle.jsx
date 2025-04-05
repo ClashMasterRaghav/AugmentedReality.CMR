@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { useThree } from '@react-three/fiber';
+import React, { useRef, useState, useEffect } from 'react';
+import { useThree, useFrame } from '@react-three/fiber';
 import { Interactive, useXR } from '@react-three/xr';
 import * as THREE from 'three';
 import { useScreenStore } from '../store/screenStore';
@@ -14,9 +14,20 @@ const DragHandle = ({ screenId, position, screenRef }) => {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef(null);
   const screenStartPos = useRef(null);
+  const rotateButtonRef = useRef();
+  const [isRotating, setIsRotating] = useState(false);
   
   // Get screen update function from store
   const updateScreenPosition = useScreenStore(state => state.updateScreenPosition);
+  
+  // Visual feedback for active state
+  useEffect(() => {
+    if (rotateButtonRef.current) {
+      const material = rotateButtonRef.current.material;
+      material.emissiveIntensity = isRotating ? 0.8 : 0.5;
+      material.needsUpdate = true;
+    }
+  }, [isRotating]);
   
   // Start dragging
   const handleDragStart = (e) => {
@@ -28,6 +39,12 @@ const DragHandle = ({ screenId, position, screenRef }) => {
     dragStartPos.current = new THREE.Vector3().copy(e.intersection.point);
     screenStartPos.current = new THREE.Vector3().copy(screenRef.current.position);
     
+    // Visual feedback
+    if (handleRef.current) {
+      handleRef.current.material.emissiveIntensity = 0.8;
+      handleRef.current.material.needsUpdate = true;
+    }
+    
     console.log('Drag started at', dragStartPos.current);
   };
   
@@ -36,7 +53,8 @@ const DragHandle = ({ screenId, position, screenRef }) => {
     if (!isDragging || !dragStartPos.current || !screenRef.current) return;
     
     // Get current controller/pointer position
-    const currentPoint = e.intersection.point;
+    const currentPoint = e.intersection ? e.intersection.point : null;
+    if (!currentPoint) return;
     
     // Calculate offset from drag start position
     const offset = new THREE.Vector3().subVectors(currentPoint, dragStartPos.current);
@@ -57,6 +75,12 @@ const DragHandle = ({ screenId, position, screenRef }) => {
     
     if (!screenRef.current) return;
     
+    // Reset visual feedback
+    if (handleRef.current) {
+      handleRef.current.material.emissiveIntensity = 0.5;
+      handleRef.current.material.needsUpdate = true;
+    }
+    
     // Update final position in store
     const position = screenRef.current.position;
     updateScreenPosition(screenId, [position.x, position.y, position.z]);
@@ -64,23 +88,32 @@ const DragHandle = ({ screenId, position, screenRef }) => {
     console.log('Drag ended at', position);
   };
   
-  // Handle rotation using the controller
-  const handleRotate = (e) => {
+  // Start rotation
+  const handleRotateStart = (e) => {
     e.stopPropagation();
-    
-    if (!screenRef.current) return;
-    
-    // Get direction to look at (towards the camera/player)
-    const lookAtPos = isPresenting && player
-      ? player.position.clone()
-      : camera.position.clone();
-    
-    // Only rotate horizontally (y-axis)
-    lookAtPos.y = screenRef.current.position.y;
-    
-    // Face the screen towards the user
-    screenRef.current.lookAt(lookAtPos);
+    setIsRotating(true);
   };
+  
+  // End rotation
+  const handleRotateEnd = () => {
+    setIsRotating(false);
+  };
+  
+  // Continuous rotation update using useFrame
+  useFrame(() => {
+    if (isRotating && screenRef.current) {
+      // Get direction to look at (towards the camera/player)
+      const lookAtPos = isPresenting && player
+        ? player.position.clone()
+        : camera.position.clone();
+      
+      // Only rotate horizontally (y-axis)
+      lookAtPos.y = screenRef.current.position.y;
+      
+      // Face the screen towards the user
+      screenRef.current.lookAt(lookAtPos);
+    }
+  });
   
   return (
     <group position={position}>
@@ -102,8 +135,14 @@ const DragHandle = ({ screenId, position, screenRef }) => {
       </Interactive>
       
       {/* Rotate button */}
-      <Interactive onSelect={handleRotate}>
-        <mesh position={[0.2, 0, 0]}>
+      <Interactive 
+        onSelect={handleRotateStart}
+        onSelectEnd={handleRotateEnd}
+      >
+        <mesh 
+          ref={rotateButtonRef}
+          position={[0.2, 0, 0]}
+        >
           <sphereGeometry args={[0.04, 16, 16]} />
           <meshStandardMaterial 
             color="#EA4335" 

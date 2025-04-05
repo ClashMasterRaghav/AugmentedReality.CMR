@@ -12,6 +12,23 @@ import YouTubeScreen from './components/screens/YouTubeScreen';
 import MapsScreen from './components/screens/MapsScreen';
 import ElectronScreen from './components/screens/ElectronScreen';
 
+// Camera permission request component
+const CameraPermissionRequest = () => {
+  const [requested, setRequested] = useState(false);
+  
+  useEffect(() => {
+    if (!requested) {
+      // Request camera permission early to ensure smooth AR initialization
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(() => console.log('Camera permission granted'))
+        .catch(err => console.error('Camera permission denied:', err))
+        .finally(() => setRequested(true));
+    }
+  }, [requested]);
+  
+  return null;
+};
+
 // Screens container component that manages all screens
 const Screens = () => {
   const screens = useScreenStore(state => state.screens);
@@ -28,6 +45,13 @@ const Screens = () => {
     }
   }, [isPresenting, screens.length]);
   
+  // Debug logging for active screens
+  useEffect(() => {
+    if (isPresenting) {
+      console.log(`Active screens in AR: ${screens.length}`, screens);
+    }
+  }, [isPresenting, screens]);
+  
   return (
     <>
       {screens.map(screen => {
@@ -35,6 +59,9 @@ const Screens = () => {
         
         // Convert position array to Vector3
         const pos = position ? [...position] : [0, 0, -1.5];
+        
+        // Log screen rendering for debugging
+        console.log(`Rendering screen: ${type} at position:`, pos);
         
         // Render the appropriate screen component based on type
         switch (type) {
@@ -80,6 +107,7 @@ const InfoPanel = () => {
 // Main App component
 const App = () => {
   const [isCompatible, setIsCompatible] = useState(true);
+  const [arStarted, setArStarted] = useState(false);
   
   // Check for WebXR compatibility
   useEffect(() => {
@@ -94,12 +122,17 @@ const App = () => {
   
   return (
     <>
+      {/* Request camera permission early */}
+      <CameraPermissionRequest />
+      
       <ARButton 
         sessionInit={{ 
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay'],
+          optionalFeatures: ['dom-overlay', 'camera-access'],
           domOverlay: { root: document.body }
         }}
+        onSessionStarted={() => setArStarted(true)}
+        onSessionEnded={() => setArStarted(false)}
         style={{ 
           position: 'fixed', 
           bottom: '24px',
@@ -133,9 +166,12 @@ const App = () => {
       )}
       
       <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
-        <XR>
+        <XR
+          referenceSpace="local"
+          foveation={2}
+        >
           {/* Controllers for interaction */}
-          <Controllers />
+          <Controllers rayMaterial={{ color: 'blue' }} hideRaysOnBlur={false} />
           <Hands />
           
           {/* Lighting */}
@@ -143,7 +179,7 @@ const App = () => {
           <directionalLight position={[0, 5, 5]} intensity={0.5} castShadow />
           
           {/* Control panel for managing screens */}
-          <ControlPanel />
+          <ControlPanel visible={true} />
           
           {/* Screen container */}
           <Suspense fallback={null}>
@@ -160,6 +196,23 @@ const App = () => {
         {/* Info panel for non-AR mode */}
         <InfoPanel />
       </Canvas>
+      
+      {/* Debug panel for AR mode */}
+      {arStarted && (
+        <div style={{
+          position: 'fixed',
+          top: 10,
+          right: 10,
+          background: 'rgba(0,0,0,0.7)',
+          color: 'white',
+          padding: '5px 10px',
+          borderRadius: '5px',
+          fontSize: '12px',
+          zIndex: 1000
+        }}>
+          AR Mode Active
+        </div>
+      )}
     </>
   );
 };
