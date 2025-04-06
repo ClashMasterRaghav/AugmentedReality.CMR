@@ -2,9 +2,11 @@ import React, { Suspense, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ARButton, XR, Controllers, Hands, useXR } from '@react-three/xr';
 import { Environment, OrbitControls, Html } from '@react-three/drei';
+import * as THREE from 'three';
 import { useScreenStore } from './store/screenStore';
 import ControlPanel from './components/ControlPanel';
 import XRBackgroundFix from './components/XRBackgroundFix';
+import { ARModeObserver } from './components/ARModeObserver';
 
 // Import screen components
 import DefaultScreen from './components/screens/DefaultScreen';
@@ -25,7 +27,20 @@ const Screens = () => {
     // Add a default welcome screen when entering AR mode if no screens exist
     if (isPresenting && screens.length === 0) {
       console.log('Adding default screen for AR mode');
+      
+      // Position screens in a semi-circle in front of the user
+      // Default screen directly in front
       addScreen('default', [0, 0, -1.5]);
+      
+      // After a short delay, add other screens in a semi-circle if none exist
+      setTimeout(() => {
+        if (useScreenStore.getState().screens.length <= 1) {
+          // Add screens in fixed positions around the user (Apple Vision Pro style)
+          addScreen('browser', [-1.0, 0, -1.2]);
+          addScreen('youtube', [1.0, 0, -1.2]);
+          addScreen('maps', [-0.5, 0.5, -1.0]);
+        }
+      }, 2000);
     }
   }, [isPresenting, screens.length]);
   
@@ -125,7 +140,7 @@ const App = () => {
       <ARButton 
         sessionInit={{ 
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay'],
+          optionalFeatures: ['dom-overlay', 'camera-access', 'unbounded'],
           domOverlay: { root: document.body }
         }}
         style={{ 
@@ -141,6 +156,12 @@ const App = () => {
           fontWeight: 'bold',
           zIndex: 999,
           cursor: 'pointer'
+        }}
+        onStart={() => {
+          console.log('AR session started by user');
+        }}
+        onEnd={() => {
+          console.log('AR session ended by user');
         }}
         onError={(error) => {
           console.error('AR session error:', error);
@@ -174,11 +195,16 @@ const App = () => {
         onClick={() => console.log('Canvas clicked')}
         onCreated={state => {
           console.log('Canvas created with state:', state);
+          
+          // Set up AR renderer properties explicitly
+          if (state.gl) {
+            state.gl.outputEncoding = THREE.sRGBEncoding;
+            state.gl.physicallyCorrectLights = true;
+          }
         }}
       >
         <XR
-          referenceSpace="local"
-          sessionGranded="floor"
+          referenceSpace="unbounded"
         >
           {/* Fix for black screen in AR */}
           <XRBackgroundFix />
@@ -199,15 +225,21 @@ const App = () => {
             <Screens />
           </Suspense>
           
-          {/* Environment for better visuals */}
+          {/* Environment for better visuals - only in non-AR mode */}
           <Environment preset="sunset" />
         </XR>
         
-        {/* Controls for non-AR mode */}
-        <OrbitControls enableDamping dampingFactor={0.1} />
+        {/* Controls for non-AR mode only */}
+        <ARModeObserver>
+          {({ isPresenting }) => !isPresenting && (
+            <OrbitControls enableDamping dampingFactor={0.1} />
+          )}
+        </ARModeObserver>
         
         {/* Info panel for non-AR mode */}
-        <InfoPanel />
+        <ARModeObserver>
+          {({ isPresenting }) => !isPresenting && <InfoPanel />}
+        </ARModeObserver>
       </Canvas>
     </>
   );
