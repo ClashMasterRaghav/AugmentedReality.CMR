@@ -173,114 +173,38 @@ function updateButtonIcon(button, newType) {
 
 // Create control button icons
 function createControlIcon(type) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    
-    // Clear canvas and set styles
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
+    // Use the actual PNG icons instead of drawing them
+    const iconLoader = new THREE.TextureLoader();
+    let iconPath = '';
     
     switch(type) {
         case 'play':
-            // Draw play icon (triangle)
-            ctx.beginPath();
-            ctx.moveTo(22, 16);
-            ctx.lineTo(22, 48);
-            ctx.lineTo(48, 32);
-            ctx.closePath();
-            ctx.fill();
+            iconPath = 'examples/textures/ar_icons/play-buttton.png';
             break;
-            
         case 'pause':
-            // Draw pause icon (two vertical bars)
-            ctx.fillRect(20, 16, 8, 32);
-            ctx.fillRect(36, 16, 8, 32);
+            iconPath = 'examples/textures/ar_icons/pause-button.png';
             break;
-            
         case 'volume':
-            // Draw volume icon
-            // Speaker base
-            ctx.beginPath();
-            ctx.moveTo(16, 24);
-            ctx.lineTo(24, 24);
-            ctx.lineTo(32, 16);
-            ctx.lineTo(32, 48);
-            ctx.lineTo(24, 40);
-            ctx.lineTo(16, 40);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Sound waves
-            ctx.beginPath();
-            ctx.moveTo(40, 22);
-            ctx.bezierCurveTo(45, 30, 45, 34, 40, 42);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(44, 18);
-            ctx.bezierCurveTo(52, 28, 52, 36, 44, 46);
-            ctx.stroke();
+            iconPath = 'examples/textures/ar_icons/unmute.png';
             break;
-            
         case 'muted':
-            // Draw muted icon
-            // Speaker base
+            iconPath = 'examples/textures/ar_icons/mute.png';
+            break;
+        default:
+            // Create a fallback if no matching icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.moveTo(16, 24);
-            ctx.lineTo(24, 24);
-            ctx.lineTo(32, 16);
-            ctx.lineTo(32, 48);
-            ctx.lineTo(24, 40);
-            ctx.lineTo(16, 40);
-            ctx.closePath();
+            ctx.arc(32, 32, 16, 0, Math.PI * 2);
             ctx.fill();
-            
-            // X mark for mute
-            ctx.beginPath();
-            ctx.moveTo(38, 22);
-            ctx.lineTo(52, 42);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(38, 42);
-            ctx.lineTo(52, 22);
-            ctx.stroke();
-            break;
-            
-        case 'fullscreen':
-            // Draw fullscreen icon
-            ctx.beginPath();
-            // Top-left corner
-            ctx.moveTo(18, 26);
-            ctx.lineTo(18, 18);
-            ctx.lineTo(26, 18);
-            
-            // Top-right corner
-            ctx.moveTo(38, 18);
-            ctx.lineTo(46, 18);
-            ctx.lineTo(46, 26);
-            
-            // Bottom-right corner
-            ctx.moveTo(46, 38);
-            ctx.lineTo(46, 46);
-            ctx.lineTo(38, 46);
-            
-            // Bottom-left corner
-            ctx.moveTo(26, 46);
-            ctx.lineTo(18, 46);
-            ctx.lineTo(18, 38);
-            ctx.stroke();
-            break;
+            return new THREE.CanvasTexture(canvas);
     }
     
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-    return texture;
+    // Return the loaded texture directly
+    return iconLoader.load(iconPath);
 }
 
 // Create a fallback texture when video fails
