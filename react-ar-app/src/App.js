@@ -6,7 +6,6 @@ import * as THREE from 'three';
 import { useScreenStore } from './store/screenStore';
 import ControlPanel from './components/ControlPanel';
 import XRBackgroundFix from './components/XRBackgroundFix';
-import { ARModeObserver } from './components/ARModeObserver';
 
 // Import screen components
 import DefaultScreen from './components/screens/DefaultScreen';
@@ -69,27 +68,6 @@ const Screens = () => {
         }
       })}
     </>
-  );
-};
-
-// Information component for non-AR mode
-const InfoPanel = () => {
-  return (
-    <Html center position={[0, 0, -1]}>
-      <div style={{
-        background: 'rgba(0, 0, 0, 0.7)',
-        color: 'white',
-        padding: '20px',
-        borderRadius: '10px',
-        width: '300px',
-        textAlign: 'center'
-      }}>
-        <h2>AR Multi-Screen Experience</h2>
-        <p>Click the "AR" button to start the AR experience.</p>
-        <p>In AR mode, you'll be able to create and interact with multiple screens.</p>
-        <p>Not compatible? Try on a WebXR-enabled device and browser.</p>
-      </div>
-    </Html>
   );
 };
 
@@ -203,6 +181,28 @@ const App = () => {
           }
         }}
       >
+        {/* Info panel for non-AR mode - rendered outside XR context */}
+        <Html center position={[0, 0, -1]}>
+          {!isCompatible && (
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.7)',
+              color: 'white',
+              padding: '20px',
+              borderRadius: '10px',
+              width: '300px',
+              textAlign: 'center'
+            }}>
+              <h2>AR Multi-Screen Experience</h2>
+              <p>Click the "AR" button to start the AR experience.</p>
+              <p>In AR mode, you'll be able to create and interact with multiple screens.</p>
+              <p>Not compatible? Try on a WebXR-enabled device and browser.</p>
+            </div>
+          )}
+        </Html>
+        
+        {/* Controls for non-AR mode - outside XR context so they always work */}
+        <OrbitControls enableDamping dampingFactor={0.1} />
+        
         <XR
           referenceSpace="unbounded"
         >
@@ -228,18 +228,6 @@ const App = () => {
           {/* Environment for better visuals - only in non-AR mode */}
           <Environment preset="sunset" />
         </XR>
-        
-        {/* Controls for non-AR mode only */}
-        <ARModeObserver>
-          {({ isPresenting }) => !isPresenting && (
-            <OrbitControls enableDamping dampingFactor={0.1} />
-          )}
-        </ARModeObserver>
-        
-        {/* Info panel for non-AR mode */}
-        <ARModeObserver>
-          {({ isPresenting }) => !isPresenting && <InfoPanel />}
-        </ARModeObserver>
       </Canvas>
     </>
   );
