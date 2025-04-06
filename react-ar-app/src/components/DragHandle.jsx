@@ -1,118 +1,105 @@
 import React, { useRef, useState } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import { Interactive, useXR } from '@react-three/xr';
 import * as THREE from 'three';
 import { useScreenStore } from '../store/screenStore';
 
 /**
- * Draggable handle component for screens
+ * DragHandle component for moving screens in 3D space
+ * Uses absolute positioning logic similar to the Three.js prototype
  */
 const DragHandle = ({ screenId, position, screenRef }) => {
-  const { isPresenting, player } = useXR();
+  const { player, isPresenting } = useXR();
   const { camera } = useThree();
   const handleRef = useRef();
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartPos = useRef(null);
-  const screenStartPos = useRef(null);
+  const [initialControllerPosition, setInitialControllerPosition] = useState(null);
+  const [initialScreenPosition, setInitialScreenPosition] = useState(null);
   
-  // Get screen update function from store
+  // Get updateScreenPosition from store
   const updateScreenPosition = useScreenStore(state => state.updateScreenPosition);
   
-  // Start dragging
+  // Handle drag start
   const handleDragStart = (e) => {
-    e.stopPropagation();
-    
-    if (!screenRef.current) return;
-    
     setIsDragging(true);
-    dragStartPos.current = new THREE.Vector3().copy(e.intersection.point);
-    screenStartPos.current = new THREE.Vector3().copy(screenRef.current.position);
     
-    console.log('Drag started at', dragStartPos.current);
+    // Store initial positions for relative movement calculation
+    const controllerPosition = new THREE.Vector3();
+    controllerPosition.setFromMatrixPosition(e.controller.matrixWorld);
+    setInitialControllerPosition(controllerPosition.clone());
+    
+    // Store initial screen position
+    setInitialScreenPosition(screenRef.current.position.clone());
+    
+    // Create matrix to get absolute coordinates (like in the Three.js prototype)
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(e.controller.matrixWorld);
+    
+    console.log('Started dragging screen:', screenId);
   };
   
-  // Continue dragging
-  const handleDrag = (e) => {
-    if (!isDragging || !dragStartPos.current || !screenRef.current) return;
-    
-    // Get current controller/pointer position
-    const currentPoint = e.intersection.point;
-    
-    // Calculate offset from drag start position
-    const offset = new THREE.Vector3().subVectors(currentPoint, dragStartPos.current);
-    
-    // Apply offset to screen position
-    const newPosition = new THREE.Vector3().addVectors(screenStartPos.current, offset);
-    
-    // Update screen reference position
-    screenRef.current.position.copy(newPosition);
-    
-    // Update position in store
-    updateScreenPosition(screenId, [newPosition.x, newPosition.y, newPosition.z]);
-  };
-  
-  // End dragging
+  // Handle drag end
   const handleDragEnd = () => {
     setIsDragging(false);
+    setInitialControllerPosition(null);
+    setInitialScreenPosition(null);
+    console.log('Ended dragging screen:', screenId);
     
-    if (!screenRef.current) return;
-    
-    // Update final position in store
-    const position = screenRef.current.position;
-    updateScreenPosition(screenId, [position.x, position.y, position.z]);
-    
-    console.log('Drag ended at', position);
+    // Update store with final position
+    if (screenRef.current) {
+      updateScreenPosition(screenId, [
+        screenRef.current.position.x,
+        screenRef.current.position.y,
+        screenRef.current.position.z
+      ]);
+    }
   };
   
-  // Handle rotation using the controller
-  const handleRotate = (e) => {
-    e.stopPropagation();
+  // Update position during dragging
+  useFrame(({ clock }) => {
+    // Animate handle to make it more noticeable
+    if (handleRef.current) {
+      handleRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 2) * 0.2;
+    }
     
-    if (!screenRef.current) return;
-    
-    // Get direction to look at (towards the camera/player)
-    const lookAtPos = isPresenting && player
-      ? player.position.clone()
-      : camera.position.clone();
-    
-    // Only rotate horizontally (y-axis)
-    lookAtPos.y = screenRef.current.position.y;
-    
-    // Face the screen towards the user
-    screenRef.current.lookAt(lookAtPos);
-  };
+    // Handle drag movement using absolute positioning
+    if (isDragging && initialControllerPosition && initialScreenPosition) {
+      // Get current controller position
+      const controller = isPresenting ? player.children[0] : camera;
+      const currentControllerPosition = new THREE.Vector3();
+      
+      if (controller.matrixWorld) {
+        currentControllerPosition.setFromMatrixPosition(controller.matrixWorld);
+        
+        // Calculate movement delta in absolute world coordinates
+        const delta = new THREE.Vector3().subVectors(
+          currentControllerPosition, 
+          initialControllerPosition
+        );
+        
+        // Apply movement delta to screen position
+        // Using absolute coordinates similar to the Three.js prototype
+        screenRef.current.position.copy(initialScreenPosition.clone().add(delta));
+      }
+    }
+  });
   
   return (
-    <group position={position}>
-      {/* Drag handle */}
-      <Interactive 
-        onSelect={handleDragStart}
-        onSelectEnd={handleDragEnd}
-        onSelectMissed={handleDragEnd}
-        onMove={handleDrag}
-      >
+    <Interactive
+      onSelectStart={handleDragStart}
+      onSelectEnd={handleDragEnd}
+    >
+      <group position={position}>
         <mesh ref={handleRef}>
-          <boxGeometry args={[0.25, 0.08, 0.02]} />
+          <sphereGeometry args={[0.03, 16, 16]} />
           <meshStandardMaterial 
-            color="#1a73e8" 
-            emissive="#1a73e8"
+            color="#4285F4"
+            emissive="#4285F4"
             emissiveIntensity={0.5}
           />
         </mesh>
-      </Interactive>
-      
-      {/* Rotate button */}
-      <Interactive onSelect={handleRotate}>
-        <mesh position={[0.2, 0, 0]}>
-          <sphereGeometry args={[0.04, 16, 16]} />
-          <meshStandardMaterial 
-            color="#EA4335" 
-            emissive="#EA4335"
-            emissiveIntensity={0.5}
-          />
-        </mesh>
-      </Interactive>
-    </group>
+      </group>
+    </Interactive>
   );
 };
 

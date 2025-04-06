@@ -27,14 +27,15 @@ const Screens = () => {
     if (isPresenting && screens.length === 0) {
       console.log('Adding default screen for AR mode');
       
+      // Use absolute coordinates for screens (similar to the Three.js prototype)
       // Position screens in a semi-circle in front of the user
-      // Default screen directly in front
+      // Default screen directly in front with fixed absolute coordinates
       addScreen('default', [0, 0, -1.5]);
       
       // After a short delay, add other screens in a semi-circle if none exist
       setTimeout(() => {
         if (useScreenStore.getState().screens.length <= 1) {
-          // Add screens in fixed positions around the user (Apple Vision Pro style)
+          // Add screens in fixed absolute positions (Apple Vision Pro style)
           addScreen('browser', [-1.0, 0, -1.2]);
           addScreen('youtube', [1.0, 0, -1.2]);
           addScreen('maps', [-0.5, 0.5, -1.0]);
@@ -48,7 +49,7 @@ const Screens = () => {
       {screens.map(screen => {
         const { id, type, position } = screen;
         
-        // Convert position array to Vector3
+        // Convert position array to absolute Vector3 coordinates
         const pos = position ? [...position] : [0, 0, -1.5];
         
         // Render the appropriate screen component based on type
@@ -72,11 +73,17 @@ const Screens = () => {
 };
 
 // Main App component
-const App = () => {
-  const [isCompatible, setIsCompatible] = useState(true);
+const App = ({ xrSupported = true }) => {
+  const [isCompatible, setIsCompatible] = useState(xrSupported);
   
-  // Check for WebXR compatibility
+  // Check for WebXR compatibility on mount (fallback if not passed as prop)
   useEffect(() => {
+    if (xrSupported === false) {
+      setIsCompatible(false);
+      console.log('WebXR not supported according to initial check');
+      return;
+    }
+    
     if (!('xr' in navigator)) {
       setIsCompatible(false);
       console.log('WebXR not supported in this browser');
@@ -92,7 +99,7 @@ const App = () => {
           setIsCompatible(false);
         });
     }
-  }, []);
+  }, [xrSupported]);
   
   useEffect(() => {
     // Listen for session changes to debug
@@ -118,7 +125,7 @@ const App = () => {
       <ARButton 
         sessionInit={{ 
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay', 'camera-access', 'unbounded'],
+          optionalFeatures: ['dom-overlay', 'camera-access', 'unbounded', 'local-floor'],
           domOverlay: { root: document.body }
         }}
         style={{ 
@@ -136,7 +143,7 @@ const App = () => {
           cursor: 'pointer'
         }}
         onStart={() => {
-          console.log('AR session started by user');
+          console.log('AR session started by user - setting up for absolute coordinates');
         }}
         onEnd={() => {
           console.log('AR session ended by user');
@@ -169,6 +176,7 @@ const App = () => {
           alpha: true,
           antialias: true,
           preserveDrawingBuffer: true,
+          powerPreference: 'high-performance'
         }}
         onClick={() => console.log('Canvas clicked')}
         onCreated={state => {
@@ -176,8 +184,15 @@ const App = () => {
           
           // Set up AR renderer properties explicitly
           if (state.gl) {
+            // Set proper color space for AR
             state.gl.outputEncoding = THREE.sRGBEncoding;
             state.gl.physicallyCorrectLights = true;
+            
+            // Make sure WebXR is properly configured
+            if (state.gl.xr) {
+              state.gl.xr.enabled = true;
+              state.gl.xr.setReferenceSpaceType('unbounded');
+            }
           }
         }}
       >

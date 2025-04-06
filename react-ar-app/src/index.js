@@ -1,7 +1,8 @@
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import * as THREE from 'three';
 
 // Debug resource loading issues
 console.log('Public URL:', process.env.PUBLIC_URL);
@@ -44,13 +45,75 @@ window.addEventListener('error', function(e) {
   }
 }, true);
 
-// Create root container
-const container = document.getElementById('root');
-const root = createRoot(container);
+// Check if WebXR is available
+const checkXRSupport = async () => {
+  // Check basic navigator.xr support
+  if (!navigator.xr) {
+    console.warn('WebXR not supported by this browser');
+    return false;
+  }
 
-// Render the app
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-); 
+  // Check AR session support
+  try {
+    const supported = await navigator.xr.isSessionSupported('immersive-ar');
+    console.log('AR session support:', supported);
+    return supported;
+  } catch (error) {
+    console.error('Error checking WebXR support:', error);
+    return false;
+  }
+};
+
+// Configure THREE.js for better AR rendering
+const configureThree = () => {
+  // Set up Three.js for AR
+  THREE.ColorManagement.enabled = true;
+  
+  // WebXR improvements
+  if (navigator.xr) {
+    // Additional WebXR specific configuration
+    navigator.xr.addEventListener('devicechange', () => {
+      console.log('XR device change detected');
+    });
+  }
+  
+  console.log('THREE.js configured for AR');
+};
+
+// Set up any polyfills or compatibility fixes
+const setupPolyfills = () => {
+  // Enable hit testing in WebXR if available
+  if (!window.XRRigidTransform) {
+    window.XRRigidTransform = function(position, orientation) {
+      this.position = position || { x: 0, y: 0, z: 0 };
+      this.orientation = orientation || { x: 0, y: 0, z: 0, w: 1 };
+    };
+  }
+};
+
+// Initialize the application
+const initApp = async () => {
+  // Check WebXR support
+  const xrSupported = await checkXRSupport();
+  
+  // Configure Three.js
+  configureThree();
+  
+  // Setup compatibility fixes
+  setupPolyfills();
+  
+  // Log device info for debugging
+  console.log('User agent:', navigator.userAgent);
+  console.log('Display capabilities:', window.screen);
+  
+  // Create root and render app
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(
+    <React.StrictMode>
+      <App xrSupported={xrSupported} />
+    </React.StrictMode>
+  );
+};
+
+// Start the app
+initApp(); 

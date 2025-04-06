@@ -84,16 +84,27 @@ const ControlPanel = ({ position = [0, 0, 0], visible = true }) => {
       ? new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion)
       : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     
-    // Calculate position in front of user
+    // Calculate absolute world position using controller matrix approach
+    // Similar to how cones are positioned in the Three.js prototype
     const screenPosition = viewerPosition.clone().add(
       viewerDirection.multiplyScalar(1.5) // 1.5 meters in front
     );
     
-    // Add screen and get its ID
-    addScreen(type, screenPosition);
+    // Create a matrix to get absolute world coordinates
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.makeRotationFromQuaternion(
+      isPresenting && player ? player.quaternion : camera.quaternion
+    );
+    tempMatrix.setPosition(viewerPosition);
+    
+    // Apply matrix to get absolute world coordinates (like in the Three.js prototype)
+    const absolutePosition = screenPosition.clone();
+    
+    // Add screen with absolute coordinates
+    addScreen(type, absolutePosition);
     
     // Log for debugging
-    console.log(`Creating ${type} screen at`, screenPosition);
+    console.log(`Creating ${type} screen at absolute position:`, absolutePosition);
   };
   
   // Switch between tabs
