@@ -8,7 +8,92 @@
 			content="width=device-width, initial-scale=1.0"
 		/>
 		<link type="text/css" rel="stylesheet" href="main.css" />
-		
+		<style>
+			#info {
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				color: #fff;
+				background-color: rgba(0, 0, 0, 0.5);
+				padding: 10px;
+				border-radius: 5px;
+				font-family: Arial, sans-serif;
+				pointer-events: none;
+				z-index: 100;
+			}
+			#info a {
+				color: #4af;
+				pointer-events: auto;
+			}
+			/* Hidden video element for texture */
+			#videoElement {
+				display: none;
+			}
+			/* Loading message */
+			#loadingMessage {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #fff;
+				background-color: rgba(0, 0, 0, 0.7);
+				padding: 15px 30px;
+				border-radius: 10px;
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				z-index: 200;
+			}
+			/* Notification container */
+			#notificationContainer {
+				position: absolute;
+				bottom: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 80%;
+				max-width: 300px;
+				z-index: 300;
+				pointer-events: none;
+			}
+			.notification {
+				background-color: rgba(0, 0, 0, 0.7);
+				color: white;
+				margin-bottom: 10px;
+				padding: 10px 15px;
+				border-radius: 8px;
+				font-family: Arial, sans-serif;
+				text-align: center;
+				animation: fadeInOut 2s ease-in-out forwards;
+			}
+			@keyframes fadeInOut {
+				0% { opacity: 0; transform: translateY(20px); }
+				10% { opacity: 1; transform: translateY(0); }
+				90% { opacity: 1; transform: translateY(0); }
+				100% { opacity: 0; transform: translateY(-20px); }
+			}
+			/* Error message for unsupported browsers */
+			#errorMessage {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #fff;
+				background-color: rgba(255, 0, 0, 0.7);
+				padding: 20px 30px;
+				border-radius: 10px;
+				font-family: Arial, sans-serif;
+				font-size: 18px;
+				z-index: 300;
+				text-align: center;
+				display: none;
+			}
+			#errorMessage h2 {
+				margin-top: 0;
+			}
+			#errorMessage p {
+				margin-bottom: 20px;
+			}
+		</style>
 	</head>
 	<body>
 		<div id="info">
